@@ -158,4 +158,4 @@ Authoritative upstream references:
 7. Explore semantic scan/search.
 8. Explore pre-LLM context reduction only against an OpenFox release that officially exposes message transforms.
 
-See [AGENTS.md](./AGENTS.md), [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md), [docs/PROVIDERS.md](./docs/PROVIDERS.md) and [docs/EVALUATION.md](./docs/EVALUATION.md) before implementing.
+See [AGENTS.md](./AGENTS.md), [docs/ROADMAP.md](./docs/ROADMAP.md), [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md), [docs/PROVIDERS.md](./docs/PROVIDERS.md) and [docs/EVALUATION.md](./docs/EVALUATION.md) before implementing.
