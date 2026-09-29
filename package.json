@@ -1,0 +1,50 @@
+{
+  "name": "openfox-semantic-tools",
+  "version": "0.0.1",
+  "description": "Provider-agnostic semantic decision tools for OpenFox using Jev/System One-compatible endpoints.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "docs"
+  ],
+  "openfox": {
+    "apiVersion": 2,
+    "entry": "./dist/index.js",
+    "displayName": "Semantic Tools",
+    "description": "Fast typed semantic decisions for OpenFox workflows, with hosted or local System One-compatible providers.",
+    "capabilities": [
+      "settings"
+    ],
+    "timeoutMs": 10000
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --import tsx --test test/**/*.test.ts",
+    "check": "npm run typecheck && npm test && npm run build"
+  },
+  "peerDependencies": {
+    "openfox": ">=2.0.157"
+  },
+  "peerDependenciesMeta": {
+    "openfox": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.2"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/theshwal/openfox-semantic-tools.git"
+  }
+}
