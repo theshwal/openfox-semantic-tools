@@ -99,6 +99,14 @@ Measure:
 
 Do not make this an automatic "done" gate until the labeled suite and real-task runs show acceptable behavior.
 
+Current status: the tool is implemented but **unmeasured**. The shipped policy
+is `calibrated: false`, so it cannot emit a positive verdict at all: every
+result is `unknown` or a follow-up status, and the normal verification path
+stays authoritative. `npm run verify:experiment` replays labelled fixtures
+through a scripted transport, which proves wiring and report shape only. Its
+report deliberately records `measured: false` and `falsePassRate: null`; a null
+rate is not a zero rate.
+
 ### semantic_scan
 
 Measure:

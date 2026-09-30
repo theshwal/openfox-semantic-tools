@@ -1,4 +1,6 @@
 import { createDecisionTool } from './tool.js'
+import { createVerifyTool } from './verify/tool.js'
+import { SKILL_SOURCE } from './skills/source.js'
 import type {
   PluginRegistry,
   PluginSettingsSchema,
@@ -117,5 +119,9 @@ export const SETTINGS: PluginSettingsSchema = {
 
 export function register(registry: PluginRegistry): void {
   registry.registerSettings(SETTINGS)
-  registry.registerTool(createDecisionTool(() => registry.context.settings('global')))
+  const readSettings = () => registry.context.settings('global')
+  registry.registerTool(createDecisionTool(readSettings))
+  registry.registerTool(createVerifyTool(readSettings))
+  // Skills carry usage guidance only; they never grant tool access.
+  registry.registerSkillSource(SKILL_SOURCE)
 }

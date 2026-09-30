@@ -80,6 +80,10 @@ No automatic workflow gating in V0.
 | Context relevance | Keep/drop/rank old context before an LLM call | High potential | Removing useful context |
 | Model/skill routing | Pick a model or skill | Low for this project | Adds complexity without clear value |
 
+`semantic_verify_task` is implemented as an advisory experiment together with
+its `semantic-verification` skill. No false-pass measurement exists yet, so it
+cannot currently produce a positive verdict.
+
 ### Important OpenFox API note
 
 The stable Plugin API v2 already supports tools, settings, hooks and workflow transitions.
@@ -158,7 +162,7 @@ Authoritative upstream references:
 7. Explore semantic scan/search.
 8. Explore pre-LLM context reduction only against an OpenFox release that officially exposes message transforms.
 
-See [AGENTS.md](./AGENTS.md), [docs/ROADMAP.md](./docs/ROADMAP.md), [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md), [docs/PROVIDERS.md](./docs/PROVIDERS.md) and [docs/EVALUATION.md](./docs/EVALUATION.md) before implementing.
+See [AGENTS.md](./AGENTS.md), [docs/ROADMAP.md](./docs/ROADMAP.md), [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md), [docs/PROVIDERS.md](./docs/PROVIDERS.md), [docs/EVALUATION.md](./docs/EVALUATION.md) and [docs/TRACEABILITY.md](./docs/TRACEABILITY.md) before implementing.
 
 ## Run the implemented V0
 
@@ -166,12 +170,13 @@ See [AGENTS.md](./AGENTS.md), [docs/ROADMAP.md](./docs/ROADMAP.md), [docs/ARCHIT
 npm ci --ignore-scripts
 npm run check
 npm run evaluate
+npm run verify:experiment
 npm pack
 ```
 
 The package entry is `dist/index.js`; `prepack` builds it. Install the built package through OpenFox's plugin installation flow, then enable it. Configure the **full POST endpoint**, optional model/API key, and timeout in global plugin settings. `backend` currently identifies the intended backend; it does not supply an inferred endpoint. No endpoint is selected automatically.
 
-Allow `semantic_decide` in the agent's tool list. Tool registration does not grant access. V0 does not install skills for tools that do not exist yet.
+Allow the semantic tools you want in the agent's tool list. Tool registration does not grant access. The `semantic-verification` skill ships with `semantic_verify_task`; it is not published for tools that do not exist yet.
 
 Example tool arguments:
 
@@ -242,3 +247,95 @@ explicit, because the tool is only ever invoked deliberately today.
 Redaction of state is deliberately not implemented: it would change the meaning
 of the question. Control the boundary by choosing a local or private endpoint,
 or by restricting the policy. See [providers and egress](docs/PROVIDERS.md).
+
+## Advisory acceptance-criteria check (experiment)
+
+`semantic_verify_task` asks a small decision model whether **one** acceptance
+criterion is actually satisfied by the evidence you supply, after your
+deterministic checks have run. It is an **experiment**, not a completion gate.
+
+```json
+{
+  "criterionId": "ac-1",
+  "criterion": "The timeout setting is bounded between 1 and 120000 ms.",
+  "issueId": "#4",
+  "evidence": {
+    "summary": "Added a numeric timeout setting validated at construction.",
+    "diffExcerpts": ["+ if (settings.timeoutMs > 120000) throw ..."],
+    "deterministicTestResults": ["ok 1 - settings defaults and invalid configuration"]
+  },
+  "evidenceRefs": ["src/providers/system-one.ts", "test/provider.test.ts#timeout-bounds"]
+}
+```
+
+One criterion per call. `evidenceRefs` are recorded in the report for your own
+traceability and are **never transmitted**; only the criterion, summary, diff
+excerpts and test output leave the machine. Oversized evidence is rejected
+rather than truncated, so a cut excerpt can never become a silent false pass.
+
+The result is always advisory:
+
+| Status | Meaning |
+| --- | --- |
+| `unknown` | Not decided: missing evidence, uncertainty band, or no calibration |
+| `needs-verification` | The criterion does not look satisfied, or a deeper pass is advised |
+| `insufficient-evidence` | The evidence does not directly address the criterion |
+| `off-scope` | The change touches unrelated behaviour |
+| `pass-candidate` | **Not reachable today** (see below) |
+
+**There is currently no `pass-candidate` outcome in production.** The shipped
+policy is explicitly uncalibrated: no labelled run against a real provider has
+been performed, so even when every gate is met the tool reports `unknown` and
+falls back to the normal verification path. This is deliberate — a positive
+verdict is the dangerous direction for this use case, and the false-pass rate is
+unknown rather than zero.
+
+A failed call (provider error, timeout, cancellation, blocked egress) returns
+`success: false` with a controlled code. It is never a verdict.
+
+**Origin and egress:** this tool always assembles repository/session-derived
+content, so it always declares an `automatic` call origin. With
+`egressPolicy: block-remote-automatic` and a remote endpoint, it fails with
+`egress_blocked` before any request is sent. Explicit `semantic_decide` calls
+remain allowed under the same policy.
+
+**Not implemented, on purpose:** no workflow transition, no hook, no
+completion signal, no automatic "done" behaviour. The tool cannot accept a task
+or close a criterion. Workflow integration is a separate decision (issue #12)
+gated on measured false-pass evidence.
+
+### Measuring the check
+
+```bash
+npm run verify:experiment            # offline, scripted transport, no credentials
+```
+
+This replays a labelled fixture set (positive, negative and adversarial cases)
+through the real tool and the real policy, and writes
+`benchmark/results/verify/{report.json,runs.json,summary.md}`.
+
+It is **plumbing evidence only**. The transport is scripted, so the answers are
+authored rather than inferred, and the report therefore records
+`measured: false` with `falsePassRate: null`. A null rate is not a zero rate.
+Token savings, avoided verifier calls and task regressions remain unmeasured.
+
+For an opt-in live run, set `SEMANTIC_ENDPOINT` (and `SEMANTIC_API_KEY` if
+required) and pass `--live`. The live path replaces only the transport; the tool
+and the policy under test are identical. It is excluded from CI.
+
+```bash
+SEMANTIC_ENDPOINT=... npm run verify:experiment -- --live
+```
+
+## Usage skill
+
+The plugin registers a `semantic-verification` skill through the public
+`registerSkillSource` API (present in the Plugin API v2 baseline). It teaches
+when to use the check, when **not** to, which evidence to assemble, how to read
+each status, and when to fall back to the normal verifier. It states that tests,
+typechecks, linters and human review remain mandatory.
+
+The skill carries no provider name, endpoint, URL or model id, and it never
+implies it grants tool access: `semantic_verify_task` must still be listed in
+the agent's allowed tools. `semantic-code-discovery` is deliberately absent —
+its tools (`semantic_search`, `semantic_scan`) do not exist yet.
