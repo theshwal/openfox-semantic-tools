@@ -10,7 +10,12 @@ test('registers the initial settings schema', () => {
 
   assert.equal(settings.length, 1)
   assert.equal(settings[0], SETTINGS)
-  assert.deepEqual([...tools.keys()].sort(), ['semantic_decide', 'semantic_verify_task'])
+  assert.deepEqual([...tools.keys()].sort(), [
+    'semantic_decide',
+    'semantic_scan',
+    'semantic_search',
+    'semantic_verify_task',
+  ])
 
   const keys = SETTINGS.fields.map((field) => field.key)
   assert.deepEqual(keys, [
@@ -52,14 +57,25 @@ test('uses global configured credentials even in project sessions', async () => 
   for (const scope of settingsCalls) assert.equal(scope, 'global')
 })
 
-test('both semantic tools read global settings only', async () => {
+test('every semantic tool reads global settings only', async () => {
   const { registry, tools, settingsCalls } = fakeRegistry()
   register(registry)
+  // The discovery tools read files before they build a provider, so the call
+  // needs a readable candidate; the endpoint stays unset so the failure happens
+  // at settings parsing, which is what proves the global scope was consulted.
+  const { mkdtemp, writeFile } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const root = await mkdtemp(join(tmpdir(), 'semantic-settings-'))
+  await writeFile(join(root, 'a.ts'), 'export const a = 1\n')
+
   const validArgs: Record<string, Record<string, unknown>> = {
     semantic_decide: { state: 'public', questions: { q: { type: 'noul', instructions: 'Check' } } },
     semantic_verify_task: { criterionId: 'ac-1', criterion: 'A criterion' },
+    semantic_search: { query: 'x', candidates: ['a.ts'], root },
+    semantic_scan: { predicate: 'x', candidates: ['a.ts'], root },
   }
-  for (const name of ['semantic_decide', 'semantic_verify_task']) {
+  for (const name of ['semantic_decide', 'semantic_verify_task', 'semantic_search', 'semantic_scan']) {
     settingsCalls.length = 0
     // Endpoint is unset, so the call fails during settings parsing. That is the
     // point: it proves the tool consulted the global scope, not a project one.

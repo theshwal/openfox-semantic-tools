@@ -6,7 +6,7 @@
 // eventually inform. Nothing here is exposed as a setting: a global confidence
 // slider would be exactly the kind of unjustified knob AGENTS.md forbids.
 
-export const VERIFY_POLICY_VERSION = 'verify-0.1.0'
+export const VERIFY_POLICY_VERSION = 'verify-0.2.0'
 
 export type GateId =
   | 'satisfied'
@@ -69,6 +69,15 @@ export const EVIDENCE_SUFFICIENCY_RUBRIC = [
   'Direct evidence that addresses the criterion with code and test output',
 ] as const
 
+/**
+ * The rubric's top level number. A three-level rubric runs 0..2, so the top is
+ * `length - 1`. Because the score is an expectation over that range, a value at
+ * or above the midpoint of the top interval is treated as direct evidence: the
+ * expectation has clearly moved into the strongest rung.
+ */
+const TOP_EVIDENCE_RUNG = EVIDENCE_SUFFICIENCY_RUBRIC.length - 1
+const DIRECT_EVIDENCE_THRESHOLD = TOP_EVIDENCE_RUNG - 0.5
+
 export const DEFAULT_POLICY: VerifyPolicy = {
   version: VERIFY_POLICY_VERSION,
   calibrated: false,
@@ -85,10 +94,13 @@ export const DEFAULT_POLICY: VerifyPolicy = {
       id: 'evidenceSufficiency',
       direction: 'at-least',
       polarity: 'high-is-good',
-      threshold: 2,
-      // Discrete rubric: "partial" is itself a meaningful routing answer.
-      undecided: null,
-      range: [0, EVIDENCE_SUFFICIENCY_RUBRIC.length - 1],
+      // The rubric has 3 levels, so the expectation runs 0..2 (top level number
+      // 2). "Direct evidence" means the expectation has crossed into the upper
+      // half of the top interval. The band below that point has not committed to
+      // the strongest rung, and a lower value is decisively not direct evidence.
+      threshold: DIRECT_EVIDENCE_THRESHOLD,
+      undecided: [DIRECT_EVIDENCE_THRESHOLD, TOP_EVIDENCE_RUNG + 0.5],
+      range: [0, TOP_EVIDENCE_RUNG],
     },
     {
       id: 'offScope',
@@ -137,24 +149,76 @@ export interface PolicyDecision {
 const MIN_ANSWER_CONFIDENCE = 0.5
 
 /**
- * Minimum probability mass a rubric answer must place on the rung it claims, for
- * the claim to be internally consistent. Below this the distribution disagrees
- * with the score and the answer is unusable.
+ * Tolerance when checking a score against the expectation implied by its own
+ * distribution.
+ *
+ * A score is E[level] = Σ(level × probability), the documented System One
+ * meaning. Responses are reported to two decimals, so an exact distribution can
+ * imply an expectation that differs by half of the last reported digit. 0.01
+ * covers one rounding step; it is deliberately tight enough that a genuine
+ * contradiction, such as a score of 0.15 against an expectation of 1.43, is
+ * still rejected.
  */
-const MIN_RUBRIC_AGREEMENT = 0.5
+const SCORE_EXPECTATION_TOLERANCE = 0.01
+
+/**
+ * Binary floating point cannot represent 0.15 - 0.14 exactly: the subtraction
+ * yields 0.010000000000000009, which is greater than the tolerance and would
+ * reject a correctly rounded response. Comparing the two numbers with a small
+ * relative slack keeps the boundary honest.
+ */
+const FLOAT_SLACK = 1e-9
+
+/**
+ * Probability mass a rubric answer must place on a single level for the answer
+ * to be decisive.
+ *
+ * The floor is strictly above 0.5 on purpose: at exactly 0.5 the top two levels
+ * are tied, the model expressed no preference, and rounding it to a level would
+ * fabricate a discrete outcome it never asserted. A tie is therefore unusable,
+ * not a coin flip.
+ */
+const MIN_DECISIVE_MASS = 0.5 + Number.EPSILON
+
+/**
+ * Computes E[level] from a rubric distribution.
+ *
+ * Returns null when the distribution is absent, not a plain record of
+ * numeric masses, or does not sum to one within a rounding tolerance.
+ */
+function expectationOf(probabilities: unknown): number | null {
+  if (probabilities === null || typeof probabilities !== 'object' || Array.isArray(probabilities)) {
+    return null
+  }
+  let sum = 0
+  let expectation = 0
+  let levels = 0
+  for (const [level, mass] of Object.entries(probabilities as Record<string, unknown>)) {
+    if (typeof mass !== 'number' || !Number.isFinite(mass) || mass < 0 || mass > 1) return null
+    if (!/^\d+$/.test(level)) return null
+    sum += mass
+    expectation += Number(level) * mass
+    levels += 1
+  }
+  // Responses carry two decimals per level, so the masses can sum to 0.99 or
+  // 1.01 without being wrong.
+  if (levels === 0 || Math.abs(sum - 1) > 0.02) return null
+  return expectation
+}
 
 /**
  * A normalized answer is only usable if it is internally consistent.
  *
- * A score answer carries both a `score` and a `probabilities` distribution.
- * The adapter accepts whatever the runtime returns, so a response may assert
- * `score: 2` while its whole probability mass sits on rung 1. Reading the
- * score alone would turn that contradiction into a positive verdict, which is
- * the exact failure this use case exists to prevent. The score is therefore
- * only accepted when the declared distribution agrees with it.
+ * A score answer carries both a `score` and a `probabilities` distribution. Per
+ * the documented contract the score is the expectation E[level] over that
+ * distribution, not a level index: a three-level rubric yields a value that may
+ * fall anywhere in [0, 2] and often lands between two levels. The adapter
+ * accepts whatever the runtime returns, so the two are cross-checked here: a
+ * score that disagrees with its own distribution is a contradiction and is
+ * rejected, while a continuous or rounded expectation is accepted.
  *
- * An explicit `confidence` is honoured the same way: a low-confidence answer
- * is unusable rather than a weak positive.
+ * An explicit `confidence` is honoured independently: a low-confidence answer is
+ * unusable rather than a weak positive.
  */
 function readValue(answer: unknown, gate: VerifyGate): number | null {
   if (answer === null || typeof answer !== 'object') return null
@@ -174,18 +238,19 @@ function readValue(answer: unknown, gate: VerifyGate): number | null {
   if (record.type === 'score') {
     const { score, probabilities } = record
     if (typeof score !== 'number' || !Number.isFinite(score)) return null
-    if (probabilities === null || typeof probabilities !== 'object') return null
-    const entries = Object.entries(probabilities as Record<string, unknown>)
-    if (entries.length === 0) return null
-    let best: { label: string; mass: number } | null = null
-    for (const [label, mass] of entries) {
-      if (typeof mass !== 'number' || !Number.isFinite(mass)) return null
-      if (best === null || mass > best.mass) best = { label, mass }
+    const expectation = expectationOf(probabilities)
+    if (expectation === null) return null
+    // Cross-check: the declared score must match the expectation its own
+    // distribution implies, within the tolerance the response precision allows.
+    if (Math.abs(score - expectation) > SCORE_EXPECTATION_TOLERANCE + FLOAT_SLACK) return null
+
+    // The mass decides decisiveness, not the index. A level index is NOT
+    // derived by rounding: that would invent a discrete outcome.
+    let decisiveMass = 0
+    for (const mass of Object.values(probabilities as Record<string, number>)) {
+      if (mass > decisiveMass) decisiveMass = mass
     }
-    // A flat distribution expresses no preference between rungs: undecided.
-    if (best === null || best.mass < MIN_RUBRIC_AGREEMENT) return null
-    // The declared score must be the rung the distribution actually favours.
-    if (best.label !== String(score)) return null
+    if (decisiveMass < MIN_DECISIVE_MASS) return null
     return score
   }
   const raw = record.probability

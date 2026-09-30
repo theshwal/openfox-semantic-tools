@@ -227,7 +227,7 @@ try {
     record('plugin is loaded by the real host', listed.loaded === true, `loaded=${listed.loaded}`)
     record(
       'host reports the tool, skill and settings contributions',
-      listed.contributions?.tools === 2 &&
+      listed.contributions?.tools === 4 &&
         listed.contributions?.skillSources === 1 &&
         listed.contributions?.settingsFields > 0,
       `tools=${listed.contributions?.tools} skillSources=${listed.contributions?.skillSources} settingsFields=${listed.contributions?.settingsFields}`,

@@ -5,6 +5,8 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import { VERIFY_POLICY_VERSION } from '../src/verify/policy.ts'
+
 /** Runs the real offline experiment script and returns its persisted report. */
 async function runExperiment(): Promise<{ report: any; runs: any[]; summary: string; exitCode: number }> {
   const out = await mkdtemp(join(tmpdir(), 'semantic-verify-exp-'))
@@ -66,7 +68,7 @@ test('every case is traceable back to its issue requirement', async () => {
     assert.equal(entry.criterionId.startsWith('ac-'), true, entry.id)
     assert.equal(entry.issueId, '#4', entry.id)
     assert.equal(entry.advisory, true, entry.id)
-    assert.equal(entry.policyVersion, 'verify-0.1.0', entry.id)
+    assert.equal(entry.policyVersion, VERIFY_POLICY_VERSION, entry.id)
     assert.equal(typeof entry.rationale === 'string' && entry.rationale.length > 0, true, entry.id)
   }
 })

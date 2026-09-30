@@ -88,7 +88,7 @@ Proof kinds used below:
 | 14.9 | "Guidance clearly states when **not** to use semantic tools." | F: prompt section "When NOT to use it"; T: `test/skills.test.ts` "the skill teaches when NOT to use the tool and how to fall back" | verified |
 | 14.10 | "Provider implementation details remain outside the skills." | F: no provider/endpoint/model text; T: `test/skills.test.ts` "the skill is provider-neutral: no provider, endpoint, URL or model id" | verified |
 | 14.11 | "Prompt discipline" — no long explanations, no hard-coded thresholds | F: prompt is operational; T: `test/skills.test.ts` "the skill does not hard-code thresholds without evidence" | verified |
-| 14.12 | "The skill should teach a **decision boundary**, not advertise the plugin." | F: `src/skills/source.ts` header comment; T: `test/skills.test.ts` "no guidance is published for a tool that does not exist yet" | verified |
+| 14.12 | "The skill should teach a **decision boundary**, not advertise the plugin." | F: `src/skills/source.ts`; T: `test/skills.test.ts` "the discovery skill is published now that its tools exist" and "the verification skill is discoverable with concise metadata" | verified |
 | 14.13 | "never treat a semantic result as a replacement for mandatory tests/typechecks/linters" | F: prompt "Limits you must keep"; T: `test/skills.test.ts` asserts the prompt mentions tests, typechecks, linters and human review | verified |
 
 ### Tool availability constraint
@@ -96,7 +96,7 @@ Proof kinds used below:
 | # | Requirement (issue text) | Proof | Verdict |
 | --- | --- | --- | --- |
 | 14.14 | "Plugin skills do **not** grant tool access." | F: prompt states it does not grant access; F: `src/index.ts` comment; T: `test/skills.test.ts` "the skill teaches when NOT to use the tool and how to fall back" | verified |
-| 14.15 | "Document the expected agent configuration and test behavior when: skill available but tool not allowed; tool allowed but skill not loaded; both available." | F: README "Usage skill" section; T: `test/skills.test.ts` "the skill source is registered through the public plugin API" (skill loads independently of settings) and `test/register.test.ts` "both semantic tools read global settings only" (tools work without the skill) | verified |
+| 14.15 | "Document the expected agent configuration and test behavior when: skill available but tool not allowed; tool allowed but skill not loaded; both available." | F: README "Usage skill" section; T: `test/skills.test.ts` "the skill source is registered through the public plugin API" (skill loads independently of settings) and `test/register.test.ts` "every semantic tool reads global settings only" (tools work without the skill) | verified |
 | 14.16 | "The skill text should not assume a tool is callable if it is unavailable." | F: prompt "Limits you must keep" — explicitly tells the agent not to work around an unavailable tool | verified |
 
 ### Tests
