@@ -1,3 +1,4 @@
+import { createDecisionTool } from './tool.js'
 import type {
   PluginRegistry,
   PluginSettingsSchema,
@@ -26,7 +27,7 @@ export const SETTINGS: PluginSettingsSchema = {
           },
         },
       ],
-      default: 'jev',
+      default: 'custom',
     },
     {
       key: 'endpoint',
@@ -73,4 +74,5 @@ export const SETTINGS: PluginSettingsSchema = {
 
 export function register(registry: PluginRegistry): void {
   registry.registerSettings(SETTINGS)
+  registry.registerTool(createDecisionTool(() => registry.context.settings('global')))
 }

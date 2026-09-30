@@ -4,7 +4,7 @@ Experimental OpenFox plugin for **fast, typed semantic decisions** and, where it
 
 The project is intentionally provider-agnostic. The first transport target is the Jev / System One-style `POST /v1/systemone` API, so the same OpenFox tools can be backed by hosted Jev or by a compatible local/open-source runtime.
 
-> Status: bootstrap / research. The repository defines the contract and evaluation rules before adding automation.
+> Status: V0 implementation — HTTP transport, `semantic_decide`, tests and fixture evaluation. Real provider quality and OpenFox runtime installation are still to be measured.
 
 ## Why this exists
 
@@ -159,3 +159,41 @@ Authoritative upstream references:
 8. Explore pre-LLM context reduction only against an OpenFox release that officially exposes message transforms.
 
 See [AGENTS.md](./AGENTS.md), [docs/ROADMAP.md](./docs/ROADMAP.md), [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md), [docs/PROVIDERS.md](./docs/PROVIDERS.md) and [docs/EVALUATION.md](./docs/EVALUATION.md) before implementing.
+
+## Run the implemented V0
+
+```bash
+npm ci --ignore-scripts
+npm run check
+npm run evaluate
+npm pack
+```
+
+The package entry is `dist/index.js`; `prepack` builds it. Install the built package through OpenFox's plugin installation flow, then enable it. Configure the **full POST endpoint**, optional model/API key, and timeout in global plugin settings. `backend` currently identifies the intended backend; it does not supply an inferred endpoint. No endpoint is selected automatically.
+
+Allow `semantic_decide` in the agent's tool list. Tool registration does not grant access. V0 does not install skills for tools that do not exist yet.
+
+Example tool arguments:
+
+```json
+{
+  "state": {"evidence": "Public synthetic excerpt"},
+  "questions": {
+    "satisfied": {"type": "noul", "instructions": "Does the supplied evidence satisfy the criterion?"},
+    "region": {"type": "choice", "instructions": "Choose the relevant region", "criteria": ["handler", "database"]},
+    "coverage": {"type": "score", "instructions": "Rate evidence completeness", "criteria": ["absent", "partial", "complete"]}
+  }
+}
+```
+
+Output contains `provider`, optional `model`, `answers` and `latencyMs`. Noul responses normalize the wire field `noul` to `probability`. Choice/score retain their distributions. Score criteria must be ordered arrays in the currently verified common protocol. Failures return `success: false` with a JSON error containing `code` and a controlled message.
+
+**Data sent:** exactly the supplied state, questions and optional model. No repository scanning, context mutation or automatic workflow gating is enabled. The configured endpoint receives the content when the tool is invoked. Keys use OpenFox secret settings; HTTP errors report status without reflecting response bodies. Redirects are refused.
+
+The default evaluation uses deterministic synthetic responses to test plumbing. It makes no quality or saving claim. To compare actual measurements, supply an array of `RunRecord` values (see `src/evaluation/records.ts`):
+
+```bash
+npm run evaluate -- /path/to/measured-runs.json /path/to/report-directory
+```
+
+Unmeasured metrics are `null`, not zero. Baseline and candidate remain separate in the summary. Results stay uncommitted by default. See [implementation order and delivery boundaries](docs/IMPLEMENTATION.md).

@@ -16,15 +16,18 @@
     "displayName": "Semantic Tools",
     "description": "Fast typed semantic decisions for OpenFox workflows, with hosted or local System One-compatible providers.",
     "capabilities": [
-      "settings"
+      "settings",
+      "tools"
     ],
-    "timeoutMs": 10000
+    "timeoutMs": 125000
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --import tsx --test test/**/*.test.ts",
-    "check": "npm run typecheck && npm test && npm run build"
+    "check": "npm run typecheck && npm test && npm run build",
+    "evaluate": "node --import tsx scripts/evaluate.ts",
+    "prepack": "npm run build"
   },
   "peerDependencies": {
     "openfox": ">=2.0.157"

@@ -2,6 +2,8 @@
 
 This roadmap exists to keep development sequential and evidence-driven.
 
+Current implementation and the adjusted delivery order are recorded in [IMPLEMENTATION.md](./IMPLEMENTATION.md). CI/package validation is moved forward to the V0 milestone; publication remains gated.
+
 ## Phase 0 — bootstrap
 
 Already present in the repository:
