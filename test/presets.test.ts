@@ -141,6 +141,67 @@ test('an unknown backend is rejected instead of silently falling back', () => {
   assert.throws(() => applyPreset({ backend: 'definitely-not-real' }))
 })
 
+test('the historical backend id still resolves, so an existing config is not broken', () => {
+  // Earlier settings stored "jev". Renaming it to "jev-hosted" must not
+  // invalidate a configuration somebody already saved.
+  assert.equal(isPresetId('jev'), true)
+  const resolved = applyPreset({ backend: 'jev', endpoint: 'http://localhost/v1/systemone' })
+  assert.equal(resolved.endpoint, 'http://localhost/v1/systemone')
+  // It resolves to the hosted preset's behaviour, without being renamed.
+  assert.equal(capabilityOf('jev', 'choiceArrayCriteria'), false)
+  assert.equal(capabilityOf('jev', 'noul'), true)
+})
+
+test('the backends named in the issue are all present as declarations', () => {
+  // Every runtime the issue names must be selectable, so an operator is never
+  // forced into "custom" for a backend the project already knows about.
+  const required = [
+    'custom',
+    'jev-hosted',
+    'kev',
+    'laya',
+    'system-one',
+    'sys1',
+    'jev-rs',
+    'local-jev',
+    'lichen',
+    'edgejev',
+  ]
+  const ids = PRESETS.map((preset) => preset.id)
+  for (const id of required) {
+    assert.ok(ids.includes(id), `missing preset: ${id}`)
+  }
+})
+
+test('an unprobed backend declares nothing as working', () => {
+  // None of these has been exercised by this repository, so every capability
+  // stays unverified. Declaring a capability here without evidence is exactly
+  // what the issue forbids.
+  const unproven = PRESETS.filter((preset) => preset.id !== 'jev-hosted' && preset.id !== 'custom')
+  assert.ok(unproven.length >= 7, `only ${unproven.length} unproven presets`)
+  for (const preset of unproven) {
+    for (const [name, value] of Object.entries(preset.capabilities)) {
+      assert.equal(value, 'unverified', `${preset.id}.${name} must not be declared without evidence`)
+    }
+    // And they supply no default that could be wrong.
+    assert.equal(preset.defaults.endpoint, undefined, `${preset.id} must not supply an endpoint`)
+    assert.equal(preset.defaults.model, undefined, `${preset.id} must not supply a model`)
+  }
+})
+
+test('an older saved configuration with the legacy backend id still parses', async () => {
+  // The end-to-end path: settings saved before the rename must still resolve.
+  const { parseSettings } = await import('../src/settings.ts')
+  const settings = parseSettings({
+    backend: 'jev',
+    endpoint: 'http://localhost/v1/systemone',
+    model: 'saved-model',
+  })
+  assert.equal(settings.endpoint, 'http://localhost/v1/systemone')
+  assert.equal(settings.model, 'saved-model')
+  assert.equal(settings.presetId, 'jev-hosted', 'the alias resolves without renaming the preset')
+})
+
 test('a preset cannot change the verification policy', async () => {
   // The issue requires that a preset only changes defaults and capabilities.
   // Whatever the backend, the shipped policy stays uncalibrated, so a positive

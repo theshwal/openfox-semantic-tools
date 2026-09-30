@@ -7,6 +7,8 @@ export function parseSettings(values: Record<string, unknown>): HttpSettings {
   // including an empty string meaning "no override", is preserved.
   const backend = values.backend === undefined ? DEFAULT_BACKEND_ID : String(values.backend)
   if (!isPresetId(backend)) throw new ProviderError('configuration',`Unsupported backend "${backend}"`)
+  // `applyPreset` returns the canonical preset id, so a legacy alias such as
+  // "jev" is recorded under its current id rather than the historical one.
   const presetDefaults = applyPreset({ ...values, backend })
   if (typeof presetDefaults.endpoint !== 'string' || !presetDefaults.endpoint.trim()) throw new ProviderError('configuration','Configure a full System One endpoint before calling this tool')
   for (const key of ['model','apiKey']) if (values[key] !== undefined && typeof values[key] !== 'string') throw new ProviderError('configuration',`Invalid ${key} setting`)
@@ -22,5 +24,5 @@ export function parseSettings(values: Record<string, unknown>): HttpSettings {
   if (!Number.isInteger(cacheTtlMs) || cacheTtlMs < 0 || cacheTtlMs > 86_400_000) throw new ProviderError('configuration','Invalid cache TTL setting')
   const cacheMaxEntries = values.cacheMaxEntries === undefined ? 128 : Number(values.cacheMaxEntries)
   if (!Number.isInteger(cacheMaxEntries) || cacheMaxEntries < 1 || cacheMaxEntries > 10_000) throw new ProviderError('configuration','Invalid cache size setting')
-  return { endpoint, timeoutMs, endpointClass, egressPolicy, presetId: backend, ...(presetDefaults.model ? {model: presetDefaults.model} : {}), ...(presetDefaults.apiKey ? {apiKey:presetDefaults.apiKey} : {}), cache: { enabled: cacheEnabled, ttlMs: cacheTtlMs, maxEntries: cacheMaxEntries } }
+  return { endpoint, timeoutMs, endpointClass, egressPolicy, presetId: presetDefaults.presetId, ...(presetDefaults.model ? {model: presetDefaults.model} : {}), ...(presetDefaults.apiKey ? {apiKey:presetDefaults.apiKey} : {}), cache: { enabled: cacheEnabled, ttlMs: cacheTtlMs, maxEntries: cacheMaxEntries } }
 }

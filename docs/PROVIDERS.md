@@ -181,10 +181,33 @@ A preset is **data, not a transport**. There is exactly one adapter
 (`SystemOneHttpProvider`); a preset only supplies defaults and declared
 capabilities, so switching backends can never change an OpenFox tool contract.
 
-| Preset | Endpoint | Purpose |
+| Preset | Endpoint | Status |
 | --- | --- | --- |
 | `custom` (default) | required, operator-supplied | Any System One-compatible endpoint. No assumptions applied. |
-| `jev-hosted` | required, operator-supplied | Hosted backend. Supplies only the auth hint. |
+| `jev-hosted` | required, operator-supplied | Observed once. See the capabilities note below. |
+| `kev` | required, operator-supplied | Declared, unverified |
+| `laya` | required, operator-supplied | Declared, unverified |
+| `system-one` | required, operator-supplied | Declared, unverified |
+| `sys1` | required, operator-supplied | Declared, unverified |
+| `jev-rs` | required, operator-supplied | Declared, unverified |
+| `local-jev` | required, operator-supplied | Declared, unverified |
+| `lichen` | required, operator-supplied | Declared, unverified |
+| `edgejev` | required, operator-supplied | Declared, unverified |
+
+A **declared** preset is a way to select a runtime the project already knows
+about, not a claim about it. It supplies no default and every capability stays
+`unverified`, so an operator is never forced into `custom` for a named backend,
+and nothing is asserted before a conformance run proves it.
+
+`system-one` and `sys1` are **separate presets** because they are separate
+runtimes, not aliases of one another. `laya` carries the `laya-compatible` alias
+for the spelling used in the issue.
+
+### Backward compatibility
+
+`jev` is accepted as an alias of `jev-hosted`, so a configuration saved before
+the rename keeps working. The alias resolves to the current id and is never
+offered in the selector. `systemone` and `laya-compatible` resolve likewise.
 
 Rules the implementation enforces:
 
