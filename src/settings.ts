@@ -16,5 +16,11 @@ export function parseSettings(values: Record<string, unknown>): HttpSettings {
   // Fail fast on an unusable endpoint or policy instead of failing inside the request.
   const endpointClass = resolveEndpointClass(endpoint, values.endpointClass)
   const egressPolicy = resolveEgressPolicy(values.egressPolicy)
-  return { endpoint, timeoutMs, endpointClass, egressPolicy, ...(presetDefaults.model ? {model: presetDefaults.model} : {}), ...(presetDefaults.apiKey ? {apiKey:presetDefaults.apiKey} : {}) }
+  // The cache is an optimization, so it is off unless explicitly enabled.
+  const cacheEnabled = values.cacheEnabled === true
+  const cacheTtlMs = values.cacheTtlMs === undefined ? 300_000 : Number(values.cacheTtlMs)
+  if (!Number.isInteger(cacheTtlMs) || cacheTtlMs < 0 || cacheTtlMs > 86_400_000) throw new ProviderError('configuration','Invalid cache TTL setting')
+  const cacheMaxEntries = values.cacheMaxEntries === undefined ? 128 : Number(values.cacheMaxEntries)
+  if (!Number.isInteger(cacheMaxEntries) || cacheMaxEntries < 1 || cacheMaxEntries > 10_000) throw new ProviderError('configuration','Invalid cache size setting')
+  return { endpoint, timeoutMs, endpointClass, egressPolicy, presetId: backend, ...(presetDefaults.model ? {model: presetDefaults.model} : {}), ...(presetDefaults.apiKey ? {apiKey:presetDefaults.apiKey} : {}), cache: { enabled: cacheEnabled, ttlMs: cacheTtlMs, maxEntries: cacheMaxEntries } }
 }
