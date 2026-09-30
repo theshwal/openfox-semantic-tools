@@ -58,6 +58,14 @@ export function createDecisionTool(readSettings: (projectId?: string) => Record<
         validateRequest(args)
         const settings = parseSettings(readSettings(context.projectId))
         const provider = new SystemOneHttpProvider(settings, transport)
+        // The provider resolves `request.model ?? this.settings.model` and sends
+        // that value verbatim. The key must use the identical expression.
+        // `validateRequest` has already rejected an absent, non-string, empty or
+        // whitespace-only model, so a present `args.model` is a usable string.
+        // It is deliberately NOT trimmed: the provider does not trim either, so
+        // trimming here would make "model-a" and " model-a " share a key while
+        // the provider is asked two different models.
+        const effectiveModel = args.model ?? settings.model ?? ''
         // The store is rebuilt whenever anything that can change an answer
         // changes. The fingerprint is an opaque in-memory digest: it covers the
         // raw endpoint, so a non-secret query parameter (tenant, API version)
@@ -75,7 +83,7 @@ export function createDecisionTool(readSettings: (projectId?: string) => Record<
             namespace: NAMESPACE_DECIDE,
             presetId: settings.presetId ?? 'custom',
             endpoint: settings.endpoint,
-            model: settings.model ?? '',
+            model: effectiveModel,
             // A generic primitive answer carries no policy, so no policy version
             // belongs in its key.
             policyVersion: null,

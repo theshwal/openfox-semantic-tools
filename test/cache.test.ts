@@ -237,6 +237,155 @@ test('a changed TTL or size setting rebuilds the store', async () => {
   assert.equal(calls, 2, 'a changed TTL rebuilds the store rather than keeping stale entries')
 })
 
+test('a per-call model override is part of the key, not only the configured one', async () => {
+  // The provider resolves `request.model ?? settings.model`, so the key must
+  // use the same effective value. Otherwise two calls with different overrides
+  // share an entry and the second one replays the first one's answer.
+  const { createDecisionTool } = await import('../src/tool.ts')
+  const ctx = { sessionId: 's', workdir: '/tmp' }
+  const question = { q: { type: 'noul' as const, instructions: 'Is it public?' } }
+  let calls = 0
+  const tool = createDecisionTool(
+    () => ({ endpoint: 'http://localhost/v1/systemone', cacheEnabled: true, cacheTtlMs: 60_000 }),
+    async () => {
+      calls += 1
+      return Response.json({ answers: { q: { type: 'noul', noul: 0.5 } } })
+    },
+  )
+
+  // Two different overrides over the same configured model: two provider calls.
+  await tool.execute({ state: 'public', questions: question, model: 'model-a' }, ctx)
+  await tool.execute({ state: 'public', questions: question, model: 'model-b' }, ctx)
+  assert.equal(calls, 2, 'a different override must not reuse the previous answer')
+
+  // The same override twice: a hit.
+  const before = calls
+  const hit = JSON.parse((await tool.execute({ state: 'public', questions: question, model: 'model-a' }, ctx)).output!)
+  assert.equal(calls - before, 0)
+  assert.equal(hit.cache, 'hit', 'an identical override reuses the entry')
+
+  // An override equal to the configured model is the effective same model.
+  const withConfigured = createDecisionTool(
+    () => ({
+      endpoint: 'http://localhost/v1/systemone',
+      model: 'configured-model',
+      cacheEnabled: true,
+      cacheTtlMs: 60_000,
+    }),
+    async () => {
+      calls += 1
+      return Response.json({ answers: { q: { type: 'noul', noul: 0.5 } } })
+    },
+  )
+  const countBefore = calls
+  await withConfigured.execute({ state: 'public', questions: question, model: 'configured-model' }, ctx)
+  await withConfigured.execute({ state: 'public', questions: question }, ctx)
+  assert.equal(calls - countBefore, 1, 'an override equal to the configured model is the same effective model')
+
+  // And no override at all: the configured model alone.
+  const defaultCalls = createDecisionTool(
+    () => ({
+      endpoint: 'http://localhost/v1/systemone',
+      model: 'configured-model',
+      cacheEnabled: true,
+      cacheTtlMs: 60_000,
+    }),
+    async () => {
+      calls += 1
+      return Response.json({ answers: { q: { type: 'noul', noul: 0.5 } } })
+    },
+  )
+  const beforeDefault = calls
+  await defaultCalls.execute({ state: 'public', questions: question }, ctx)
+  await defaultCalls.execute({ state: 'public', questions: question }, ctx)
+  assert.equal(calls - beforeDefault, 1, 'repeated calls with no override hit the cache')
+
+  // An override that differs from the configured model must not collide with a
+  // bare call, and must not be replayed either way.
+  const mixed = createDecisionTool(
+    () => ({
+      endpoint: 'http://localhost/v1/systemone',
+      model: 'configured-model',
+      cacheEnabled: true,
+      cacheTtlMs: 60_000,
+    }),
+    async () => {
+      calls += 1
+      return Response.json({ answers: { q: { type: 'noul', noul: 0.5 } } })
+    },
+  )
+  const beforeMixed = calls
+  await mixed.execute({ state: 'public', questions: question }, ctx)
+  const overridden = JSON.parse(
+    (await mixed.execute({ state: 'public', questions: question, model: 'other-model' }, ctx)).output!,
+  )
+  assert.equal(overridden.cache, 'miss', 'an override is a different effective model')
+  const bare = JSON.parse((await mixed.execute({ state: 'public', questions: question }, ctx)).output!)
+  assert.equal(bare.cache, 'hit', 'the bare call still hits its own entry')
+  assert.equal(calls - beforeMixed, 2, 'exactly two provider calls: the bare one and the override')
+
+  // The provider sends the model verbatim, so the key must not normalise it:
+  // trimming would make two different sent models share an entry.
+  const spaced = createDecisionTool(
+    () => ({ endpoint: 'http://localhost/v1/systemone', cacheEnabled: true, cacheTtlMs: 60_000 }),
+    async () => {
+      calls += 1
+      return Response.json({ answers: { q: { type: 'noul', noul: 0.5 } } })
+    },
+  )
+  const beforeSpaced = calls
+  await spaced.execute({ state: 'public', questions: question, model: 'model-a' }, ctx)
+  await spaced.execute({ state: 'public', questions: question, model: ' model-a ' }, ctx)
+  assert.equal(
+    calls - beforeSpaced,
+    2,
+    'a model differing only by surrounding spaces is a different sent model',
+  )
+})
+
+test('a blank model is rejected before the cache is ever consulted', async () => {
+  // validateRequest rejects an empty or whitespace-only model, and it runs
+  // before the cache key is built, so a bad model can neither be cached nor
+  // served from a previous hit.
+  const { createDecisionTool } = await import('../src/tool.ts')
+  const ctx = { sessionId: 's', workdir: '/tmp' }
+  let calls = 0
+  const tool = createDecisionTool(
+    () => ({ endpoint: 'http://localhost/v1/systemone', cacheEnabled: true, cacheTtlMs: 60_000 }),
+    async () => {
+      calls += 1
+      return Response.json({ answers: { q: { type: 'noul', noul: 0.5 } } })
+    },
+  )
+  const question = { q: { type: 'noul' as const, instructions: 'Is it public?' } }
+  // Prime the cache with a valid call.
+  await tool.execute({ state: 'public', questions: question, model: 'model-a' }, ctx)
+  assert.equal(calls, 1)
+
+  for (const bad of ['', '   ']) {
+    const result = await tool.execute({ state: 'public', questions: question, model: bad }, ctx)
+    assert.equal(result.success, false, `model ${JSON.stringify(bad)} must be rejected`)
+    assert.equal(calls, 1, 'a rejected model must not reach the provider or the cache')
+  }
+})
+
+test('the model actually sent matches the model in the key', async () => {
+  // The key must not only separate models, it must describe what is sent.
+  const { createDecisionTool } = await import('../src/tool.ts')
+  const ctx = { sessionId: 's', workdir: '/tmp' }
+  const sent: Array<string | undefined> = []
+  const tool = createDecisionTool(
+    () => ({ endpoint: 'http://localhost/v1/systemone', cacheEnabled: true, cacheTtlMs: 60_000 }),
+    async (_url, init) => {
+      sent.push(JSON.parse(String(init?.body)).model)
+      return Response.json({ answers: { q: { type: 'noul', noul: 0.5 } } })
+    },
+  )
+  const question = { q: { type: 'noul' as const, instructions: 'Is it public?' } }
+  await tool.execute({ state: 'public', questions: question, model: ' override ' }, ctx)
+  assert.deepEqual(sent, [' override '], 'the provider receives the model verbatim, untrimmed')
+})
+
 test('a non-positive result is never stored as a positive reuse', () => {
   const cache = new DecisionCache({ enabled: true, ttlMs: 60_000 })
   // The cache only ever stores successful provider responses; callers decide
