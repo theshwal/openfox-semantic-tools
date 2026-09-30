@@ -3,6 +3,18 @@ import { createVerifyTool } from './verify/tool.js'
 import { createDiscoveryTool } from './discovery/tool.js'
 import { DEFAULT_BACKEND_ID, PRESETS } from './presets/index.js'
 import { SKILL_SOURCE } from './skills/source.js'
+import { ADVISORY_VERIFICATION_WORKFLOW, listAdvisoryWorkflows } from './workflow/templates.js'
+
+/**
+ * Advisory workflow templates, exported as reference data.
+ *
+ * The plugin deliberately does NOT register them as behaviour: it registers no
+ * transition handler and no hook, so it can never branch a workflow on a
+ * semantic result. A workflow author opts in by copying a template, and removing
+ * the semantic step leaves the deterministic checks and the normal verifier
+ * intact.
+ */
+export { ADVISORY_VERIFICATION_WORKFLOW, listAdvisoryWorkflows }
 import type {
   PluginRegistry,
   PluginSettingsSchema,

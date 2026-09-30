@@ -248,6 +248,95 @@ is faked to make the case pass.
 Capability discovery is opt-in and failure-safe. No probe runs when a preset is
 applied, at plugin registration, or on the settings path.
 
+## Advisory workflow integration
+
+The plugin can appear inside a workflow, but **only as advice**. It registers no
+transition handler and no hook, so it cannot branch a workflow on a semantic
+result, and it can never shorten verification.
+
+`openfox-semantic-workflow --out <dir>` writes
+`semantic-advisory-verification.workflow.json`, a real workflow file following
+the OpenFox 2.0.160 contract: a declarative state machine with `metadata`,
+`entryStep`, `settings.maxIterations` and `steps`, each step carrying an ordered
+transition list where the first match wins. `--print` previews it and writes
+nothing. With no argument it writes nowhere.
+
+The command is a compiled entry point shipped in the package and exposed through
+the `bin` field, so it runs from a plain installation with **no dev dependency
+and no TypeScript runtime**: install the package and run
+`openfox-semantic-workflow --out <dir>`.
+
+From a **source checkout**, `npm run workflow:install` only wraps that same
+compiled binary, so the project must be built first (`npm run build`): the npm
+script is project-local and is not what a published consumer uses.
+
+Where to put it, per the same contract:
+
+| Tier | Path | Notes |
+| --- | --- | --- |
+| User | `{configDir}/workflows/{id}.workflow.json` | Machine-local |
+| Project | `{projectDir}/.openfox/workflows/{id}.workflow.json` | Recommended, committable |
+
+Installing is opt-in: nothing is written at plugin registration.
+
+### Disabling it, per project or per machine
+
+There is no plugin setting to turn this on or off, because the plugin never
+executes the workflow itself. It is a file, so disabling it is a file operation
+you own:
+
+| Goal | Action |
+| --- | --- |
+| Disable for one project | Delete `{projectDir}/.openfox/workflows/{id}.workflow.json` (or remove the step from it) |
+| Disable for one machine | Delete `{configDir}/workflows/{id}.workflow.json` |
+| Keep the checks, drop the advice | Delete only the `semantic-advice` step and point `deterministic-checks` at `normal-verifier` |
+| Keep everything, stop the provider call | Remove `semantic_verify_task` from the agent's allowed tools; the step says so and continues |
+
+In every case the deterministic checks and the normal verifier remain, so no
+verification is lost by disabling the advisory path.
+
+The workflow has three steps:
+
+```text
+deterministic-checks (shell)  ->  semantic-advice (agent)  ->  normal-verifier (sub_agent)
+```
+
+- The checks run first in a `shell` step branching on the exit code, and a
+  failure is not short-circuited.
+- The semantic step loads `semantic-verification` with `load_skill`, then calls
+  `semantic_verify_task` **with an explicit argument example** (`criterionId`,
+  `criterion`, `evidence` with `summary`, `diffExcerpts`,
+  `deterministicTestResults`). If the tool is not in the agent's allowed tools,
+  or the call fails, it says so in one line and continues: the step can never
+  block the workflow.
+- The normal verifier always runs. A graph walk in the tests proves every
+  reachable path reaches it and that nothing but the verifier terminates.
+
+No transition condition inspects a semantic status, so the workflow could not
+branch on one even if a future tool returned a positive verdict. Removing the
+semantic step leaves the checks and the verifier intact, which is what makes the
+opt-in safe. No threshold and no calibrated policy is expressed in the file.
+
+A test loads the emitted file into a **real isolated Openfox 2.0.160 host** and
+asserts it appears in the host's own `userItems` tier, so the schema is proven
+against the real loader rather than against a stub.
+
+### What is proven, and what is not
+
+- **Proven, structurally**: the graph. Every reachable path reaches
+  `normal-verifier`, only the verifier terminates, no transition condition
+  inspects a semantic status, the file loads in a real host, and the packaged
+  CLI runs without a dev dependency.
+- **Proven, behaviourally**: the disable path. Removing the semantic step and
+  rewiring the checks to the verifier keeps both, with nothing lost.
+- **Specified but not proven at runtime**: what the agent actually does inside
+  the `semantic-advice` step. A test asserts the prompt *says* to continue when
+  the tool is unavailable or fails, but that is a specification reviewed by a
+  human, **not** an observed agent behaviour. It stays unverified until a real
+  agent turn executes this workflow.
+
+No end-to-end benchmark exists, so this workflow shortens nothing today.
+
 ## Decision cache
 
 The cache is an **optional optimization**, off by default. It reuses an
