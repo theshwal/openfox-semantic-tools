@@ -10,15 +10,20 @@ import {
 import type { DecisionAnswer } from '../src/decision/types.ts'
 
 /**
- * A rubric answer must carry a distribution agreeing with its score, the way a
- * real runtime returns it, otherwise the policy rejects it as unusable.
+ * A rubric answer must carry a distribution agreeing with its expectation, the
+ * way a real runtime returns it, otherwise the policy rejects it as unusable.
+ *
+ * `score` is the expectation E[level] = Σ(level × probability), per the
+ * documented System One contract, so a degenerate one-hot distribution at the
+ * top level satisfies it just as a continuous value does.
  */
-const scoreAnswer = (score: 0 | 1 | 2) =>
+const scoreAnswer = (score: number, probabilities?: Record<string, number>) =>
   ({
     type: 'score',
     score,
-    probabilities: { 0: score === 0 ? 1 : 0, 1: score === 1 ? 1 : 0, 2: score === 2 ? 1 : 0 },
-  }) as DecisionAnswer
+    probabilities:
+      probabilities ?? { '0': score === 0 ? 1 : 0, '1': score === 1 ? 1 : 0, '2': score === 2 ? 1 : 0 },
+  }) as unknown as DecisionAnswer
 
 const answers = (
   satisfied: number,
@@ -53,25 +58,127 @@ test('every gate declares one polarity and one threshold, with a sound band', ()
     const [low, high] = gate.undecided
     assert.ok(low <= high, `${gate.id} band must be ordered`)
     if (gate.direction === 'at-least') {
-      assert.ok(high <= gate.threshold, `${gate.id}: band must not reach the threshold`)
+      // With a continuous reading the band may start at the threshold (the value
+      // itself is the reading), but it must never cross it, or a value could be
+      // both undecided and decisive.
+      assert.ok(low <= gate.threshold, `${gate.id}: band must not cross the threshold`)
       assert.ok(gate.polarity === 'high-is-good')
     } else {
-      assert.ok(low >= gate.threshold, `${gate.id}: band must not reach the threshold`)
+      assert.ok(low >= gate.threshold, `${gate.id}: band must not cross the threshold`)
       assert.ok(gate.polarity === 'high-is-risk')
     }
   }
 })
 
-test('a discrete rubric has no ambiguous region, so every rung routes', () => {
+test('a score is read as the expectation, not as a level index', () => {
+  // The documented contract: score = E[level] = Σ(level × probability).
+  // The live runtime returns continuous values, so a fractional expectation on a
+  // 3-level rubric is a legitimate answer, not a malformed one.
+  const continuous = {
+    ...answers(0.99, 2, 0.01, 0.01),
+    evidenceSufficiency: scoreAnswer(1.9, { 0: 0, 1: 0.1, 2: 0.9 }),
+  }
+  const decision = evaluateVerifyPolicy(continuous as Record<string, DecisionAnswer>, calibratedPolicy)
+  const gate = decision.gates.find((entry) => entry.id === 'evidenceSufficiency')
+  assert.equal(gate?.verdict, 'met', 'E[level] = 1.9 sits decisively at the top of a 0..2 rubric')
+  assert.equal(gate?.value, 1.9)
+  assert.equal(decision.status, 'pass-candidate')
+})
+
+test('the expectation is checked against the distribution, within rounding tolerance', () => {
+  const gateOf = (a: unknown) =>
+    evaluateVerifyPolicy(a as Record<string, DecisionAnswer>, calibratedPolicy).gates.find(
+      (entry) => entry.id === 'evidenceSufficiency',
+    )?.verdict
+
+  // Official documented example: 0 × 0.0 + 1 × 0.57 + 2 × 0.43 = 1.43. The
+  // answer is self-consistent, so it is usable and routed by its value.
+  const exact = {
+    ...answers(0.99, 2, 0.01, 0.01),
+    evidenceSufficiency: scoreAnswer(1.43, { 0: 0, 1: 0.57, 2: 0.43 }),
+  }
+  assert.equal(gateOf(exact), 'unmet', 'E[level] = 1.43 is below the direct-evidence threshold')
+
+  // The live campaign returned 0.15 where its own distribution implies 0.14:
+  // a two-decimal rounding difference. It stays inside tolerance, so it is
+  // accepted and routed, rather than rejected as malformed.
+  const rounded = {
+    ...answers(0.99, 2, 0.01, 0.01),
+    evidenceSufficiency: scoreAnswer(0.15, { 0: 0.9, 1: 0.06, 2: 0.04 }),
+  }
+  assert.equal(gateOf(rounded), 'unmet', 'rounding inside tolerance is accepted, then routed')
+
+  // A genuine contradiction is still rejected: 0.15 against an expectation of
+  // 1.43 is far outside the rounding tolerance.
+  const contradicted = {
+    ...answers(0.99, 2, 0.01, 0.01),
+    evidenceSufficiency: scoreAnswer(0.15, { 0: 0, 1: 0.57, 2: 0.43 }),
+  }
+  assert.equal(gateOf(contradicted), 'unusable')
+})
+
+test('a tie is never a level, and never a pass', () => {
+  // Mass split evenly across the top two levels: the model expressed no
+  // preference. Rounding it to a level would fabricate an outcome it did not
+  // assert, so the answer must be refused before any routing happens.
+  const tied = {
+    ...answers(0.99, 2, 0.01, 0.01),
+    evidenceSufficiency: scoreAnswer(1.5, { 0: 0, 1: 0.5, 2: 0.5 }),
+  }
+  const decision = evaluateVerifyPolicy(tied as Record<string, DecisionAnswer>, calibratedPolicy)
+  const gate = decision.gates.find((entry) => entry.id === 'evidenceSufficiency')
+  assert.equal(gate?.verdict, 'unusable', 'a 50/50 split asserts no level')
+  assert.notEqual(decision.status, 'pass-candidate')
+})
+
+test('a score outside the declared rubric range is unusable', () => {
+  // The range is 0..len(criteria)-1 = 0..2 here, never 0..1.
+  const outOfRange = {
+    ...answers(0.99, 2, 0.01, 0.01),
+    evidenceSufficiency: scoreAnswer(3, { 0: 0, 1: 0, 2: 1 }),
+  }
+  const decision = evaluateVerifyPolicy(outOfRange as Record<string, DecisionAnswer>, calibratedPolicy)
+  assert.equal(decision.status, 'unknown')
+  const gate = decision.gates.find((entry) => entry.id === 'evidenceSufficiency')
+  assert.equal(gate?.verdict, 'unusable')
+})
+
+test('a low confidence still disqualifies a consistent expectation', () => {
+  // Fixing the score semantics must not weaken the confidence floor.
+  const doubtful = {
+    ...answers(0.99, 2, 0.01, 0.01),
+    evidenceSufficiency: {
+      type: 'score',
+      score: 1.9,
+      probabilities: { 0: 0, 1: 0.1, 2: 0.9 },
+      confidence: 0.1,
+    },
+  }
+  const gate = evaluateVerifyPolicy(doubtful as Record<string, DecisionAnswer>, calibratedPolicy).gates.find(
+    (entry) => entry.id === 'evidenceSufficiency',
+  )
+  assert.equal(gate?.verdict, 'unusable')
+})
+
+test('a discrete rubric still routes every decisive expectation', () => {
   const sufficiency = DEFAULT_POLICY.gates.find((gate) => gate.id === 'evidenceSufficiency')
-  assert.equal(sufficiency?.undecided, null)
-  for (const [score, expected] of [[2, 'met'], [1, 'unmet'], [0, 'unmet']] as const) {
+  assert.ok(sufficiency)
+  // The score is an expectation, so the rubric keeps a band between "clearly not
+  // direct evidence" and "direct evidence" rather than only whole rungs.
+  assert.notEqual(sufficiency.undecided, null)
+  // A one-hot distribution at each rung is still a decisive answer, and must
+  // route on the expectation value: 0 and 1 are not direct, 2 is.
+  for (const [score, expected] of [
+    [2, 'met'],
+    [0, 'unmet'],
+    [1, 'unmet'],
+  ] as const) {
     const decision = evaluateVerifyPolicy(
       answers(0.99, score as 0 | 1 | 2, 0.01, 0.01),
       calibratedPolicy,
     )
     const gate = decision.gates.find((entry) => entry.id === 'evidenceSufficiency')
-    assert.equal(gate?.verdict, expected, `score ${score}`)
+    assert.equal(gate?.verdict, expected, `one-hot at level ${score}`)
   }
 })
 

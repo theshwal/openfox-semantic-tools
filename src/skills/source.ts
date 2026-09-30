@@ -90,13 +90,71 @@ negative verdict. It carries a code and nothing else.
 }
 
 /**
- * `semantic-code-discovery` is intentionally NOT published here. It would guide
- * `semantic_search` / `semantic_scan`, which do not exist yet: exposing usage
- * guidance for a missing tool would advertise a capability the agent cannot
- * call. It ships with issue #5.
+ * `semantic-code-discovery` guides the two discovery tools. It teaches a
+ * decision boundary, not a workflow: the point is to reach the tool only when
+ * it saves exploration, and to prefer deterministic tools otherwise.
  */
+export const SEMANTIC_CODE_DISCOVERY_SKILL: PluginSkill = {
+  id: 'semantic-code-discovery',
+  name: 'Semantic code discovery',
+  description:
+    'Use semantic search and scoring only after narrowing candidates, to rank a short list of files. Prefer grep, symbols and tests when they already answer the question.',
+  prompt: `## When to use these tools
+
+Call \`semantic_search\` or \`semantic_scan\` when:
+
+- you know the behaviour or concept but not where it lives, and text search
+  returned nothing useful or too many candidates;
+- you already have a short list of files and want to know which few deserve a
+  read, instead of opening all of them;
+- you want to check the same behavioural predicate over several candidates at
+  once, for example whether an endpoint scopes its data.
+
+## When NOT to use them
+
+Do not call them when:
+
+- grep, a symbol lookup, or reading a known file already answers the question;
+- the answer is one or two deterministic tool calls away;
+- a test, a linter or a typechecker already gives an exact answer;
+- you have no candidate list yet. These tools rank what you give them. They do
+  not search the repository, and they must never be used to sweep it.
+## Supplying candidates
+
+- \`candidates\`: relative paths, narrowed by deterministic search first. Keep
+  the list short; the tool refuses an oversized list or oversized files rather
+  than truncating them, because a cut file could hide the relevant code.
+- \`query\` for \`semantic_search\`, \`predicate\` for \`semantic_scan\`: one clear
+  question or behaviour, stated concretely.
+- \`root\`: defaults to the session working directory. Paths outside it, and
+  symbolic links, are refused.
+
+## Reading the result
+
+- \`candidates\` is a ranked list of **candidates**, each with the score, its
+  distribution and its confidence. A high score means "read this first", not
+  "this is correct".
+- Entries with \`usable: false\` carry no score. The answer was missing,
+  inconsistent or undecided. Do not treat them as relevant; read the file
+  yourself instead.
+- \`reasons\` explains why nothing was ranked, when that happens.
+- A failed call is not a result. Fall back to normal code tools.
+
+## Limits
+
+- This skill does not grant tool access. \`semantic_search\` and \`semantic_scan\`
+  must both be in the agent's allowed tools; if they are not callable, use
+  deterministic tools.
+- The result is advisory. It never accepts a task or closes a criterion.
+- Ranking is not verification: always confirm a candidate by reading it and
+  running the relevant tests.
+- Keep the state small and relevant. Unrelated files in the list cost accuracy
+  as well as tokens.
+`,
+}
+
 export const SKILL_SOURCE: PluginSkillSource = {
   id: SKILL_SOURCE_ID,
   label: { en: 'Semantic tools', fr: 'Outils sémantiques' },
-  load: () => [SEMANTIC_VERIFICATION_SKILL],
+  load: () => [SEMANTIC_CODE_DISCOVERY_SKILL, SEMANTIC_VERIFICATION_SKILL],
 }

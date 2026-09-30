@@ -26,7 +26,7 @@ test('skill registration never reads settings or performs a request', async () =
   const { registry, settingsCalls } = fakeRegistry()
   register(registry)
   assert.equal(settingsCalls.length, 0, 'registration must not consult settings')
-  assert.equal((await SKILL_SOURCE.load()).length, 1)
+  assert.equal((await SKILL_SOURCE.load()).length, 2)
 })
 
 test('the verification skill is discoverable with concise metadata', async () => {
@@ -39,13 +39,20 @@ test('the verification skill is discoverable with concise metadata', async () =>
   assert.ok(found.prompt.length > found.description.length * 2, 'detail must load on demand only')
 })
 
-test('no guidance is published for a tool that does not exist yet', async () => {
-  const ids = (await loadedSkills()).map((skill) => skill.id)
-  // semantic_search / semantic_scan ship with issue #5. Advertising them now
-  // would teach the agent to call tools it cannot have.
-  assert.ok(!ids.includes('semantic-code-discovery'))
-  assert.ok(!ids.includes('semantic-search'))
-  assert.ok(!ids.includes('semantic-scan'))
+test('the discovery skill is published now that its tools exist', async () => {
+  const skills = await loadedSkills()
+  const found = skills.find((skill) => skill.id === 'semantic-code-discovery')
+  assert.ok(found, 'semantic-code-discovery must ship with the discovery tools')
+  assert.equal(found.name, 'Semantic code discovery')
+  // The description sits in the permanent prompt: it must stay short.
+  assert.ok(found.description.length <= 200, `description is ${found.description.length} chars`)
+  // Detail must load on demand only, so the prompt carries substantially more.
+  assert.ok(found.prompt.length > found.description.length * 2)
+  // The prompt is prose and is reviewed by a human: only its non-negotiable
+  // commitments are asserted here, never its exact wording.
+  assert.ok(found.prompt.includes('semantic_search') && found.prompt.includes('semantic_scan'))
+  assert.ok(found.prompt.includes('allowed tools'))
+  assert.ok(found.prompt.includes('CANDIDATES') || found.prompt.includes('candidates'))
 })
 
 test('the skill teaches when NOT to use the tool and how to fall back', () => {
