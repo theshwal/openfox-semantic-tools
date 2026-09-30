@@ -222,9 +222,44 @@ hostname may resolve to loopback. It reports observations only —
 `remoteEndpointObserved`, `localEndpointObserved`, `protocolConformanceObserved`
 and the purely descriptive `providerLabelExplicitlyConfigured` — plus the
 `compatible` / `strictCompatible` verdicts and the authoritative `deviations`
-list. A `compatible: true` result against the stub says nothing about hosted Jev
-or any other provider; no real runtime has been exercised by this repository
-yet. See [providers and egress](docs/PROVIDERS.md).
+list. A `compatible: true` result against the stub says nothing about any hosted
+provider. One opt-in live campaign has reached the official hosted endpoint and
+recorded a single real deviation (`choice` with array criteria); the findings are
+in [live provider findings](docs/LIVE-JEV-FINDINGS.md) once that document is
+published, and every other candidate runtime remains unverified. See
+[providers and egress](docs/PROVIDERS.md).
+
+## Decision cache (optional, off by default)
+
+An identical previous answer can be reused instead of calling the provider
+again, which helps during retries and verifier loops. Three settings control it:
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `cacheEnabled` | `false` | Turns the cache on. Off means behaviour is unchanged. |
+| `cacheTtlMs` | `300000` | How long an entry may be reused. `0` disables reuse. |
+| `cacheMaxEntries` | `128` | Hard bound, oldest-first eviction. |
+
+It is deliberately conservative:
+
+- the key covers the tool namespace, preset, endpoint, model, protocol version,
+  state, questions **with their criteria**, and the policy version for a
+  higher-level result — never the question text alone;
+- no secret reaches a key: userinfo and credential-looking query parameters are
+  stripped, and the key is an opaque digest that is safe to log;
+- a **non-secret** query parameter is kept, so `?tenant=a` and `?tenant=b`
+  cannot share entries;
+- the store is rebuilt when the provider identity changes, including the
+  credential, because a different key can address a different tenant on the same
+  host. The fingerprint is opaque and never leaves the process;
+- only successful answers are stored, so an error, timeout or malformed response
+  is never replayed as a result;
+- values are cloned in and out, so a caller cannot corrupt the store;
+- the generic decision namespace is separate from any policy outcome.
+
+It cannot calibrate anything and cannot make a positive verdict reachable.
+Benchmark evidence is still missing, which is why it stays disabled by default.
+See [providers, egress and cache](docs/PROVIDERS.md).
 
 ## Controlling what leaves the machine
 

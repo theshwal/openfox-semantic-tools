@@ -225,6 +225,53 @@ is faked to make the case pass.
 Capability discovery is opt-in and failure-safe. No probe runs when a preset is
 applied, at plugin registration, or on the settings path.
 
+## Decision cache
+
+The cache is an **optional optimization**, off by default. It reuses an
+identical previous answer instead of calling the provider again, which helps
+during retries and verifier loops that ask the same question about unchanged
+state.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `cacheEnabled` | `false` | Turns the cache on. Off means behaviour is unchanged. |
+| `cacheTtlMs` | `300000` | How long an entry may be reused. `0` disables reuse entirely. |
+| `cacheMaxEntries` | `128` | Hard bound, with deterministic oldest-first eviction. |
+
+It is built so that a mistake is inert rather than dangerous:
+
+- **The key is canonical and complete.** It covers the tool namespace, the
+  preset identity, the endpoint, the model, the protocol version, the state,
+  the questions *with their criteria*, and the policy version when a
+  higher-level result is cached. Keying on the question text alone is not
+  enough: the same wording against different state is a different answer.
+- **No secret reaches a key.** Userinfo is stripped, and query parameters whose
+  name looks like a credential (`token`, `api_key`, `key`, `signature`, …) are
+  dropped before hashing, so a key is safe to log. A key is a digest: it exposes
+  nothing.
+- **Non-secret query parameters are kept.** `?tenant=a` and `?tenant=b` are
+  different providers and must not share entries; dropping the whole query
+  would cause a cross-tenant reuse.
+- **The store is rebuilt when the provider identity changes.** An opaque
+  in-memory fingerprint covers the raw endpoint, the model, the preset, the
+  credential, the endpoint class, the egress policy and the cache settings. A
+  changed key is a different tenant on the same host, so a credential change
+  invalidates the store. The fingerprint is never logged and never leaves the
+  process.
+- **Only successful answers are stored.** A provider error, timeout, abort or
+  malformed response throws before the store, so it can never be replayed as a
+  result.
+- **Values are cloned at both boundaries.** A caller mutating the object it
+  passed in, or the object it got back, cannot corrupt the store.
+- **Namespaces are separate.** A generic `semantic_decide` answer is never reused
+  as a higher-level policy outcome.
+- **Hit/miss counters are exposed** for evaluation. They contain counters only:
+  no key, no state content, no credential.
+
+The cache cannot influence policy: it does not calibrate anything and cannot
+make a positive verdict reachable. Caching is opt-in until a benchmark shows a
+real repeated-call benefit.
+
 ## Data egress
 
 Endpoints are classified as `local`, `private` or `remote` from the hostname

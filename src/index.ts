@@ -104,6 +104,36 @@ export const SETTINGS: PluginSettingsSchema = {
       ],
       default: 'allow',
     },
+    {
+      key: 'cacheEnabled',
+      type: 'boolean',
+      label: { en: 'Decision cache', fr: 'Cache de décisions' },
+      description: {
+        en: 'Reuse an identical previous answer instead of calling the provider again. Off by default; only stored successful answers are reused, never an error.',
+        fr: 'Réutilise une réponse identique au lieu d\'appeler à nouveau le fournisseur. Désactivé par défaut ; seules les réponses réussies sont réutilisées, jamais une erreur.',
+      },
+      default: false,
+    },
+    {
+      key: 'cacheTtlMs',
+      type: 'number',
+      label: { en: 'Cache TTL (ms)', fr: 'TTL du cache (ms)' },
+      description: {
+        en: 'How long a cached answer may be reused. Zero disables reuse entirely.',
+        fr: 'Durée pendant laquelle une réponse en cache peut être réutilisée. Zéro désactive toute réutilisation.',
+      },
+      default: 300000,
+    },
+    {
+      key: 'cacheMaxEntries',
+      type: 'number',
+      label: { en: 'Cache max entries', fr: 'Entrées max du cache' },
+      description: {
+        en: 'Hard bound on stored answers, with oldest-first eviction.',
+        fr: 'Limite stricte des réponses stockées, avec éviction de la plus ancienne.',
+      },
+      default: 128,
+    },
   ],
 }
 

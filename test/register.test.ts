@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { register, SETTINGS } from '../src/index.ts'
+import { parseSettings } from '../src/settings.ts'
+import { ProviderError } from '../src/errors.ts'
 import { DEFAULT_BACKEND_ID, PRESETS } from '../src/presets/index.ts'
 import { fakeRegistry } from './helpers/registry.ts'
 
@@ -27,7 +29,30 @@ test('registers the initial settings schema', () => {
     'timeoutMs',
     'endpointClass',
     'egressPolicy',
+    'cacheEnabled',
+    'cacheTtlMs',
+    'cacheMaxEntries',
   ])
+})
+
+test('the decision cache is off by default and configurable', () => {
+  const enabled = SETTINGS.fields.find((field) => field.key === 'cacheEnabled')
+  assert.equal(enabled?.type, 'boolean')
+  assert.equal(enabled?.default, false, 'caching must be a deliberate choice')
+
+  const parse = (values: Record<string, unknown>) =>
+    parseSettings({ endpoint: 'http://localhost/v1/systemone', ...values })
+  const defaults = parse({})
+  assert.equal(defaults.cache?.enabled, false)
+  assert.equal(defaults.cache?.ttlMs, 300_000)
+  assert.equal(defaults.cache?.maxEntries, 128)
+
+  assert.equal(parse({ cacheEnabled: true }).cache?.enabled, true)
+  // A zero TTL disables reuse without disabling the setting itself.
+  assert.equal(parse({ cacheEnabled: true, cacheTtlMs: 0 }).cache?.ttlMs, 0)
+  for (const invalid of [{ cacheTtlMs: -1 }, { cacheTtlMs: 1.5 }, { cacheMaxEntries: 0 }, { cacheMaxEntries: 999_999 }]) {
+    assert.throws(() => parse(invalid), ProviderError, JSON.stringify(invalid))
+  }
 })
 
 test('exposes data-egress controls and keeps the api key secret', () => {

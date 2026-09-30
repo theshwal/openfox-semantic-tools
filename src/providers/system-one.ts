@@ -4,7 +4,12 @@ import { assertEgressAllowed, resolveEndpointClass, resolveEgressPolicy, type Ca
 import { ProviderError } from '../errors.js'
 
 export { ProviderError }
-export interface HttpSettings { endpoint: string; model?: string; apiKey?: string; timeoutMs: number; endpointClass?: EndpointClass; egressPolicy?: EgressPolicy }
+export interface CacheSettings {
+  enabled: boolean
+  ttlMs: number
+  maxEntries: number
+}
+export interface HttpSettings { endpoint: string; model?: string; apiKey?: string; timeoutMs: number; endpointClass?: EndpointClass; egressPolicy?: EgressPolicy; /** Preset identity, used to keep cache keys separated per backend. */ presetId?: string; cache?: CacheSettings }
 const probability = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1
 
 export function normalizeResponse(payload: unknown, request: DecisionRequest): Record<string, DecisionAnswer> {
