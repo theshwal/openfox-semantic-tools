@@ -38,3 +38,9 @@ Each issue is implemented and checked separately. Experimental tools are not adv
 5. Record provider conformance and labeled decision results before adding semantic verification.
 
 No change to the user's production OpenFox installation has been performed by this implementation.
+
+## First provider selected
+
+The user selected hosted Jev as the first real evaluation target. Configure its verified endpoint and key in the execution environment; no hosted URL or credential is guessed or embedded.
+
+`npm run conformance` runs four public/synthetic positive protocol cases against `SEMANTIC_ENDPOINT`, with optional `SEMANTIC_API_KEY` and `SEMANTIC_MODEL`. It persists a redacted JSON report. This starts #7 but does not replace its full negative/unsupported-model suite or #9 labeled quality benchmarks. No paid request is executed by normal CI or by the fixture evaluator.

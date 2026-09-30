@@ -27,7 +27,8 @@
     "test": "node --import tsx --test test/**/*.test.ts",
     "check": "npm run typecheck && npm test && npm run build",
     "evaluate": "node --import tsx scripts/evaluate.ts",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "conformance": "node --import tsx scripts/conformance.ts"
   },
   "peerDependencies": {
     "openfox": ">=2.0.157"

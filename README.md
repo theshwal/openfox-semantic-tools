@@ -197,3 +197,5 @@ npm run evaluate -- /path/to/measured-runs.json /path/to/report-directory
 ```
 
 Unmeasured metrics are `null`, not zero. Baseline and candidate remain separate in the summary. Results stay uncommitted by default. See [implementation order and delivery boundaries](docs/IMPLEMENTATION.md).
+
+For opt-in live protocol checks, configure `SEMANTIC_ENDPOINT`, `SEMANTIC_API_KEY` and optionally `SEMANTIC_MODEL` securely in your environment, then run `npm run conformance`. The first evaluation target is hosted Jev. Four public/synthetic cases are sent; the report omits endpoint and credentials. Live checks are excluded from CI. This is an initial protocol smoke test, not full provider conformance or decision-quality evidence.
