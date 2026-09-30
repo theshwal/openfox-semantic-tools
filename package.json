@@ -17,7 +17,8 @@
     "description": "Fast typed semantic decisions for OpenFox workflows, with hosted or local System One-compatible providers.",
     "capabilities": [
       "settings",
-      "tools"
+      "tools",
+      "skills"
     ],
     "timeoutMs": 125000
   },
@@ -30,7 +31,8 @@
     "evaluate": "node --import tsx scripts/evaluate.ts",
     "prepack": "npm run build",
     "conformance": "node --import tsx scripts/conformance.ts",
-    "conformance:smoke": "node --import tsx scripts/conformance-smoke.ts"
+    "conformance:smoke": "node --import tsx scripts/conformance-smoke.ts",
+    "verify:experiment": "node --import tsx scripts/verify-experiment.ts"
   },
   "peerDependencies": {
     "openfox": ">=2.0.157"

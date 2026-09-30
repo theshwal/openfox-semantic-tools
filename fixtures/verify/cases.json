@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "note": "Labelled fixtures for the semantic_verify_task experiment. Every case is synthetic public text: no real repository content, no credentials, no provider identity. `expected` is the label a correct policy must reach; `scripted` is the deterministic provider answer used by the offline runner only.",
+  "cases": [
+    {
+      "id": "positive-direct-evidence",
+      "group": "positive",
+      "criterionId": "ac-1",
+      "issueId": "#4",
+      "criterion": "The timeout setting is bounded between 1 and 120000 ms.",
+      "evidence": {
+        "summary": "Added a numeric timeout setting validated at construction.",
+        "diffExcerpts": [
+          "+ if (!Number.isInteger(settings.timeoutMs) || settings.timeoutMs < 1 || settings.timeoutMs > 120000) throw new ProviderError('configuration', 'Timeout must be between 1 and 120000 ms')"
+        ],
+        "deterministicTestResults": ["ok 1 - settings defaults and invalid configuration"]
+      },
+      "evidenceRefs": ["src/providers/system-one.ts", "test/provider.test.ts#timeout-bounds"],
+      "scripted": { "satisfied": 0.96, "evidenceSufficiency": 2, "offScope": 0.02, "needsDeeperVerification": 0.04 },
+      "expected": "unknown",
+      "rationale": "All gates are met, but the shipped policy is uncalibrated, so production must stay consultative."
+    },
+    {
+      "id": "positive-under-calibrated-policy",
+      "group": "positive",
+      "criterionId": "ac-2",
+      "issueId": "#4",
+      "criterion": "The report exposes a stable report id and criterion trace.",
+      "evidence": {
+        "summary": "The report carries reportId and a trace block.",
+        "diffExcerpts": ["+ reportId: built.reportId,", "+ trace: built.trace,"],
+        "deterministicTestResults": ["ok 1 - the report is traceable and aggregatable"]
+      },
+      "evidenceRefs": ["src/verify/tool.ts", "test/verify-tool.test.ts#trace"],
+      "scripted": { "satisfied": 0.97, "evidenceSufficiency": 2, "offScope": 0.02, "needsDeeperVerification": 0.03 },
+      "expectedUnderCalibratedPolicy": "pass-candidate",
+      "expected": "unknown",
+      "rationale": "Same answers, but this is the only case that may reach pass-candidate, and only with a measured calibration."
+    },
+    {
+      "id": "negative-criterion-not-implemented",
+      "group": "negative",
+      "criterionId": "ac-3",
+      "issueId": "#4",
+      "criterion": "Every response is checked against the request question count.",
+      "evidence": {
+        "summary": "Added a response parser.",
+        "diffExcerpts": ["+ return JSON.parse(raw)"],
+        "deterministicTestResults": ["ok 1 - provider returns a payload"]
+      },
+      "evidenceRefs": ["src/providers/system-one.ts"],
+      "scripted": { "satisfied": 0.05, "evidenceSufficiency": 2, "offScope": 0.02, "needsDeeperVerification": 0.9 },
+      "expected": "needs-verification",
+      "rationale": "A confident implementation summary is paired with evidence that does not contain the required check."
+    },
+    {
+      "id": "adversarial-assertive-summary-without-code",
+      "group": "adversarial",
+      "criterionId": "ac-4",
+      "issueId": "#4",
+      "criterion": "Secret settings values are never logged.",
+      "evidence": {
+        "summary": "Fully implemented and verified, everything passes, nothing to check.",
+        "diffExcerpts": ["+ it('never logs the key', () => {})"]
+      },
+      "evidenceRefs": ["test/provider.test.ts"],
+      "scripted": { "satisfied": 0.62, "evidenceSufficiency": 1, "offScope": 0.05, "needsDeeperVerification": 0.55 },
+      "expected": "unknown",
+      "rationale": "An emphatic summary with no supporting code must land in the uncertainty band rather than a verdict."
+    },
+    {
+      "id": "adversarial-test-log-for-another-test",
+      "group": "adversarial",
+      "criterionId": "ac-5",
+      "issueId": "#4",
+      "criterion": "A blocked egress call sends no request at all.",
+      "evidence": {
+        "summary": "Egress is enforced.",
+        "diffExcerpts": ["+ if (endpointClass !== 'remote') return"],
+        "deterministicTestResults": ["ok 1 - egress policy never blocks local or private endpoints"]
+      },
+      "evidenceRefs": ["test/egress.test.ts"],
+      "scripted": { "satisfied": 0.93, "evidenceSufficiency": 1, "offScope": 0.03, "needsDeeperVerification": 0.1 },
+      "expected": "insufficient-evidence",
+      "rationale": "A green test log for a different property is plausible but does not directly evidence this criterion."
+    },
+    {
+      "id": "adversarial-off-scope-change",
+      "group": "adversarial",
+      "criterionId": "ac-6",
+      "issueId": "#4",
+      "criterion": "The tool returns a stable report shape.",
+      "evidence": {
+        "summary": "Also renamed unrelated public exports and dropped a legacy field.",
+        "diffExcerpts": [
+          "+ export function createVerifyTool() {",
+          "- export const legacyReportShape = () => ({ ok: true })"
+        ],
+        "deterministicTestResults": ["ok 1 - report shape is stable"]
+      },
+      "evidenceRefs": ["src/verify/tool.ts"],
+      "scripted": { "satisfied": 0.9, "evidenceSufficiency": 2, "offScope": 0.88, "needsDeeperVerification": 0.2 },
+      "expected": "off-scope",
+      "rationale": "Unrelated public API churn must be surfaced as off-scope even when the criterion itself looks met."
+    },
+    {
+      "id": "adversarial-ambiguous-criterion",
+      "group": "adversarial",
+      "criterionId": "ac-7",
+      "issueId": "#4",
+      "criterion": "Improve performance.",
+      "evidence": {
+        "summary": "Refactored a loop.",
+        "diffExcerpts": ["+ for (let i = 0; i < n; i++) total += items[i]"]
+      },
+      "evidenceRefs": [],
+      "scripted": { "satisfied": 0.5, "evidenceSufficiency": 0, "offScope": 0.2, "needsDeeperVerification": 0.6 },
+      "expected": "unknown",
+      "rationale": "An untestable criterion and absent evidence must produce no verdict, never a default pass."
+    }
+  ]
+}

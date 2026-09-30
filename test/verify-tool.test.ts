@@ -1,0 +1,231 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+
+import { createVerifyTool, type VerifyReport } from '../src/verify/tool.ts'
+import { VERIFY_QUESTION_IDS } from '../src/verify/questions.ts'
+import { VERIFY_POLICY_VERSION } from '../src/verify/policy.ts'
+import { DEFAULT_POLICY } from '../src/verify/policy.ts'
+
+const ctx = { sessionId: 'fixture', workdir: '/tmp', projectId: 'project' }
+
+const args = {
+  criterionId: 'ac-1',
+  criterion: 'Timeouts are bounded.',
+  evidence: {
+    summary: 'Added a bounded timeout setting.',
+    diffExcerpts: ['+ timeoutMs: number'],
+    deterministicTestResults: ['ok 1 - timeout bounds'],
+  },
+}
+
+const answers = (
+  satisfied: number,
+  sufficiency: 0 | 1 | 2,
+  offScope: number,
+  needsDeeper: number,
+) => ({
+  answers: {
+    [VERIFY_QUESTION_IDS.satisfied]: { type: 'noul', noul: satisfied },
+    [VERIFY_QUESTION_IDS.evidenceSufficiency]: {
+      type: 'score',
+      score: sufficiency,
+      probabilities: { 0: 0, 1: 0, 2: 1 },
+    },
+    [VERIFY_QUESTION_IDS.offScope]: { type: 'noul', noul: offScope },
+    [VERIFY_QUESTION_IDS.needsDeeperVerification]: { type: 'noul', noul: needsDeeper },
+  },
+})
+
+/** Captures the outgoing request and replays a canned provider answer. */
+function stubTransport(payload: unknown) {
+  const seen: Array<{ body: any; headers: Record<string, string> }> = []
+  const transport: typeof fetch = async (_url, init) => {
+    seen.push({
+      body: JSON.parse(String(init?.body)),
+      headers: (init?.headers ?? {}) as Record<string, string>,
+    })
+    return Response.json(payload)
+  }
+  return { transport, seen }
+}
+
+test('one batched call asks exactly the four policy questions', async () => {
+  const { transport, seen } = stubTransport(answers(0.95, 2, 0.02, 0.05))
+  const tool = createVerifyTool(() => ({ endpoint: 'http://localhost/v1/systemone' }), { transport })
+  const result = await tool.execute(args, ctx)
+
+  assert.equal(result.success, true)
+  assert.equal(seen.length, 1, 'a single provider call must cover every question')
+  assert.deepEqual(Object.keys(seen[0].body.questions).sort(), [
+    'evidenceSufficiency',
+    'needsDeeperVerification',
+    'offScope',
+    'satisfied',
+  ])
+  assert.equal(seen[0].body.state.acceptanceCriterion, args.criterion)
+  // The evidence rubric must stay an ordered array for the common contract.
+  assert.ok(Array.isArray(seen[0].body.questions.evidenceSufficiency.criteria))
+})
+
+test('the production report is advisory and never a positive verdict', async () => {
+  const { transport } = stubTransport(answers(0.99, 2, 0.01, 0.01))
+  const tool = createVerifyTool(() => ({ endpoint: 'http://localhost/v1/systemone' }), { transport })
+  const report = JSON.parse((await tool.execute(args, ctx)).output!) as VerifyReport
+
+  assert.equal(report.status, 'unknown')
+  assert.equal(report.advisory, true)
+  assert.equal(report.calibrated, false)
+  assert.equal(report.policyVersion, VERIFY_POLICY_VERSION)
+  assert.ok(report.reasons.includes('policy_not_calibrated'))
+})
+
+test('the report is traceable and aggregatable without exposing provider payload', async () => {
+  const { transport } = stubTransport(answers(0.95, 2, 0.02, 0.05))
+  const tool = createVerifyTool(() => ({ endpoint: 'http://localhost/v1/systemone' }), { transport })
+  const report = JSON.parse(
+    (await tool.execute({ ...args, issueId: '#4', evidenceRefs: ['src/verify/tool.ts'] }, ctx)).output!,
+  ) as VerifyReport
+
+  assert.match(report.reportId, /^verify:[A-Za-z0-9._-]+:[0-9a-f]{16}$/)
+  assert.ok(report.reportId.startsWith('verify:ac-1:'))
+  assert.equal(report.trace.issueId, '#4')
+  assert.equal(report.trace.criterionId, 'ac-1')
+  assert.equal(report.trace.criterionText, args.criterion)
+  assert.deepEqual(report.trace.evidenceRefs, ['src/verify/tool.ts'])
+  assert.ok(!JSON.stringify(report).includes('endpoint'))
+  assert.ok(report.evidenceBytes > 0)
+})
+
+test('a calibrated policy can surface a positive status as a candidate only', async () => {
+  const { transport } = stubTransport(answers(0.99, 2, 0.01, 0.01))
+  const tool = createVerifyTool(() => ({ endpoint: 'http://localhost/v1/systemone' }), {
+    transport,
+    policy: { ...DEFAULT_POLICY, calibrated: true },
+  })
+  const report = JSON.parse((await tool.execute(args, ctx)).output!) as VerifyReport
+  assert.equal(report.status, 'pass-candidate')
+  // Even when positive, the result stays advice and never claims completion.
+  assert.equal(report.advisory, true)
+  assert.equal(JSON.stringify(report).includes('task complete'), false)
+})
+
+test('repository-derived evidence is always sent with an automatic origin', async () => {
+  // block-remote-automatic permits explicit calls only. If the tool forgot to
+  // declare an automatic origin, this remote call would wrongly succeed.
+  const { transport, seen } = stubTransport(answers(0.9, 2, 0.02, 0.05))
+  const tool = createVerifyTool(
+    () => ({
+      endpoint: 'https://api.example.invalid/v1/systemone',
+      endpointClass: 'remote',
+      egressPolicy: 'block-remote-automatic',
+    }),
+    { transport },
+  )
+  const result = await tool.execute(args, ctx)
+
+  assert.equal(result.success, false)
+  assert.equal(JSON.parse(result.error!).code, 'egress_blocked')
+  assert.equal(seen.length, 0, 'a blocked call must send nothing at all')
+})
+
+test('an explicit semantic_decide call stays allowed under the same policy', async () => {
+  // Proves the new tool did not narrow the Lot 1 contract.
+  const { createDecisionTool } = await import('../src/tool.ts')
+  const { transport, seen } = stubTransport({ answers: { q: { type: 'noul', noul: 0.9 } } })
+  const tool = createDecisionTool(
+    () => ({
+      endpoint: 'https://api.example.invalid/v1/systemone',
+      endpointClass: 'remote',
+      egressPolicy: 'block-remote-automatic',
+    }),
+    transport,
+  )
+  const result = await tool.execute(
+    { state: 'public', questions: { q: { type: 'noul', instructions: 'Is this public?' } } },
+    ctx,
+  )
+  assert.equal(result.success, true)
+  assert.equal(seen.length, 1)
+})
+
+test('local endpoints are never blocked for verification content', async () => {
+  const { transport, seen } = stubTransport(answers(0.9, 2, 0.02, 0.05))
+  const tool = createVerifyTool(
+    () => ({ endpoint: 'http://127.0.0.1:1/v1/systemone', egressPolicy: 'block-remote-all' }),
+    { transport },
+  )
+  const result = await tool.execute(args, ctx)
+  assert.equal(result.success, true)
+  assert.equal(seen.length, 1)
+})
+
+test('invalid input is rejected before any provider call', async () => {
+  const { transport, seen } = stubTransport(answers(0.9, 2, 0.02, 0.05))
+  const tool = createVerifyTool(() => ({ endpoint: 'http://localhost/v1/systemone' }), { transport })
+  for (const bad of [{}, { criterionId: 'ac-1' }, { ...args, criterion: '  ' }, { ...args, nope: 1 }]) {
+    const result = await tool.execute(bad, ctx)
+    assert.equal(result.success, false, JSON.stringify(bad))
+  }
+  assert.equal(seen.length, 0)
+})
+
+test('provider failures never surface as a positive or negative verdict', async () => {
+  const cases: Array<[string, () => Promise<Response>]> = [
+    ['http', async () => new Response('secret-token-in-body', { status: 503 })],
+    ['invalid_response', async () => new Response('<html>not json</html>', { status: 200 })],
+    ['invalid_response', async () => Response.json({ answers: { satisfied: { type: 'noul', noul: 0.99 } } })],
+  ]
+  for (const [expectedCode, response] of cases) {
+    const tool = createVerifyTool(
+      () => ({ endpoint: 'http://localhost/v1/systemone' }),
+      { transport: (async () => response()) as typeof fetch },
+    )
+    const result = await tool.execute(args, ctx)
+    assert.equal(result.success, false)
+    const parsed = JSON.parse(result.error!)
+    assert.equal(parsed.code, expectedCode)
+    assert.ok(!JSON.stringify(parsed).includes('secret-token-in-body'), 'no upstream body may be reflected')
+  }
+})
+
+test('cancellation and timeouts stay failures with their own codes', async () => {
+  const controller = new AbortController()
+  controller.abort()
+  const tool = createVerifyTool(() => ({ endpoint: 'http://localhost/v1/systemone' }))
+  const aborted = await tool.execute(args, { ...ctx, signal: controller.signal })
+  assert.equal(JSON.parse(aborted.error!).code, 'aborted')
+
+  const slow = createVerifyTool(
+    () => ({ endpoint: 'http://localhost/v1/systemone', timeoutMs: 50 }),
+    {
+      transport: ((_u: unknown, init: any) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new Error('aborted')))
+        })) as unknown as typeof fetch,
+    },
+  )
+  const timedOut = await slow.execute(args, ctx)
+  assert.equal(JSON.parse(timedOut.error!).code, 'timeout')
+})
+
+test('an internal fault is not reported as a caller argument error', async () => {
+  // A settings read that throws is a plugin-side problem, not a bad argument.
+  // Telling the agent to "fix its arguments" would send it the wrong way.
+  const tool = createVerifyTool(() => {
+    throw new Error('settings backend unavailable: super-secret-token')
+  })
+  const result = await tool.execute(args, ctx)
+  assert.equal(result.success, false)
+  const parsed = JSON.parse(result.error!)
+  assert.equal(parsed.code, 'internal')
+  assert.ok(!result.error!.includes('super-secret-token'), 'no internal message may be reflected')
+})
+
+test('the API key is never echoed in the report or the error', async () => {
+  const tool = createVerifyTool(
+    () => ({ endpoint: 'http://localhost/v1/systemone', apiKey: 'sk-do-not-log-me' }),
+    { transport: (async () => new Response('nope', { status: 500 })) as typeof fetch },
+  )
+  const result = await tool.execute(args, ctx)
+  assert.equal(JSON.stringify(result).includes('sk-do-not-log-me'), false)
+})

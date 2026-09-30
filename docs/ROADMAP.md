@@ -48,11 +48,13 @@ Presets must remain thin. Provider benchmarks must use the same fixtures.
 
 ## Phase 3 — high-value OpenFox experiments
 
-8. **#4 — semantic_verify_task**
+8. **#4 — semantic_verify_task** — implemented as an advisory experiment; no
+   false-pass measurement yet, so no positive verdict is reachable.
 9. **#5 — semantic_scan / semantic_search**
 10. **#14 — plugin skills for semantic tool usage**
-    - the skill source mechanism can be scaffolded after #2;
-    - only expose guidance for higher-level tools once the corresponding tool exists and has useful evidence;
+    - `semantic-verification` ships with #4;
+    - `semantic-code-discovery` stays unpublished until #5 exists, so guidance
+      is never advertised for a tool the agent cannot call;
     - skills teach decision boundaries, not provider details.
 
 Primary goal:
@@ -65,6 +67,8 @@ Promotion into normal agent usage requires measured results and the matching ski
 
 11. **#12 — workflow integration for semantic_verify_task**
     - only after #4 demonstrates acceptable false-pass behavior.
+    - the tool currently registers no transition handler, so this is still
+      open; #4 ships advisory-only.
 
 12. **#11 — semantic decision cache**
     - only after correctness and provider identity/key semantics are stable.
