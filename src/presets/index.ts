@@ -1,20 +1,3 @@
-/**
- * Provider presets.
- *
- * A preset is **data**, never a second transport. It supplies defaults and
- * declared capabilities, and nothing else:
- *
- * - it owns no HTTP client, so `SystemOneHttpProvider` stays the only adapter;
- * - it carries no semantic policy: no threshold, no score, no calibration flag;
- * - it carries no credential, only a hint about whether auth is usually needed;
- * - its capabilities are **declarations with a provenance**, not certifications.
- *   A capability is only `true` or `false` when it was actually observed; every
- *   other case is `unverified`, so nothing is ever inferred from silence.
- *
- * The point of a preset is configuration ergonomics, and a custom endpoint must
- * keep working exactly as before.
- */
-
 import { ProviderError } from '../errors.js'
 
 export type CapabilityName =
@@ -53,10 +36,131 @@ export interface ProviderPreset {
 export const DEFAULT_BACKEND_ID = 'custom'
 
 /**
+ * Ids accepted but never offered in the selector, kept so an already saved
+ * configuration keeps working. `jev` is the historical id of the hosted preset:
+ * renaming it outright would silently invalidate somebody's settings.
+ */
+const BACKEND_ALIASES: Readonly<Record<string, string>> = {
+  jev: 'jev-hosted',
+  'laya-compatible': 'laya',
+  systemone: 'system-one',
+}
+
+/** Resolves an id or an alias to a real preset id, or null when unknown. */
+function resolvePresetId(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  if (PRESETS.some((preset) => preset.id === value)) return value
+  return BACKEND_ALIASES[value] ?? null
+}
+
+/** Every capability explicitly unknown, rather than absent. */
+function declaredOnly(): Record<CapabilityName, CapabilityValue> {
+  return {
+    noul: 'unverified',
+    choiceObjectCriteria: 'unverified',
+    choiceArrayCriteria: 'unverified',
+    score: 'unverified',
+    batchedQuestions: 'unverified',
+  }
+}
+
+/**
+ * The backends the issue names that this repository has **not** exercised.
+ *
+ * They are registered so an operator is never forced into "custom" for a
+ * runtime the project already knows about, but every capability stays
+ * `unverified` and no default is supplied: nothing here is a claim about the
+ * runtime, only a way to select it. A capability may be promoted to `true` or
+ * `false` only from an actual conformance run.
+ */
+const DECLARED_BACKENDS: readonly ProviderPreset[] = [
+  {
+    id: 'kev',
+    label: { en: 'Kev', fr: 'Kev' },
+    description: {
+      en: 'Open decision-model family with a compatible server. Unverified here.',
+      fr: 'Famille de modèles de décision ouverts avec un serveur compatible. Non vérifié ici.',
+    },
+    defaults: {},
+    capabilities: declaredOnly(),
+  },
+  {
+    id: 'laya',
+    label: { en: 'Laya-compatible', fr: 'Compatible Laya' },
+    description: {
+      en: 'Laya-compatible servers. Unverified here.',
+      fr: 'Serveurs compatibles Laya. Non vérifié ici.',
+    },
+    defaults: {},
+    capabilities: declaredOnly(),
+  },
+  {
+    id: 'system-one',
+    label: { en: 'System One', fr: 'System One' },
+    description: {
+      en: 'Native local-first System One runtime. Unverified here.',
+      fr: 'Runtime System One local-first natif. Non vérifié ici.',
+    },
+    defaults: {},
+    capabilities: declaredOnly(),
+  },
+  {
+    id: 'sys1',
+    label: { en: 'sys1', fr: 'sys1' },
+    description: {
+      en: 'Rust System One server. Unverified here.',
+      fr: 'Serveur System One en Rust. Non vérifié ici.',
+    },
+    defaults: {},
+    capabilities: declaredOnly(),
+  },
+  {
+    id: 'jev-rs',
+    label: { en: 'jev-rs', fr: 'jev-rs' },
+    description: {
+      en: 'Rust scoring and runtime harness. Unverified here.',
+      fr: 'Harnais de scoring et runtime en Rust. Non vérifié ici.',
+    },
+    defaults: {},
+    capabilities: declaredOnly(),
+  },
+  {
+    id: 'local-jev',
+    label: { en: 'local-jev', fr: 'local-jev' },
+    description: {
+      en: 'Offline Jev-compatible server. Unverified here.',
+      fr: 'Serveur Jev-compatible hors ligne. Non vérifié ici.',
+    },
+    defaults: {},
+    capabilities: declaredOnly(),
+  },
+  {
+    id: 'lichen',
+    label: { en: 'Lichen', fr: 'Lichen' },
+    description: {
+      en: 'Jev-compatible inference over open-weight models. Unverified here.',
+      fr: 'Inférence Jev-compatible sur des modèles ouverts. Non vérifié ici.',
+    },
+    defaults: {},
+    capabilities: declaredOnly(),
+  },
+  {
+    id: 'edgejev',
+    label: { en: 'EdgeJev', fr: 'EdgeJev' },
+    description: {
+      en: 'Local ONNX deployment path for decision models. Unverified here.',
+      fr: 'Chemin de déploiement ONNX local pour modèles de décision. Non vérifié ici.',
+    },
+    defaults: {},
+    capabilities: declaredOnly(),
+  },
+]
+
+/**
  * `custom` is always present and is the default: the generic adapter needs no
  * preset. The hosted preset records the one deviation this repository actually
- * observed against the official endpoint (see docs/LIVE-JEV-FINDINGS.md); every
- * capability not probed stays `unverified`.
+ * observed against the official endpoint; every capability not probed stays
+ * `unverified`.
  */
 export const PRESETS: readonly ProviderPreset[] = [
   {
@@ -67,13 +171,7 @@ export const PRESETS: readonly ProviderPreset[] = [
       fr: 'Tout endpoint compatible System One. Aucune hypothèse de preset appliquée.',
     },
     defaults: {},
-    capabilities: {
-      noul: 'unverified',
-      choiceObjectCriteria: 'unverified',
-      choiceArrayCriteria: 'unverified',
-      score: 'unverified',
-      batchedQuestions: 'unverified',
-    },
+    capabilities: declaredOnly(),
   },
   {
     id: 'jev-hosted',
@@ -98,10 +196,11 @@ export const PRESETS: readonly ProviderPreset[] = [
       batchedQuestions: true,
     },
   },
+  ...DECLARED_BACKENDS,
 ]
 
 export function isPresetId(value: unknown): boolean {
-  return typeof value === 'string' && PRESETS.some((preset) => preset.id === value)
+  return resolvePresetId(value) !== null
 }
 
 export function listPresets(): readonly ProviderPreset[] {
@@ -114,8 +213,9 @@ export function listPresets(): readonly ProviderPreset[] {
  * turns a missing declaration into `false`.
  */
 export function capabilityOf(presetId: unknown, capability: CapabilityName): CapabilityValue {
-  if (!isPresetId(presetId)) return 'unverified'
-  const preset = PRESETS.find((entry) => entry.id === presetId)!
+  const id = resolvePresetId(presetId)
+  if (id === null) return 'unverified'
+  const preset = PRESETS.find((entry) => entry.id === id)!
   return preset.capabilities[capability] ?? 'unverified'
 }
 
@@ -135,11 +235,12 @@ export interface ResolvedProviderSettings {
  * or key always wins, including an empty string, which means "no override".
  */
 export function applyPreset(values: Record<string, unknown>): ResolvedProviderSettings {
-  const presetId = values.backend === undefined ? DEFAULT_BACKEND_ID : String(values.backend)
-  if (!isPresetId(presetId)) {
+  const requested = values.backend === undefined ? DEFAULT_BACKEND_ID : values.backend
+  const presetId = resolvePresetId(requested)
+  if (presetId === null) {
     // Reuse the controlled configuration error so the tool layer can report it
     // without leaking an unexpected exception type.
-    throw new ProviderError('configuration', `Unsupported backend "${presetId}"`)
+    throw new ProviderError('configuration', `Unsupported backend "${String(requested)}"`)
   }
   const preset = PRESETS.find((entry) => entry.id === presetId)!
 
