@@ -48,29 +48,33 @@ Presets must remain thin. Provider benchmarks must use the same fixtures.
 
 8. **#4 — semantic_verify_task**
 9. **#5 — semantic_scan / semantic_search**
+10. **#14 — plugin skills for semantic tool usage**
+    - the skill source mechanism can be scaffolded after #2;
+    - only expose guidance for higher-level tools once the corresponding tool exists and has useful evidence;
+    - skills teach decision boundaries, not provider details.
 
 Primary goal:
 
-> reduce expensive generative work without losing task quality.
+> reduce expensive generative work without losing task quality, then teach OpenFox when to use the proven semantic capabilities.
 
-Promotion requires measured results.
+Promotion into normal agent usage requires measured results and the matching skill guidance.
 
 ## Phase 4 — conditional automation / optimization
 
-10. **#12 — workflow integration for semantic_verify_task**
+11. **#12 — workflow integration for semantic_verify_task**
     - only after #4 demonstrates acceptable false-pass behavior.
 
-11. **#11 — semantic decision cache**
+12. **#11 — semantic decision cache**
     - only after correctness and provider identity/key semantics are stable.
 
-12. **#6 — context relevance/message transforms**
+13. **#6 — context relevance/message transforms**
     - only after the public message-transform API exists in a released OpenFox version.
 
 These are deliberately conditional. They may be closed as not planned if evidence is weak.
 
 ## Phase 5 — distribution
 
-13. **#13 — CI, packaging and first usable release**
+14. **#13 — CI, packaging and first usable release**
 
 A curated OpenFox registry submission should happen only after V0 is installable, tested and useful outside the author's machine.
 
@@ -82,8 +86,14 @@ A curated OpenFox registry submission should happen only after V0 is installable
    +--> #2 semantic_decide
    |       |
    |       +--> #4 semantic_verify_task -----> #12 workflow integration
+   |       |          \
+   |       |           +--> #14 semantic-verification skill
    |       |
    |       +--> #5 semantic scan/search
+   |       |          \
+   |       |           +--> #14 semantic-code-discovery skill
+   |       |
+   |       +--> #14 skill-source scaffold
    |       |
    |       +--> #11 cache (later)
    |
