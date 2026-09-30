@@ -57,6 +57,26 @@ In order:
 
 Model/skill routing is not a project priority unless evidence changes that.
 
+## Skills and agent adoption
+
+Semantic tools are not self-explanatory merely because they are registered.
+
+Use OpenFox plugin skills to teach **when and how** proven semantic tools should be used:
+
+- prefer a small number of usage-oriented skills over one skill per tool;
+- keep skill descriptions concise so permanent prompt overhead stays low;
+- put detailed operational guidance in the skill prompt loaded through `load_skill`;
+- teach when **not** to use semantic tools;
+- keep provider names/endpoints/models out of skills;
+- never let a skill imply that it grants tool access — plugin tools still require the agent's `allowedTools`.
+
+Planned usage skills are tracked in issue #14:
+
+- `semantic-code-discovery` for semantic search/scan;
+- `semantic-verification` for post-build evidence checks.
+
+The skill source may be scaffolded after `semantic_decide`, but do not expose guidance for a higher-level tool before that tool exists and has enough evidence to justify normal agent usage.
+
 ## OpenFox message transforms
 
 Current OpenFox `develop` exposes `registerMessageTransform`, which can mutate messages/system prompt before LLM dispatch and is a promising hook for context reduction.
