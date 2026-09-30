@@ -9,3 +9,6 @@ coverage/
 
 benchmark/results/
 *.tgz
+
+# Local live-campaign runner: reads an operator-provided key file, never committed.
+live-jev-runner.mjs
