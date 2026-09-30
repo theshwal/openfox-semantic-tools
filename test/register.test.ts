@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { register, SETTINGS } from '../src/index.ts'
+import { DEFAULT_BACKEND_ID, PRESETS } from '../src/presets/index.ts'
 import { fakeRegistry } from './helpers/registry.ts'
 
 test('registers the initial settings schema', () => {
@@ -43,6 +44,18 @@ test('exposes data-egress controls and keeps the api key secret', () => {
   assert.equal(egressPolicy?.default, 'allow')
   const apiKey = SETTINGS.fields.find((field) => field.key === 'apiKey')
   assert.equal(apiKey?.secret, true)
+})
+
+test('the backend selector is driven by the presets and custom stays default', () => {
+  const backend = SETTINGS.fields.find((field) => field.key === 'backend')
+  assert.deepEqual(
+    backend?.options?.map((option) => option.value),
+    PRESETS.map((preset) => preset.id),
+  )
+  assert.equal(backend?.default, DEFAULT_BACKEND_ID, 'a custom endpoint must remain the default')
+  // The endpoint stays required: a preset never supplies a host.
+  const endpoint = SETTINGS.fields.find((field) => field.key === 'endpoint')
+  assert.equal(endpoint?.default, '')
 })
 
 test('uses global configured credentials even in project sessions', async () => {

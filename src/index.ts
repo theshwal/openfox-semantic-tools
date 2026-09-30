@@ -1,6 +1,7 @@
 import { createDecisionTool } from './tool.js'
 import { createVerifyTool } from './verify/tool.js'
 import { createDiscoveryTool } from './discovery/tool.js'
+import { DEFAULT_BACKEND_ID, PRESETS } from './presets/index.js'
 import { SKILL_SOURCE } from './skills/source.js'
 import type {
   PluginRegistry,
@@ -17,28 +18,16 @@ export const SETTINGS: PluginSettingsSchema = {
         en: 'Use hosted Jev or any compatible System One HTTP endpoint.',
         fr: 'Utiliser Jev hébergé ou un endpoint HTTP System One compatible.',
       },
-      options: [
-        {
-          value: 'jev',
-          label: { en: 'Jev (hosted)', fr: 'Jev (hébergé)' },
-        },
-        {
-          value: 'custom',
-          label: {
-            en: 'Custom / local System One',
-            fr: 'System One personnalisé / local',
-          },
-        },
-      ],
-      default: 'custom',
+      options: PRESETS.map((preset) => ({ value: preset.id, label: preset.label })),
+      default: DEFAULT_BACKEND_ID,
     },
     {
       key: 'endpoint',
       type: 'text',
       label: { en: 'System One endpoint', fr: 'Endpoint System One' },
       description: {
-        en: 'Full POST endpoint. Provider presets may supply a default later.',
-        fr: 'Endpoint POST complet. Les presets fournisseur pourront fournir une valeur par défaut plus tard.',
+        en: 'Full POST endpoint. Always required: a preset supplies defaults and declared capabilities, never a host.',
+        fr: 'Endpoint POST complet. Toujours requis : un preset fournit des défauts et des capacités déclarées, jamais un hôte.',
       },
       default: '',
     },
