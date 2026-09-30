@@ -14,4 +14,7 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run check
       - run: npm run evaluate
+      # Offline protocol conformance against a local stub. Proves the suite and
+      # the transport only; never a hosted or paid provider.
+      - run: npm run conformance:smoke
       - run: npm pack --dry-run

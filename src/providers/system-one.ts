@@ -1,10 +1,10 @@
 import type { DecisionAnswer, DecisionProvider, DecisionRequest, DecisionResponse, DecisionOptions } from '../decision/types.js'
 import { isRecord, validateRequest } from '../decision/validation.js'
+import { assertEgressAllowed, resolveEndpointClass, resolveEgressPolicy, type CallOrigin, type EndpointClass, type EgressPolicy } from '../egress.js'
+import { ProviderError } from '../errors.js'
 
-export class ProviderError extends Error {
-  constructor(readonly code: string, message: string) { super(message); this.name = 'ProviderError' }
-}
-export interface HttpSettings { endpoint: string; model?: string; apiKey?: string; timeoutMs: number }
+export { ProviderError }
+export interface HttpSettings { endpoint: string; model?: string; apiKey?: string; timeoutMs: number; endpointClass?: EndpointClass; egressPolicy?: EgressPolicy }
 const probability = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1
 
 export function normalizeResponse(payload: unknown, request: DecisionRequest): Record<string, DecisionAnswer> {
@@ -41,6 +41,12 @@ export class SystemOneHttpProvider implements DecisionProvider {
   }
   async decide(request: DecisionRequest, options: DecisionOptions = {}): Promise<DecisionResponse> {
     validateRequest(request)
+    // Enforce egress before any network work so a blocked call sends nothing.
+    assertEgressAllowed(
+      this.settings.endpointClass ?? resolveEndpointClass(this.settings.endpoint, undefined),
+      resolveEgressPolicy(this.settings.egressPolicy),
+      (options.origin ?? 'explicit') as CallOrigin,
+    )
     const started = performance.now()
     const timeout = AbortSignal.timeout(this.settings.timeoutMs)
     const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout

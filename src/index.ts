@@ -69,6 +69,49 @@ export const SETTINGS: PluginSettingsSchema = {
       },
       default: 5000,
     },
+    {
+      key: 'endpointClass',
+      type: 'select',
+      label: { en: 'Endpoint class', fr: 'Classe de l’endpoint' },
+      description: {
+        en: 'Auto-detect, or override whether the endpoint counts as local, private or remote for data-egress policy.',
+        fr: 'Détection automatique, ou forcer la classe local/privé/distant pour la politique d’exfiltration de données.',
+      },
+      options: [
+        { value: 'auto', label: { en: 'Auto-detect', fr: 'Détection automatique' } },
+        { value: 'local', label: { en: 'Local', fr: 'Local' } },
+        { value: 'private', label: { en: 'Private network', fr: 'Réseau privé' } },
+        { value: 'remote', label: { en: 'Remote', fr: 'Distant' } },
+      ],
+      default: 'auto',
+    },
+    {
+      key: 'egressPolicy',
+      type: 'select',
+      label: { en: 'Egress policy', fr: 'Politique d’exfiltration' },
+      description: {
+        en: 'Controls whether repository or session-derived content may be sent to a remote endpoint. Local and private endpoints are never blocked. Blocked calls return a structured failure and never reroute.',
+        fr: 'Contrôle l’envoi de contenu issu du dépôt ou de la session vers un endpoint distant. Les endpoints locaux et privés ne sont jamais bloqués. Un appel bloqué renvoie un échec structuré et n’est jamais réacheminé.',
+      },
+      options: [
+        {
+          value: 'allow',
+          label: { en: 'Allow', fr: 'Autoriser' },
+        },
+        {
+          value: 'block-remote-automatic',
+          label: {
+            en: 'Block automatic remote calls (keep explicit calls)',
+            fr: 'Bloquer les appels distants automatiques (garder les appels explicites)',
+          },
+        },
+        {
+          value: 'block-remote-all',
+          label: { en: 'Block all remote calls', fr: 'Bloquer tous les appels distants' },
+        },
+      ],
+      default: 'allow',
+    },
   ],
 }
 

@@ -23,10 +23,23 @@ test('registers the initial settings schema', () => {
     'model',
     'apiKey',
     'timeoutMs',
+    'endpointClass',
+    'egressPolicy',
   ])
 })
 
-test('marks the API key as secret', () => {
+test('exposes data-egress controls and keeps the api key secret', () => {
+  const endpointClass = SETTINGS.fields.find((field) => field.key === 'endpointClass')
+  const egressPolicy = SETTINGS.fields.find((field) => field.key === 'egressPolicy')
+  assert.deepEqual(
+    endpointClass?.options?.map((option) => option.value),
+    ['auto', 'local', 'private', 'remote'],
+  )
+  assert.deepEqual(
+    egressPolicy?.options?.map((option) => option.value),
+    ['allow', 'block-remote-automatic', 'block-remote-all'],
+  )
+  assert.equal(egressPolicy?.default, 'allow')
   const apiKey = SETTINGS.fields.find((field) => field.key === 'apiKey')
   assert.equal(apiKey?.secret, true)
 })

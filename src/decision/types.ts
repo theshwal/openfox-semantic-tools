@@ -60,7 +60,18 @@ export interface DecisionResponse {
 
 export interface DecisionOptions {
   signal?: AbortSignal
+  /**
+   * Whether the call was explicitly invoked by the agent (`explicit`) or issued
+   * automatically on repository/session-derived content (`automatic`).
+   * Egress policy may forbid the latter on remote endpoints. Defaults to
+   * `explicit` so a deliberately invoked tool call is never silently blocked.
+   */
+  origin?: CallOrigin
 }
+
+// Single source of truth: the egress policy owns the vocabulary.
+import type { CallOrigin } from '../egress.js'
+export type { CallOrigin }
 
 export interface DecisionProvider {
   readonly id: string

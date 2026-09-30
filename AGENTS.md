@@ -28,7 +28,7 @@ Compatibility baseline for V0: OpenFox 2.0.157 for tools/settings.
 6. Deterministic checks remain deterministic; never replace tests/typechecks/linters with semantic inference.
 7. A provider error, timeout, malformed response or low-confidence result must never silently become a positive/pass result.
 8. Never log API keys or full secret-bearing settings.
-9. Do not transmit repository/session content to a remote provider except through an explicitly invoked or enabled feature.
+9. Do not transmit repository/session content to a remote provider except through an explicitly invoked or enabled feature. Endpoints are classified `local`/`private`/`remote` and the `egressPolicy` setting blocks automatic remote calls before any request is sent. A call that does not declare an origin is treated as explicit.
 10. No OpenFox core changes for V0. If a later use case needs an upstream API change, isolate it in a separate issue/PR and keep the request generic.
 
 ## Scope discipline

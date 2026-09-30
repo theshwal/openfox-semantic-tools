@@ -198,4 +198,47 @@ npm run evaluate -- /path/to/measured-runs.json /path/to/report-directory
 
 Unmeasured metrics are `null`, not zero. Baseline and candidate remain separate in the summary. Results stay uncommitted by default. See [implementation order and delivery boundaries](docs/IMPLEMENTATION.md).
 
-For opt-in live protocol checks, configure `SEMANTIC_ENDPOINT`, `SEMANTIC_API_KEY` and optionally `SEMANTIC_MODEL` securely in your environment, then run `npm run conformance`. The first evaluation target is hosted Jev. Four public/synthetic cases are sent; the report omits endpoint and credentials. Live checks are excluded from CI. This is an initial protocol smoke test, not full provider conformance or decision-quality evidence.
+For opt-in live protocol checks, configure `SEMANTIC_ENDPOINT`, `SEMANTIC_API_KEY` and optionally `SEMANTIC_MODEL` securely in your environment, then run `npm run conformance`. The report omits the endpoint and credentials. Live checks are excluded from CI.
+
+```bash
+npm run conformance            # against SEMANTIC_ENDPOINT
+npm run conformance:smoke      # against a local offline stub, no credentials
+```
+
+`npm run conformance:smoke` is the only conformance evidence reproducible in
+CI: it starts a local System One stub and runs the same case matrix, so it
+proves the transport, the suite and the report shape. It proves **nothing** about
+decision quality or about a real runtime. `SEMANTIC_UNSUPPORTED_MODEL` enables
+the negative model case.
+
+The report contains no provider identity and no provider verification: nothing a
+protocol probe can do establishes which system answered, and a public-looking
+hostname may resolve to loopback. It reports observations only —
+`remoteEndpointObserved`, `localEndpointObserved`, `protocolConformanceObserved`
+and the purely descriptive `providerLabelExplicitlyConfigured` — plus the
+`compatible` / `strictCompatible` verdicts and the authoritative `deviations`
+list. A `compatible: true` result against the stub says nothing about hosted Jev
+or any other provider; no real runtime has been exercised by this repository
+yet. See [providers and egress](docs/PROVIDERS.md).
+
+## Controlling what leaves the machine
+
+Every semantic call sends its state to the configured endpoint. Two settings
+make that boundary explicit:
+
+- **Endpoint class** — auto-detected as `local`, `private` or `remote`, with a
+  manual override for unusual networks.
+- **Egress policy** — `allow` (default), `block-remote-automatic` (refuses
+  automatic remote calls for repository/session-derived content while keeping
+  deliberate `semantic_decide` calls) or `block-remote-all` (refuses every remote
+  call).
+
+Local and private endpoints are never blocked. A blocked call returns a
+structured `egress_blocked` failure **before** any request is sent and is never
+silently rerouted. Automatic calls opt into the policy explicitly via
+`DecisionOptions.origin`; a call that does not declare an origin is treated as
+explicit, because the tool is only ever invoked deliberately today.
+
+Redaction of state is deliberately not implemented: it would change the meaning
+of the question. Control the boundary by choosing a local or private endpoint,
+or by restricting the policy. See [providers and egress](docs/PROVIDERS.md).
