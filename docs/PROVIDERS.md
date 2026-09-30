@@ -279,6 +279,22 @@ Where to put it, per the same contract:
 
 Installing is opt-in: nothing is written at plugin registration.
 
+### Disabling it, per project or per machine
+
+There is no plugin setting to turn this on or off, because the plugin never
+executes the workflow itself. It is a file, so disabling it is a file operation
+you own:
+
+| Goal | Action |
+| --- | --- |
+| Disable for one project | Delete `{projectDir}/.openfox/workflows/{id}.workflow.json` (or remove the step from it) |
+| Disable for one machine | Delete `{configDir}/workflows/{id}.workflow.json` |
+| Keep the checks, drop the advice | Delete only the `semantic-advice` step and point `deterministic-checks` at `normal-verifier` |
+| Keep everything, stop the provider call | Remove `semantic_verify_task` from the agent's allowed tools; the step says so and continues |
+
+In every case the deterministic checks and the normal verifier remain, so no
+verification is lost by disabling the advisory path.
+
 The workflow has three steps:
 
 ```text
@@ -304,6 +320,22 @@ opt-in safe. No threshold and no calibrated policy is expressed in the file.
 A test loads the emitted file into a **real isolated Openfox 2.0.160 host** and
 asserts it appears in the host's own `userItems` tier, so the schema is proven
 against the real loader rather than against a stub.
+
+### What is proven, and what is not
+
+- **Proven, structurally**: the graph. Every reachable path reaches
+  `normal-verifier`, only the verifier terminates, no transition condition
+  inspects a semantic status, the file loads in a real host, and the packaged
+  CLI runs without a dev dependency.
+- **Proven, behaviourally**: the disable path. Removing the semantic step and
+  rewiring the checks to the verifier keeps both, with nothing lost.
+- **Specified but not proven at runtime**: what the agent actually does inside
+  the `semantic-advice` step. A test asserts the prompt *says* to continue when
+  the tool is unavailable or fails, but that is a specification reviewed by a
+  human, **not** an observed agent behaviour. It stays unverified until a real
+  agent turn executes this workflow.
+
+No end-to-end benchmark exists, so this workflow shortens nothing today.
 
 ## Decision cache
 

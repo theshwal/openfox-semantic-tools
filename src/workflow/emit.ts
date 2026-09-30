@@ -37,11 +37,14 @@ if (printOnly) {
   await writeFile(join(target, fileName), document)
   console.log(`Installed ${join(target, fileName)}`)
 } else {
+  // Nothing is written and nothing is written *about*: no personal path is
+  // printed either, since this program may run in an environment whose config
+  // directory the operator never intended to touch.
   console.error('Nothing written. Pass --out <dir> to install, or --print to preview.')
   process.exitCode = 1
 }
 
-if (!printOnly) {
+if (!printOnly && target !== null) {
   // `getGlobalConfigDir` in OpenFox 2.0.160: ${XDG_CONFIG_HOME:-~/.config}/openfox
   const configDir = join(process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config'), 'openfox')
   console.log(

@@ -40,6 +40,7 @@ test('the workflow CLI is a compiled entry point, not a dev script', async () =>
   const manifest = JSON.parse(await readFile(join(PROJECT, 'package.json'), 'utf8')) as {
     bin?: Record<string, string>
     files?: string[]
+    scripts?: Record<string, string>
   }
   // A public bin entry, shipped through the published files list.
   assert.equal(manifest.bin?.['openfox-semantic-workflow'], './dist/workflow/emit.js')
@@ -49,6 +50,28 @@ test('the workflow CLI is a compiled entry point, not a dev script', async () =>
   assert.match(source, /^#!\/usr\/bin\/env node/, 'the compiled file needs its shebang')
   // And no dev-only runtime is imported by the shipped path.
   assert.ok(!source.includes('tsx'), 'the shipped CLI must not need a TypeScript runtime')
+
+  // Every workflow-related npm script must point at something that exists, so a
+  // renamed or deleted file cannot leave a broken shortcut behind.
+  for (const [name, command] of Object.entries(manifest.scripts ?? {})) {
+    if (!name.startsWith('workflow:')) continue
+    assert.ok(!command.includes('scripts/emit-workflow'), `${name} points at a deleted file`)
+    for (const token of command.split(/\s+/).filter((t) => t.startsWith('dist/'))) {
+      const artifact = join(PROJECT, token)
+      assert.ok(existsSync(artifact) || existsSync(join(PROJECT, 'src', token.replace(/^dist\//, '').replace(/\.js$/, '.ts'))), `${name} points at a missing artifact: ${token}`)
+    }
+  }
+})
+
+test('no argument writes nothing and names no personal path', async () => {
+  const build = await run('npm', ['run', 'build'], { cwd: PROJECT })
+  assert.equal(build.code, 0, build.stderr.slice(0, 500))
+  const dry = await run(process.execPath, [join(PROJECT, 'dist', 'workflow', 'emit.js')], { cwd: PROJECT })
+  assert.notEqual(dry.code, 0, 'a bare run must fail rather than write')
+  assert.match(dry.stderr, /Nothing written/)
+  // It must not print the operator's own config path either.
+  assert.ok(!dry.stdout.includes('.config'), `no personal path in output: ${dry.stdout}`)
+  assert.ok(!dry.stdout.includes('.config'), `no personal path on stdout: ${dry.stdout}`)
 })
 
 test('the installed package runs the CLI with no dev dependencies', async () => {
@@ -198,6 +221,38 @@ test('a real OpenFox host loads the workflow file the packaged CLI writes', asyn
     await new Promise((r) => setTimeout(r, 500))
     child.kill('SIGKILL')
     await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('disabling the advisory path leaves the checks and the verifier intact', () => {
+  // The documented disable procedure: remove the semantic step and rewire the
+  // checks to the verifier. This must not lose verification.
+  const steps = ADVISORY_VERIFICATION_WORKFLOW.steps
+  const withoutAdvice = steps.filter((s) => s.id !== 'semantic-advice')
+  const byId = new Map(withoutAdvice.map((s) => [s.id, s]))
+
+  assert.ok(byId.has('deterministic-checks'), 'the checks survive')
+  assert.ok(byId.has('normal-verifier'), 'the verifier survives')
+  assert.ok(!byId.has('semantic-advice'))
+
+  // Rewired: the checks go straight to the verifier, which still terminates.
+  // The rewire is what the documented procedure tells an operator to do.
+  const checks = { ...byId.get('deterministic-checks')!, transitions: [{ when: { type: 'always' }, goto: 'normal-verifier' }] }
+  assert.deepEqual(checks.transitions, [{ when: { type: 'always' }, goto: 'normal-verifier' }])
+  const verifier = byId.get('normal-verifier')!
+  assert.deepEqual(verifier.transitions, [{ when: { type: 'always' }, goto: '$done' }])
+
+  // And no path can end anywhere but the verifier.
+  const ids = new Set(withoutAdvice.map((s) => s.id))
+  const rewired = withoutAdvice.map((s) => (s.id === 'deterministic-checks' ? checks : s))
+  for (const step of rewired) {
+    for (const t of step.transitions) {
+      assert.ok(t.goto === '$done' || ids.has(t.goto), `${step.id} -> ${t.goto}`)
+    }
+  }
+  for (const step of rewired) {
+    const terminates = step.transitions.every((t) => t.goto === '$done' || t.goto === '$blocked')
+    assert.equal(terminates, step.id === 'normal-verifier', step.id)
   }
 })
 

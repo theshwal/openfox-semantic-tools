@@ -140,6 +140,40 @@ test('the semantic step names the tool, its arguments and the skill', () => {
   assert.match(prompt, /never block the workflow/i)
 })
 
+test('scope: the prompt text is reviewed, not a runtime proof of the agent', () => {
+  // Honest boundary. These tests assert what the file says, not what an agent
+  // will do when it runs. The fallback behaviour of case 2 is therefore
+  // specified and reviewable, but remains UNVERIFIED at runtime until a real
+  // agent turn executes this workflow.
+  const flat = ADVISORY_VERIFICATION_WORKFLOW.steps
+    .map((s) => `${s.id} ${s.prompt ?? ''}`)
+    .join(' ')
+    .replace(/\n\s*/g, ' ')
+  assert.ok(flat.includes('allowed tools'), 'the fallback is specified in the prompt')
+  assert.ok(flat.includes('never block the workflow'), 'the fallback is specified in the prompt')
+  // The structural guarantees ARE proven, because they live in the graph rather
+  // than in prose: no transition condition mentions a semantic status.
+  for (const step of ADVISORY_VERIFICATION_WORKFLOW.steps) {
+    for (const transition of step.transitions) {
+      assert.ok(
+        !/semantic|pass|verdict|score/i.test(JSON.stringify(transition.when)),
+        `${step.id}: no condition may branch on a semantic result`,
+      )
+    }
+  }
+})
+
+test('the prompt does not claim a positive status is reachable today', () => {
+  const flat = template.steps.find((s) => s.id === 'semantic-advice')!.prompt!.replace(/\n\s*/g, ' ')
+  // The shipped policy is uncalibrated, so a positive status is unreachable.
+  // The prompt must say so rather than implying it can happen.
+  assert.match(flat, /A positive status is not reachable today/i)
+  assert.match(flat, /uncalibrated/i)
+  // And if a future calibration produced one, it is still only a candidate.
+  assert.match(flat, /future calibration .* candidate for further checking/i)
+  assert.ok(!/It can return a positive status/i.test(flat), 'must not imply it is possible now')
+})
+
 test('the workflow is listed and uniquely identified', () => {
   const workflows = listAdvisoryWorkflows()
   assert.equal(workflows.length, 1)

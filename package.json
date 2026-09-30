@@ -34,7 +34,6 @@
     "conformance:smoke": "node --import tsx scripts/conformance-smoke.ts",
     "verify:experiment": "node --import tsx scripts/verify-experiment.ts",
     "harness": "node --import tsx scripts/openfox-harness.ts",
-    "workflow:emit": "node --import tsx scripts/emit-workflow.ts",
     "workflow:install": "node dist/workflow/emit.js"
   },
   "peerDependencies": {
