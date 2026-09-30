@@ -164,10 +164,66 @@ quality or compatibility with a real runtime.
 Verified offline: the suite, the generic adapter, and the egress guards against
 a local stub.
 
-Not verified: behaviour against TypeSafe Jev, Kev, Laya, system-one, sys1,
-jev-rs, local-jev, Lichen or EdgeJev. No hosted request has been executed, so
-`compatible: true` from this repository only ever describes a local stub. Real
-per-runtime deviations must be recorded here as they are measured, not assumed.
+Observed once against the official hosted endpoint, through an opt-in campaign
+that is never run in CI: the base protocol was served, and a single deviation
+was found — `choice` with array criteria was rejected while object-map criteria
+worked. That single run is a **declaration with a provenance**, recorded in the
+hosted preset, not a certification of the runtime.
+
+Not verified: behaviour against Kev, Laya, system-one, sys1, jev-rs, local-jev,
+Lichen or EdgeJev. Only the hosted endpoint has ever been reached, and only
+once, which is far too little to characterise any runtime. Real per-runtime
+deviations must be recorded here as they are measured, not assumed.
+
+## Provider presets
+
+A preset is **data, not a transport**. There is exactly one adapter
+(`SystemOneHttpProvider`); a preset only supplies defaults and declared
+capabilities, so switching backends can never change an OpenFox tool contract.
+
+| Preset | Endpoint | Purpose |
+| --- | --- | --- |
+| `custom` (default) | required, operator-supplied | Any System One-compatible endpoint. No assumptions applied. |
+| `jev-hosted` | required, operator-supplied | Hosted backend. Supplies only the auth hint. |
+
+Rules the implementation enforces:
+
+- **`custom` is always available and always the default.** A custom endpoint
+  works exactly as before, with no preset lookup and no capability assumption.
+- **A preset never supplies a host.** The full POST endpoint stays mandatory in
+  settings. The hosted preset deliberately ships an empty endpoint, so no
+  hostname is ever guessed at request time.
+- **Explicit values always win**, including an empty string, which means "no
+  override". A preset fills in what is missing and never overwrites a choice.
+- **Presets carry no credential** — only a hint about whether auth is usually
+  required. Keys stay in the existing secret setting.
+- **Presets carry no policy**: no threshold, no score, no calibration flag. A
+  preset cannot make a positive verdict reachable.
+
+### Capabilities are tri-state, with a provenance
+
+A declared capability is `true`, `false`, or `unverified`:
+
+| Value | Meaning |
+| --- | --- |
+| `true` | Observed to work |
+| `false` | Observed to fail |
+| `unverified` | Nobody asked. **Not** a failure. |
+
+`capabilityOf()` returns `unverified` for any capability a preset does not
+declare, and for any unknown preset. Absence of evidence is never turned into a
+failure.
+
+The hosted preset records `choiceArrayCriteria: false` because a conformance run
+against the official endpoint observed array criteria rejected with a targeted
+error while object-map criteria worked (see the live findings document). This is
+a **declaration with a provenance, not a certification**: it describes one
+observed run, it is not a permanent property of the runtime, and it must be
+re-observed rather than assumed. The generic transport is unchanged, so nothing
+is faked to make the case pass.
+
+Capability discovery is opt-in and failure-safe. No probe runs when a preset is
+applied, at plugin registration, or on the settings path.
 
 ## Data egress
 
