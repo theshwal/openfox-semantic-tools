@@ -40,6 +40,30 @@ test('invalid input never reaches transport', async () => {
   await assert.rejects(p.decide({...request,questions:{bad:{type:'other'}}} as any)); assert.equal(called,false)
   for (const state of [undefined, NaN, ()=>{}, new Date()]) assert.throws(()=>validateRequest({...request,state}))
 })
+test('egress policy blocks automatic remote calls before any request is sent', async () => {
+  let calls = 0
+  const transport = async () => { calls++; return Response.json(payload) }
+  const remote = {endpoint:'https://api.example.com/v1/systemone',timeoutMs:1000,egressPolicy:'block-remote-automatic' as const}
+  await assert.rejects(new SystemOneHttpProvider(remote, transport).decide(request,{origin:'automatic'}),{code:'egress_blocked'})
+  assert.equal(calls,0)
+  // An explicitly invoked call stays allowed under the same policy.
+  await new SystemOneHttpProvider(remote, transport).decide(request,{origin:'explicit'})
+  assert.equal(calls,1)
+  // Omitting origin must not silently downgrade an automatic call to explicit.
+  await new SystemOneHttpProvider(remote, transport).decide(request)
+  assert.equal(calls,2)
+})
+test('egress policy never blocks local or private endpoints and never leaks secrets', async () => {
+  for (const endpoint of ['http://127.0.0.1:9/v1/systemone','http://192.168.1.10:8080/v1/systemone']) {
+    const p = new SystemOneHttpProvider({endpoint,timeoutMs:1000,egressPolicy:'block-remote-all' as const}, async () => Response.json(payload))
+    assert.equal((await p.decide(request,{origin:'automatic'})).provider,'system-one',endpoint)
+  }
+  const blocked = await new SystemOneHttpProvider({endpoint:'https://api.example.com/v1/systemone',timeoutMs:1000,apiKey:'super-secret-key',egressPolicy:'block-remote-all' as const}, async () => Response.json(payload))
+    .decide(request,{origin:'explicit'}).then(()=>null,e=>e)
+  assert.equal((blocked as any).code,'egress_blocked')
+  assert.ok(!String(blocked?.message).includes('super-secret-key'))
+  assert.ok(!String(blocked?.message).includes('Authorization'))
+})
 test('actual HTTP timeout and cancellation stop a stalled response', async () => {
   const server = createServer(() => {})
   await new Promise<void>(resolve => server.listen(0,'127.0.0.1',resolve))
