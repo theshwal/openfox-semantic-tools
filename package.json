@@ -33,7 +33,9 @@
     "conformance": "node --import tsx scripts/conformance.ts",
     "conformance:smoke": "node --import tsx scripts/conformance-smoke.ts",
     "verify:experiment": "node --import tsx scripts/verify-experiment.ts",
-    "harness": "node --import tsx scripts/openfox-harness.ts"
+    "harness": "node --import tsx scripts/openfox-harness.ts",
+    "workflow:emit": "node --import tsx scripts/emit-workflow.ts",
+    "workflow:install": "node dist/workflow/emit.js"
   },
   "peerDependencies": {
     "openfox": ">=2.0.157"
@@ -55,5 +57,8 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/theshwal/openfox-semantic-tools.git"
+  },
+  "bin": {
+    "openfox-semantic-workflow": "./dist/workflow/emit.js"
   }
 }

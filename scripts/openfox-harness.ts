@@ -181,7 +181,15 @@ try {
   server = spawn(
     process.execPath,
     [OPENFOX_CLI, '--port', String(port), '--no-browser'],
-    { env, stdio: ['ignore', 'pipe', 'pipe'] },
+    {
+      env: {
+        ...env,
+        // Without this the CLI re-executes itself with a larger heap, and that
+        // grandchild outlives a kill aimed at the direct child.
+        OPENFOX_HEAP_INCREASED: '1',
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
   )
   let serverLog = ''
   server.stdout!.on('data', (c: Buffer) => (serverLog += String(c)))
