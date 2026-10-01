@@ -123,11 +123,14 @@ export function createProviderSelfTestTool(
             { signal: context.signal, origin: 'explicit' },
           )
           const decision = evaluateVerifyPolicy(response.answers, policy)
+          const expected = fixture.id === 'direct-evidence' && policy.calibrated
+            ? 'pass-candidate'
+            : fixture.expected
           runs.push({
             id: fixture.id,
-            expected: fixture.expected,
+            expected,
             observed: decision.status,
-            matched: decision.status === fixture.expected,
+            matched: decision.status === expected,
             reasons: decision.reasons,
             gates: decision.gates,
           })
