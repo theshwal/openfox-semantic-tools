@@ -50,20 +50,24 @@ test('inactive or absent profiles never change the conservative defaults', () =>
 
 test('profile freshness is visible for provider/model/version drift', () => {
   assert.equal(
-    assessProfileFreshness(profile, { presetId: 'kev', model: 'kev-4b', runtimeVersion: '1' }),
+    assessProfileFreshness(profile, { presetId: 'kev', model: 'kev-4b', runtimeVersion: '1', policyVersion: DEFAULT_POLICY.version }),
     'matched',
   )
   assert.equal(
-    assessProfileFreshness(profile, { presetId: 'laya', model: 'kev-4b', runtimeVersion: '1' }),
+    assessProfileFreshness(profile, { presetId: 'laya', model: 'kev-4b', runtimeVersion: '1', policyVersion: DEFAULT_POLICY.version }),
     'stale',
   )
   assert.equal(
-    assessProfileFreshness(profile, { presetId: 'kev', model: 'kev-9b', runtimeVersion: '1' }),
+    assessProfileFreshness(profile, { presetId: 'kev', model: 'kev-9b', runtimeVersion: '1', policyVersion: DEFAULT_POLICY.version }),
     'stale',
   )
   assert.equal(
-    assessProfileFreshness(profile, { presetId: 'kev', model: 'kev-4b' }),
+    assessProfileFreshness(profile, { presetId: 'kev', model: 'kev-4b', policyVersion: DEFAULT_POLICY.version }),
     'unverified',
+  )
+  assert.equal(
+    assessProfileFreshness(profile, { presetId: 'kev', model: 'kev-4b', runtimeVersion: '1', policyVersion: 'verify-future' }),
+    'stale',
   )
 })
 
