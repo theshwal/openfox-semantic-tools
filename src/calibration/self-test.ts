@@ -111,7 +111,9 @@ export function createProviderSelfTestTool(
           ...(runtimeVersion ? { runtimeVersion } : {}),
           policyVersion: DEFAULT_POLICY.version,
         })
-        const policy = resolveVerifyPolicy(DEFAULT_POLICY, profile, explicit)
+        const applicableProfile =
+          profile && freshness === 'matched' ? profile : profile ? { ...profile, active: false } : null
+        const policy = resolveVerifyPolicy(DEFAULT_POLICY, applicableProfile, explicit)
         const provider = new SystemOneHttpProvider(settings, transport)
         const runs = []
         for (const fixture of SMOKE_FIXTURES) {
