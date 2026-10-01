@@ -315,3 +315,36 @@ test('the API key is never echoed in the report or the error', async () => {
   const result = await tool.execute(args, ctx)
   assert.equal(JSON.stringify(result).includes('sk-do-not-log-me'), false)
 })
+
+
+test('verification resolves explicit calibration overrides above an active profile', async () => {
+  const { transport } = stubTransport(answers(0.8, 2, 0.1, 0.1))
+  const tool = createVerifyTool(
+    () => ({
+      backend: 'custom',
+      endpoint: 'http://localhost/v1/systemone',
+      calibrationProfileJson: JSON.stringify({
+        schemaVersion: 1,
+        id: 'active-profile',
+        provider: { presetId: 'custom' },
+        policyVersion: VERIFY_POLICY_VERSION,
+        testedAt: '2026-10-01T00:00:00.000Z',
+        status: 'provisional',
+        provenance: 'test',
+        active: true,
+        calibrated: false,
+        gateOverrides: { satisfied: { threshold: 0.85, undecided: [0.5, 0.85] } },
+      }),
+      calibrationOverridesJson: JSON.stringify({
+        calibrated: true,
+        gates: { satisfied: { threshold: 0.75 } },
+      }),
+    }),
+    { transport },
+  )
+  const report = JSON.parse((await tool.execute(args, ctx)).output!) as VerifyReport
+  assert.equal(report.calibrated, true)
+  const satisfied = report.gates.find((gate) => gate.id === 'satisfied')!
+  assert.equal(satisfied.threshold, 0.75)
+  assert.equal(satisfied.verdict, 'met')
+})
