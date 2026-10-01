@@ -3,7 +3,7 @@ import { EVIDENCE_SUFFICIENCY_RUBRIC, type GateId } from './policy.js'
 import type { VerifyState } from './state.js'
 
 /**
- * The four questions the use case always asks about the same state, in a single
+ * The questions the use case always asks about the same state, in a single
  * batched provider call. Ids match the policy gate ids so a caller never has to
  * map one vocabulary onto another.
  *
@@ -12,6 +12,7 @@ import type { VerifyState } from './state.js'
  * declares the polarity; the wording is kept consistent with it here.
  */
 export const VERIFY_QUESTION_IDS = {
+  criterionTestable: 'criterionTestable',
   satisfied: 'satisfied',
   evidenceSufficiency: 'evidenceSufficiency',
   offScope: 'offScope',
@@ -20,6 +21,21 @@ export const VERIFY_QUESTION_IDS = {
 
 export function buildVerifyQuestions(criterion: string): Record<string, DecisionQuestion> {
   return {
+    /**
+     * Asked first, and about the criterion text alone. Every other question
+     * assumes the criterion can be decided at all; when it cannot, their
+     * answers are readings of noise. Phrased as a positive so the gate keeps
+     * `high-is-good` / `at-least`: a HIGH answer means "decidable".
+     */
+    [VERIFY_QUESTION_IDS.criterionTestable]: {
+      type: 'noul',
+      instructions:
+        'Considered on its own, without any implementation evidence, is the acceptance criterion ' +
+        `"${criterion}" ` +
+        'a checkable statement — could some concrete state of the code make it clearly true or clearly false? ' +
+        'Answer high only when the criterion names observable behaviour or a measurable property. ' +
+        'Answer low for a criterion that states an intention, a quality without a measure, or a vague improvement.',
+    },
     [VERIFY_QUESTION_IDS.satisfied]: {
       type: 'noul',
       instructions:
@@ -35,7 +51,7 @@ export function buildVerifyQuestions(criterion: string): Record<string, Decision
     [VERIFY_QUESTION_IDS.offScope]: {
       type: 'noul',
       instructions:
-        'Is the implementation staying on scope for this criterion, rather than changing unrelated behaviour? Answer high only when unrelated behaviour is genuinely touched.',
+        'Does the implementation touch behaviour unrelated to this criterion? Answer high only when unrelated behaviour is genuinely changed.',
     },
     [VERIFY_QUESTION_IDS.needsDeeperVerification]: {
       type: 'noul',

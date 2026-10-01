@@ -6,13 +6,14 @@
 // eventually inform. Nothing here is exposed as a setting: a global confidence
 // slider would be exactly the kind of unjustified knob AGENTS.md forbids.
 
-export const VERIFY_POLICY_VERSION = 'verify-0.2.0'
+export const VERIFY_POLICY_VERSION = 'verify-0.3.0'
 
 export type GateId =
   | 'satisfied'
   | 'evidenceSufficiency'
   | 'offScope'
   | 'needsDeeperVerification'
+  | 'criterionTestable'
 
 /**
  * `high-is-good`: a high value supports acceptance.
@@ -24,6 +25,22 @@ export type GateId =
  */
 export type GatePolarity = 'high-is-good' | 'high-is-risk'
 export type GateDirection = 'at-least' | 'at-most'
+/**
+ * `unusable`: the answer is malformed, out of the admissible range, or
+ * contradicts itself. It carries no value the policy may read, and it can
+ * never be a step towards a positive.
+ *
+ * There is deliberately NO confidence-derived verdict. A value the runtime
+ * declares about its own certainty is telemetry, not evidence about the
+ * repository: it is not comparable across runtimes, it is not comparable
+ * across providers, and a policy threshold on it measures the runtime rather
+ * than the code. `verify-0.2.2` had a `low-confidence` verdict driven by a
+ * declared confidence floor and a decisive-mass floor; both were removed
+ * because they made a coherent, well-formed answer indistinguishable from a
+ * malformed one, and in the recorded live campaigns they discarded every
+ * decisive reading on the other gates. A valid, coherent answer is now
+ * classified ONLY by the gate's own threshold and band.
+ */
 export type GateVerdict = 'met' | 'unmet' | 'undecided' | 'unusable'
 
 export interface VerifyGate {
@@ -42,10 +59,6 @@ export interface VerifyGate {
    *
    * - `at-least`: undecided is [low, threshold), met >= threshold, unmet < low
    * - `at-most`:  undecided is (threshold, high], met <= threshold, unmet > high
-   *
-   * A discrete ordinal rubric uses null: its rungs are already distinct
-   * verdicts, so pretending a rung is "uncertain" would only blur a correct
-   * routing decision.
    */
   readonly undecided: readonly [number, number] | null
   /** Admissible answer range. A value outside it is unusable, never decisive. */
@@ -71,17 +84,62 @@ export const EVIDENCE_SUFFICIENCY_RUBRIC = [
 
 /**
  * The rubric's top level number. A three-level rubric runs 0..2, so the top is
- * `length - 1`. Because the score is an expectation over that range, a value at
- * or above the midpoint of the top interval is treated as direct evidence: the
- * expectation has clearly moved into the strongest rung.
+ * `length - 1`.
  */
 const TOP_EVIDENCE_RUNG = EVIDENCE_SUFFICIENCY_RUBRIC.length - 1
-const DIRECT_EVIDENCE_THRESHOLD = TOP_EVIDENCE_RUNG - 0.5
+
+/**
+ * "Direct evidence" gate, in level units, per the score contract in
+ * `docs/SCORE-CONTRACT.md` (option A).
+ *
+ * The score is E[level], so the gate asks whether the expectation has reached
+ * the TOP level, the strongest rung. The contract states the gate explicitly as
+ * `E[level] >= top - 0.1`: a score may be used to cross a threshold, and never
+ * to measure a distance. The 0.1 slack absorbs the two-decimal rounding a real
+ * runtime reports.
+ */
+const DIRECT_EVIDENCE_THRESHOLD = TOP_EVIDENCE_RUNG - 0.1
+
+/**
+ * Where "decisively NOT direct evidence" ends, in level units.
+ *
+ * Unchanged from the previous policy and derived from the rubric, not tuned: a
+ * value at or above the top of the middle rung has moved into the upper half of
+ * the scale and is no longer an unambiguous "no direct evidence". Below it the
+ * answer is decisive and is reported as insufficient evidence.
+ *
+ * Between this edge and the gate, the expectation has neither committed to the
+ * top rung nor been ruled out, so the band is `undecided` — the safe direction,
+ * `unknown`, never a positive.
+ */
+const NOT_DIRECT_FLOOR = TOP_EVIDENCE_RUNG - 0.5
+
+/**
+ * `criterionTestable`: the criterion itself must be decidable from evidence.
+ *
+ * A criterion like "improve performance" has no state in which it is satisfied
+ * and no state in which it fails, so EVERY other answer about it is noise. This
+ * gate is asked BEFORE the substantive ones are trusted, and a decisively
+ * negative reading is its own terminal `unknown` with the reason
+ * `criterion_not_testable`. It is never a pass and never a
+ * `needs-verification`: a deeper pass cannot make an undecidable criterion
+ * decidable, and the correct next action is to rewrite the criterion.
+ */
+const CRITERION_TESTABLE_THRESHOLD = 0.8
+const CRITERION_NOT_TESTABLE_FLOOR = 0.4
 
 export const DEFAULT_POLICY: VerifyPolicy = {
   version: VERIFY_POLICY_VERSION,
   calibrated: false,
   gates: [
+    {
+      id: 'criterionTestable',
+      direction: 'at-least',
+      polarity: 'high-is-good',
+      threshold: CRITERION_TESTABLE_THRESHOLD,
+      undecided: [CRITERION_NOT_TESTABLE_FLOOR, CRITERION_TESTABLE_THRESHOLD],
+      range: [0, 1],
+    },
     {
       id: 'satisfied',
       direction: 'at-least',
@@ -95,11 +153,11 @@ export const DEFAULT_POLICY: VerifyPolicy = {
       direction: 'at-least',
       polarity: 'high-is-good',
       // The rubric has 3 levels, so the expectation runs 0..2 (top level number
-      // 2). "Direct evidence" means the expectation has crossed into the upper
-      // half of the top interval. The band below that point has not committed to
-      // the strongest rung, and a lower value is decisively not direct evidence.
+      // 2). "Direct evidence" is an expectation that reached the top level, per
+      // docs/SCORE-CONTRACT.md. Below the gate the answer is undecided down to
+      // the top of the middle rung, and decisively insufficient below that.
       threshold: DIRECT_EVIDENCE_THRESHOLD,
-      undecided: [DIRECT_EVIDENCE_THRESHOLD, TOP_EVIDENCE_RUNG + 0.5],
+      undecided: [NOT_DIRECT_FLOOR, DIRECT_EVIDENCE_THRESHOLD],
       range: [0, TOP_EVIDENCE_RUNG],
     },
     {
@@ -143,10 +201,14 @@ export interface PolicyDecision {
   readonly calibrated: boolean
   readonly gates: readonly GateOutcome[]
   readonly reasons: readonly string[]
+  /**
+   * Numbers the runtime declared about ITS OWN certainty, kept as telemetry
+   * only. They are reported so a later calibrated run can correlate them with
+   * an outcome; they never reach a threshold, a verdict or a status. Values
+   * only, so nothing textual from a provider payload can reach a report.
+   */
+  readonly telemetry: { readonly declaredConfidence: Readonly<Record<string, number | null>> }
 }
-
-/** Minimum declared confidence before an answer may drive any verdict. */
-const MIN_ANSWER_CONFIDENCE = 0.5
 
 /**
  * Tolerance when checking a score against the expectation implied by its own
@@ -168,17 +230,6 @@ const SCORE_EXPECTATION_TOLERANCE = 0.01
  * relative slack keeps the boundary honest.
  */
 const FLOAT_SLACK = 1e-9
-
-/**
- * Probability mass a rubric answer must place on a single level for the answer
- * to be decisive.
- *
- * The floor is strictly above 0.5 on purpose: at exactly 0.5 the top two levels
- * are tied, the model expressed no preference, and rounding it to a level would
- * fabricate a discrete outcome it never asserted. A tie is therefore unusable,
- * not a coin flip.
- */
-const MIN_DECISIVE_MASS = 0.5 + Number.EPSILON
 
 /**
  * Computes E[level] from a rubric distribution.
@@ -207,20 +258,21 @@ function expectationOf(probabilities: unknown): number | null {
 }
 
 /**
- * A normalized answer is only usable if it is internally consistent.
+ * Reads the number the runtime committed to, or null when the answer is
+ * malformed or self-contradictory.
  *
- * A score answer carries both a `score` and a `probabilities` distribution. Per
- * the documented contract the score is the expectation E[level] over that
- * distribution, not a level index: a three-level rubric yields a value that may
- * fall anywhere in [0, 2] and often lands between two levels. The adapter
- * accepts whatever the runtime returns, so the two are cross-checked here: a
- * score that disagrees with its own distribution is a contradiction and is
- * rejected, while a continuous or rounded expectation is accepted.
+ * There is one question here, and it is about COHERENCE only: a `score` answer
+ * carries both a `score` and a `probabilities` distribution, and per the
+ * documented contract the score is the expectation E[level] over that
+ * distribution. A score that disagrees with its own distribution is a
+ * CONTRADICTION and is `unusable`; a continuous or rounded expectation is
+ * accepted.
  *
- * An explicit `confidence` is honoured independently: a low-confidence answer is
- * unusable rather than a weak positive.
+ * Nothing about a declared `confidence` can change the result. A non-numeric
+ * confidence is still a malformed payload, so it is refused, but a LOW value is
+ * simply telemetry.
  */
-function readValue(answer: unknown, gate: VerifyGate): number | null {
+function readValue(answer: unknown): number | null {
   if (answer === null || typeof answer !== 'object') return null
   const record = answer as {
     type?: unknown
@@ -229,33 +281,25 @@ function readValue(answer: unknown, gate: VerifyGate): number | null {
     probabilities?: unknown
     confidence?: unknown
   }
-  if (record.confidence !== undefined) {
-    if (typeof record.confidence !== 'number' || !Number.isFinite(record.confidence)) return null
-    // A provider may state its own uncertainty; below the floor the answer is
-    // not trustworthy enough to drive any verdict, favourable or not.
-    if (record.confidence < MIN_ANSWER_CONFIDENCE) return null
-  }
+  if (record.confidence !== undefined && typeof record.confidence !== 'number') return null
   if (record.type === 'score') {
     const { score, probabilities } = record
     if (typeof score !== 'number' || !Number.isFinite(score)) return null
     const expectation = expectationOf(probabilities)
     if (expectation === null) return null
-    // Cross-check: the declared score must match the expectation its own
-    // distribution implies, within the tolerance the response precision allows.
     if (Math.abs(score - expectation) > SCORE_EXPECTATION_TOLERANCE + FLOAT_SLACK) return null
-
-    // The mass decides decisiveness, not the index. A level index is NOT
-    // derived by rounding: that would invent a discrete outcome.
-    let decisiveMass = 0
-    for (const mass of Object.values(probabilities as Record<string, number>)) {
-      if (mass > decisiveMass) decisiveMass = mass
-    }
-    if (decisiveMass < MIN_DECISIVE_MASS) return null
     return score
   }
   const raw = record.probability
   if (typeof raw !== 'number' || !Number.isFinite(raw)) return null
   return raw
+}
+
+/** The declared confidence, as a number, for telemetry. Never a policy input. */
+function declaredConfidenceOf(answer: unknown): number | null {
+  if (answer === null || typeof answer !== 'object') return null
+  const value = (answer as { confidence?: unknown }).confidence
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
 function classify(gate: VerifyGate, answer: unknown): GateOutcome {
@@ -265,10 +309,12 @@ function classify(gate: VerifyGate, answer: unknown): GateOutcome {
     direction: gate.direction,
     polarity: gate.polarity,
   }
-  const value = readValue(answer, gate)
+  const value = readValue(answer)
   if (value === null) return { ...base, value: null, verdict: 'unusable' }
   const [rangeMin, rangeMax] = gate.range
-  if (value < rangeMin || value > rangeMax) return { ...base, value, verdict: 'unusable' }
+  if (value < rangeMin || value > rangeMax) {
+    return { ...base, value, verdict: 'unusable' }
+  }
 
   const [low, high] = gate.undecided ?? []
   const decisive =
@@ -283,10 +329,31 @@ function classify(gate: VerifyGate, answer: unknown): GateOutcome {
 
 /** Reason code contributed by a gate whose value is decisively unmet. */
 const UNMET_REASON: Record<GateId, string> = {
+  criterionTestable: 'criterion_not_testable',
   offScope: 'off_scope_detected',
   evidenceSufficiency: 'evidence_insufficient',
   needsDeeperVerification: 'deeper_verification_recommended',
   satisfied: 'criterion_not_satisfied',
+}
+
+/**
+ * Gates whose status is decided by the criterion itself rather than by the
+ * evidence. A decisive negative here outranks every evidence reading, because
+ * a verdict about an undecidable criterion is a verdict about nothing.
+ */
+const PRECONDITION_GATES = ['criterionTestable'] as const
+
+/**
+ * Orders the reason codes of a decision: the code that decided the status
+ * first, then every other decisive failure still worth reporting.
+ *
+ * The full list of `unmet` reasons is always reported, because a caller that
+ * only learns the primary one would still be missing real findings. Only the
+ * FIRST code is the routing decision, so the list is never read as a ranking.
+ */
+function reasonsStartingWith(unmetReasons: readonly string[], primary: string): string[] {
+  const rest = unmetReasons.filter((reason) => reason !== primary)
+  return [primary, ...rest]
 }
 
 export function evaluateVerifyPolicy(
@@ -294,7 +361,14 @@ export function evaluateVerifyPolicy(
   policy: VerifyPolicy = DEFAULT_POLICY,
 ): PolicyDecision {
   const gates = policy.gates.map((gate) => classify(gate, answers[gate.id]))
-  const base = { policyVersion: policy.version, calibrated: policy.calibrated, gates }
+  const declaredConfidence: Record<string, number | null> = {}
+  for (const gate of policy.gates) declaredConfidence[gate.id] = declaredConfidenceOf(answers[gate.id])
+  const base = {
+    policyVersion: policy.version,
+    calibrated: policy.calibrated,
+    gates,
+    telemetry: { declaredConfidence },
+  }
 
   // A decisive failure stays visible even when another gate is undecided: the
   // status stays `unknown`, but the caller must still learn what is wrong.
@@ -302,32 +376,67 @@ export function evaluateVerifyPolicy(
     .filter((gate) => gate.verdict === 'unmet')
     .map((gate) => UNMET_REASON[gate.id])
 
+  const verdictOf = (id: GateId) => gates.find((gate) => gate.id === id)?.verdict
+  const unmet = (id: GateId) => verdictOf(id) === 'unmet'
+  const undecided = (id: GateId) => verdictOf(id) === 'undecided'
+
+  // 1. A malformed or self-contradictory answer carries no value. Nothing may
+  //    be concluded, and nothing may be positive.
   if (gates.some((gate) => gate.verdict === 'unusable')) {
     return { ...base, status: 'unknown', reasons: ['answer_unusable', ...unmetReasons] }
   }
-  if (gates.some((gate) => gate.verdict === 'undecided')) {
-    return { ...base, status: 'unknown', reasons: ['answer_undecided', ...unmetReasons] }
+
+  // 2. An undecidable criterion is terminal, before any risk or evidence
+  //    reading is trusted. A deeper pass cannot fix it; the criterion can.
+  const notTestable = PRECONDITION_GATES.filter((id) => unmet(id))
+  if (notTestable.length > 0) {
+    return {
+      ...base,
+      status: 'unknown',
+      reasons: reasonsStartingWith(unmetReasons, UNMET_REASON.criterionTestable),
+    }
   }
 
-  const unmet = (id: GateId) => gates.find((gate) => gate.id === id)?.verdict === 'unmet'
-  const reasons: string[] = []
+  // 3. A neutral reading, or a gate whose answer is absent, is `unknown` — but
+  //    a decisively unmet gate beside it still routes below, so the caller is
+  //    told what is wrong rather than only that nothing is known.
+  const anyUndecided = gates.some((gate) => gate.verdict === 'undecided')
+
   let status: VerifyStatus
+  let primary: string
 
   if (unmet('offScope')) {
+    // Unrelated behaviour is a scope failure regardless of how well the
+    // criterion itself reads.
     status = 'off-scope'
-    reasons.push('off_scope_detected')
-  } else if (unmet('evidenceSufficiency')) {
-    status = 'insufficient-evidence'
-    reasons.push('evidence_insufficient')
-  } else if (unmet('needsDeeperVerification')) {
-    status = 'needs-verification'
-    reasons.push('deeper_verification_recommended')
+    primary = UNMET_REASON.offScope
   } else if (unmet('satisfied')) {
+    // The criterion is not met, on evidence that was read. The work is
+    // incomplete: that is `needs-verification`, not `insufficient-evidence`,
+    // because a deeper pass is exactly the follow-up that can settle it.
     status = 'needs-verification'
-    reasons.push('criterion_not_satisfied')
+    primary = UNMET_REASON.satisfied
+  } else if (unmet('needsDeeperVerification')) {
+    // The criterion may be met, but a concrete risk of a superficial fix was
+    // identified: a deeper pass is warranted.
+    status = 'needs-verification'
+    primary = UNMET_REASON.needsDeeperVerification
+  } else if (unmet('evidenceSufficiency')) {
+    // Reached only when `satisfied` did not already decide the case. An
+    // insufficient-evidence verdict that overrode a decisive "not satisfied"
+    // would report the wrong next action: redo the work, not gather evidence.
+    status = 'insufficient-evidence'
+    primary = UNMET_REASON.evidenceSufficiency
+  } else if (anyUndecided) {
+    status = 'unknown'
+    primary = 'answer_undecided'
   } else {
     status = 'pass-candidate'
+    primary = 'all_gates_met'
   }
+
+  const reasons =
+    status === 'pass-candidate' ? [] : reasonsStartingWith(unmetReasons, primary)
 
   if (status === 'pass-candidate' && !policy.calibrated) {
     // A positive verdict is not reachable before a measured calibration exists.

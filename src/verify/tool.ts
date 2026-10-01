@@ -27,6 +27,11 @@ export interface VerifyReport {
   answers: Record<string, DecisionAnswer>
   gates: ReturnType<typeof evaluateVerifyPolicy>['gates']
   reasons: string[]
+  /**
+   * Numbers the runtime declared about its own certainty. Reported for later
+   * analysis and never used to decide the status.
+   */
+  telemetry: ReturnType<typeof evaluateVerifyPolicy>['telemetry']
 }
 
 export interface VerifyToolOptions {
@@ -105,6 +110,7 @@ export function createVerifyTool(
           answers: response.answers,
           gates: decision.gates,
           reasons: [...decision.reasons],
+          telemetry: decision.telemetry,
         }
         return { success: true, output: JSON.stringify(report) }
       } catch (error) {

@@ -33,6 +33,11 @@ export interface DecisionRequest {
 export interface NoulAnswer {
   type: 'noul'
   probability: number
+  /**
+   * The runtime's own declared certainty. Telemetry only: no use case reads it
+   * as a policy input, because it describes the runtime rather than the subject.
+   */
+  confidence?: number
 }
 
 export interface ChoiceAnswer {

@@ -1,10 +1,21 @@
 {
-  "schemaVersion": 1,
-  "note": "Labelled fixtures for the semantic_verify_task experiment. Every case is synthetic public text: no real repository content, no credentials, no provider identity. `expected` is the label a correct policy must reach; `scripted` is the deterministic provider answer used by the offline runner only.",
+  "schemaVersion": 2,
+  "note": "Labelled fixtures for the semantic_verify_task experiment, in eight declared families so a provider comparison cannot be decided by a single case. Every case is synthetic public text: no real repository content, no credentials, no provider identity. `expected` is the label a correct policy must reach under the shipped, uncalibrated policy; `expectedUnderCalibratedPolicy` records what the same content would justify once a measured calibration exists, and is never the current label. `scripted` is the deterministic provider answer used by the offline runner only. A label is the correct next ACTION for a human reading the criterion and the evidence; it is never adjusted to raise a match rate. See scripts/verify-fixture-set.ts for the rules the whole set must satisfy.",
+  "families": [
+    "direct-positive-evidence",
+    "partial-evidence",
+    "criterion-not-implemented",
+    "contradictory-evidence",
+    "other-test-or-scope",
+    "off-scope-change",
+    "ambiguous-criterion",
+    "needs-deeper-verification"
+  ],
   "cases": [
     {
       "id": "positive-direct-evidence",
       "group": "positive",
+      "category": "direct-positive-evidence",
       "criterionId": "ac-1",
       "issueId": "#4",
       "criterion": "The timeout setting is bounded between 1 and 120000 ms.",
@@ -16,13 +27,14 @@
         "deterministicTestResults": ["ok 1 - settings defaults and invalid configuration"]
       },
       "evidenceRefs": ["src/providers/system-one.ts", "test/provider.test.ts#timeout-bounds"],
-      "scripted": { "satisfied": 0.96, "evidenceSufficiency": 2, "offScope": 0.02, "needsDeeperVerification": 0.04 },
+      "scripted": { "criterionTestable": 0.95, "satisfied": 0.96, "evidenceSufficiency": 2, "offScope": 0.02, "needsDeeperVerification": 0.04 },
       "expected": "unknown",
       "rationale": "All gates are met, but the shipped policy is uncalibrated, so production must stay consultative."
     },
     {
       "id": "positive-under-calibrated-policy",
       "group": "positive",
+      "category": "direct-positive-evidence",
       "criterionId": "ac-2",
       "issueId": "#4",
       "criterion": "The report exposes a stable report id and criterion trace.",
@@ -32,7 +44,7 @@
         "deterministicTestResults": ["ok 1 - the report is traceable and aggregatable"]
       },
       "evidenceRefs": ["src/verify/tool.ts", "test/verify-tool.test.ts#trace"],
-      "scripted": { "satisfied": 0.97, "evidenceSufficiency": 2, "offScope": 0.02, "needsDeeperVerification": 0.03 },
+      "scripted": { "criterionTestable": 0.95, "satisfied": 0.97, "evidenceSufficiency": 2, "offScope": 0.02, "needsDeeperVerification": 0.03 },
       "expectedUnderCalibratedPolicy": "pass-candidate",
       "expected": "unknown",
       "rationale": "Same answers, but this is the only case that may reach pass-candidate, and only with a measured calibration."
@@ -40,6 +52,7 @@
     {
       "id": "negative-criterion-not-implemented",
       "group": "negative",
+      "category": "criterion-not-implemented",
       "criterionId": "ac-3",
       "issueId": "#4",
       "criterion": "Every response is checked against the request question count.",
@@ -49,13 +62,14 @@
         "deterministicTestResults": ["ok 1 - provider returns a payload"]
       },
       "evidenceRefs": ["src/providers/system-one.ts"],
-      "scripted": { "satisfied": 0.05, "evidenceSufficiency": 2, "offScope": 0.02, "needsDeeperVerification": 0.9 },
+      "scripted": { "criterionTestable": 0.95, "satisfied": 0.05, "evidenceSufficiency": 2, "offScope": 0.02, "needsDeeperVerification": 0.9 },
       "expected": "needs-verification",
       "rationale": "A confident implementation summary is paired with evidence that does not contain the required check."
     },
     {
       "id": "adversarial-assertive-summary-without-code",
       "group": "adversarial",
+      "category": "other-test-or-scope",
       "criterionId": "ac-4",
       "issueId": "#4",
       "criterion": "Secret settings values are never logged.",
@@ -64,13 +78,15 @@
         "diffExcerpts": ["+ it('never logs the key', () => {})"]
       },
       "evidenceRefs": ["test/provider.test.ts"],
-      "scripted": { "satisfied": 0.62, "evidenceSufficiency": 1, "offScope": 0.05, "needsDeeperVerification": 0.55 },
-      "expected": "unknown",
-      "rationale": "An emphatic summary with no supporting code must land in the uncertainty band rather than a verdict."
+      "scripted": { "criterionTestable": 0.95, "satisfied": 0.62, "evidenceSufficiency": 1, "offScope": 0.05, "needsDeeperVerification": 0.55 },
+      "expected": "insufficient-evidence",
+      "rationale": "The evidence is an empty test body and an emphatic summary: it contains no code that demonstrates the criterion, and it does not refute it either. The decisive defect here is the evidence, not the criterion, so the correct action is to obtain the real evidence.",
+      "labelAudit": "CHANGED in verify-0.3.0: unknown -> insufficient-evidence. Justified by the content, not by the score. The evidence block contains a test declaration with an empty body and no implementation line, so `evidenceSufficiency` = 1 (indirect at best) is a decisive reading of a real deficiency, while `satisfied` = 0.62 sits inside its own band and therefore decides nothing. The correct next action for a human is 'go and get the evidence', which is exactly insufficient-evidence. The old `unknown` was the weaker label: it claimed the policy itself could not decide, when the policy had identified something specific. No threshold and no scripted number was touched. The audit brief suggested needs-verification instead; that is rejected on content, because it would require `satisfied` to be decisively false (below 0.6) and the evidence refutes nothing."
     },
     {
       "id": "adversarial-test-log-for-another-test",
       "group": "adversarial",
+      "category": "other-test-or-scope",
       "criterionId": "ac-5",
       "issueId": "#4",
       "criterion": "A blocked egress call sends no request at all.",
@@ -80,13 +96,14 @@
         "deterministicTestResults": ["ok 1 - egress policy never blocks local or private endpoints"]
       },
       "evidenceRefs": ["test/egress.test.ts"],
-      "scripted": { "satisfied": 0.93, "evidenceSufficiency": 1, "offScope": 0.03, "needsDeeperVerification": 0.1 },
+      "scripted": { "criterionTestable": 0.95, "satisfied": 0.93, "evidenceSufficiency": 1, "offScope": 0.03, "needsDeeperVerification": 0.1 },
       "expected": "insufficient-evidence",
-      "rationale": "A green test log for a different property is plausible but does not directly evidence this criterion."
+      "rationale": "A green test log for a different property is plausible but does not directly evidence this criterion, while `satisfied` is not refuted: insufficient-evidence is the correct action, go and get the real evidence."
     },
     {
       "id": "adversarial-off-scope-change",
       "group": "adversarial",
+      "category": "off-scope-change",
       "criterionId": "ac-6",
       "issueId": "#4",
       "criterion": "The tool returns a stable report shape.",
@@ -99,13 +116,14 @@
         "deterministicTestResults": ["ok 1 - report shape is stable"]
       },
       "evidenceRefs": ["src/verify/tool.ts"],
-      "scripted": { "satisfied": 0.9, "evidenceSufficiency": 2, "offScope": 0.88, "needsDeeperVerification": 0.2 },
+      "scripted": { "criterionTestable": 0.95, "satisfied": 0.9, "evidenceSufficiency": 2, "offScope": 0.88, "needsDeeperVerification": 0.2 },
       "expected": "off-scope",
       "rationale": "Unrelated public API churn must be surfaced as off-scope even when the criterion itself looks met."
     },
     {
       "id": "adversarial-ambiguous-criterion",
       "group": "adversarial",
+      "category": "ambiguous-criterion",
       "criterionId": "ac-7",
       "issueId": "#4",
       "criterion": "Improve performance.",
@@ -114,9 +132,699 @@
         "diffExcerpts": ["+ for (let i = 0; i < n; i++) total += items[i]"]
       },
       "evidenceRefs": [],
-      "scripted": { "satisfied": 0.5, "evidenceSufficiency": 0, "offScope": 0.2, "needsDeeperVerification": 0.6 },
+      "scripted": { "criterionTestable": 0.1, "satisfied": 0.5, "evidenceSufficiency": 0, "offScope": 0.2, "needsDeeperVerification": 0.6 },
       "expected": "unknown",
-      "rationale": "An untestable criterion and absent evidence must produce no verdict, never a default pass."
+      "expectedReason": "criterion_not_testable",
+      "rationale": "The criterion is not decidable at all: no state of the code can make it clearly true or clearly false, and no evidence exists either. A dedicated unknown, never a default pass, and never needs-verification because a deeper pass cannot make an undecidable criterion decidable.",
+      "labelAudit": "The status was already unknown; what changed in verify-0.3.0 is WHY. Before this batch the case reached unknown through two coincidences, and the label did not say which rule fired. `criterionTestable` (0.1) is now decisively not testable, so the status comes from a dedicated reason. The status label is unchanged because the content already implied it."
+    },
+    {
+      "id": "positive-cache-eviction-bound",
+      "group": "positive",
+      "category": "direct-positive-evidence",
+      "criterionId": "ac-8",
+      "issueId": "#4",
+      "criterion": "The in-memory cache drops its least recently used entry once it holds more than 64 answers.",
+      "evidence": {
+        "summary": "Eviction is implemented in the cache and covered by a deterministic test.",
+        "diffExcerpts": [
+          "+ if (this.entries.size > this.maxEntries) this.evictLeastRecentlyUsed()",
+          "+ private evictLeastRecentlyUsed(): void {",
+          "+   const oldest = this.order.keys().next().value",
+          "+   if (oldest !== undefined) this.delete(oldest)",
+          "+ }"
+        ],
+        "deterministicTestResults": [
+          "ok 1 - the sixty-fifth answer evicts the oldest one",
+          "ok 2 - a read refreshes recency"
+        ]
+      },
+      "evidenceRefs": ["src/cache/index.ts", "test/cache.test.ts#eviction"],
+      "scripted": { "criterionTestable": 0.94, "satisfied": 0.95, "evidenceSufficiency": 2, "offScope": 0.04, "needsDeeperVerification": 0.08 },
+      "expectedUnderCalibratedPolicy": "pass-candidate",
+      "expected": "unknown",
+      "rationale": "Implementation, bound and behaviour are all visible in the excerpt and confirmed by a named test, so nothing is refuted and nothing is missing. The shipped policy still routes to unknown because it is uncalibrated."
+    },
+    {
+      "id": "positive-concurrency-single-flight",
+      "group": "positive",
+      "category": "direct-positive-evidence",
+      "criterionId": "ac-9",
+      "issueId": "#4",
+      "criterion": "Two concurrent calls carrying the same request share a single provider round trip.",
+      "evidence": {
+        "summary": "An in-flight map deduplicates identical requests and the count is asserted in a test.",
+        "diffExcerpts": [
+          "+ const key = this.keyFor(request)",
+          "+ const existing = this.inFlight.get(key)",
+          "+ if (existing) return existing",
+          "+ const promise = this.transport.decide(request)",
+          "+ this.inFlight.set(key, promise)"
+        ],
+        "deterministicTestResults": [
+          "ok 1 - two simultaneous identical requests produce one fetch",
+          "ok 2 - distinct requests are not merged"
+        ]
+      },
+      "evidenceRefs": ["src/providers/system-one.ts", "test/provider.test.ts#single-flight"],
+      "scripted": { "criterionTestable": 0.92, "satisfied": 0.93, "evidenceSufficiency": 2, "offScope": 0.03, "needsDeeperVerification": 0.12 },
+      "expectedUnderCalibratedPolicy": "pass-candidate",
+      "expected": "unknown",
+      "rationale": "The merge is visible in the code path and the round-trip count is asserted, so the criterion is directly evidenced. Kept distinct from ac-2: this one exercises concurrency behaviour rather than report shape."
+    },
+    {
+      "id": "positive-endpoint-parsing-rules",
+      "group": "positive",
+      "category": "direct-positive-evidence",
+      "criterionId": "ac-10",
+      "issueId": "#4",
+      "criterion": "An endpoint URL carrying an embedded password is rejected before the provider object is constructed.",
+      "evidence": {
+        "summary": "The constructor refuses credentials, query strings and fragments in the endpoint.",
+        "diffExcerpts": [
+          "+ if (url.username || url.password || url.search || url.hash) {",
+          "+   throw new ProviderError('configuration', 'Endpoint must be an HTTP(S) URL without credentials, query or fragment')",
+          "+ }"
+        ],
+        "deterministicTestResults": [
+          "ok 1 - an endpoint with embedded credentials is refused",
+          "ok 2 - an endpoint with a query string is refused"
+        ]
+      },
+      "evidenceRefs": ["src/providers/system-one.ts", "test/provider.test.ts#endpoint-validation"],
+      "scripted": { "criterionTestable": 0.93, "satisfied": 0.94, "evidenceSufficiency": 2, "offScope": 0.02, "needsDeeperVerification": 0.07 },
+      "expectedUnderCalibratedPolicy": "pass-candidate",
+      "expected": "unknown",
+      "rationale": "The refusal is implemented where the criterion requires it and asserted by a test. The only reason this is not a positive today is the uncalibrated policy."
+    },
+    {
+      "id": "partial-evidence-summary-without-excerpts",
+      "group": "negative",
+      "category": "partial-evidence",
+      "criterionId": "ac-11",
+      "issueId": "#4",
+      "criterion": "An aborted request is distinguishable from a network failure in the returned error code.",
+      "evidence": {
+        "summary": "Abort handling was reworked and the distinction is covered, though the excerpt only shows the guard that rethrows the caller's signal."
+      },
+      "evidenceRefs": ["src/providers/system-one.ts"],
+      "scripted": { "criterionTestable": 0.9, "satisfied": 0.78, "evidenceSufficiency": 1, "offScope": 0.05, "needsDeeperVerification": 0.25 },
+      "expected": "insufficient-evidence",
+      "rationale": "Only a summary is supplied, with no code and no test output. The change is plausible and nothing refutes the criterion, so the correct action is to supply the excerpt rather than to declare the work missing."
+    },
+    {
+      "id": "partial-evidence-invariant-tested-elsewhere",
+      "group": "negative",
+      "category": "partial-evidence",
+      "criterionId": "ac-12",
+      "issueId": "#4",
+      "criterion": "A redacted request never leaves the process when a secret setting is present.",
+      "evidence": {
+        "summary": "The redaction helper was added in an earlier commit that is not part of this change.",
+        "diffExcerpts": ["+ const body = redact(request, settings)"]
+      },
+      "evidenceRefs": ["src/providers/system-one.ts"],
+      "scripted": { "criterionTestable": 0.91, "satisfied": 0.84, "evidenceSufficiency": 1, "offScope": 0.04, "needsDeeperVerification": 0.2 },
+      "expected": "insufficient-evidence",
+      "rationale": "The one-line call site is visible and nothing contradicts the criterion, but the helper's behaviour is not in the evidence. Insufficient evidence, not a failure: the right next action is to show the helper or its test."
+    },
+    {
+      "id": "partial-evidence-two-of-three-assertions",
+      "group": "negative",
+      "category": "partial-evidence",
+      "criterionId": "ac-13",
+      "issueId": "#4",
+      "criterion": "A malformed distribution is rejected with a dedicated error code rather than a generic parse failure.",
+      "evidence": {
+        "summary": "The transport now checks the sum of the returned masses before accepting a score answer.",
+        "diffExcerpts": [
+          "+ if (Math.abs(sum - 1) > 0.002) throw new ProviderError('invalid_response', 'Distribution does not sum to one')"
+        ],
+        "deterministicTestResults": ["ok 1 - a distribution that does not sum to one is rejected"]
+      },
+      "evidenceRefs": ["src/providers/system-one.ts", "test/provider.test.ts#distribution"],
+      "scripted": { "criterionTestable": 0.9, "satisfied": 0.8, "evidenceSufficiency": 1, "offScope": 0.03, "needsDeeperVerification": 0.18 },
+      "expected": "insufficient-evidence",
+      "rationale": "The code and the test show one of the two required behaviours: the code is clearly there, but nothing shows a dedicated code, so the criterion is only partly evidenced. Go and read the error mapping."
+    },
+    {
+      "id": "contradictory-test-asserts-the-opposite",
+      "group": "adversarial",
+      "category": "contradictory-evidence",
+      "criterionId": "ac-14",
+      "issueId": "#4",
+      "criterion": "A response whose answer count differs from the question count is rejected.",
+      "evidence": {
+        "summary": "A first version was added, and the accompanying test asserts the opposite of the criterion.",
+        "diffExcerpts": ["+ return JSON.parse(raw)"],
+        "deterministicTestResults": [
+          "not ok 1 - a response with a missing answer is accepted",
+          "# expected 200, got 200"
+        ]
+      },
+      "evidenceRefs": ["src/providers/system-one.ts", "test/provider.test.ts#count"],
+      "scripted": { "criterionTestable": 0.93, "satisfied": 0.15, "evidenceSufficiency": 2, "offScope": 0.05, "needsDeeperVerification": 0.3 },
+      "expected": "needs-verification",
+      "rationale": "The deterministic output is red and explicitly states the opposite behaviour, so this is a decided failure rather than a gap in the evidence: the work is incomplete and must be redone."
+    },
+    {
+      "id": "contradictory-summary-denies-criterion",
+      "group": "adversarial",
+      "category": "contradictory-evidence",
+      "criterionId": "ac-15",
+      "issueId": "#4",
+      "criterion": "The public report never contains a credential value.",
+      "evidence": {
+        "summary": "The implementation explicitly leaves the apiKey field in the report payload; the reviewer flagged it in the excerpt.",
+        "diffExcerpts": [
+          "+ report = { ...report, apiKey: settings.apiKey ?? null }",
+          "- // reviewer: shipping the key here breaks the secret policy"
+        ],
+        "deterministicTestResults": ["not ok 1 - the report exposes the api key"]
+      },
+      "evidenceRefs": ["src/verify/tool.ts", "test/verify-tool.test.ts#secret"],
+      "scripted": { "criterionTestable": 0.94, "satisfied": 0.08, "evidenceSufficiency": 2, "offScope": 0.08, "needsDeeperVerification": 0.35 },
+      "expected": "needs-verification",
+      "rationale": "The evidence both implements and demonstrates the violation, and the deterministic test is red. The criterion is refuted, so the work must be redone rather than merely evidenced."
+    },
+    {
+      "id": "contradictory-code-without-any-check",
+      "group": "adversarial",
+      "category": "contradictory-evidence",
+      "criterionId": "ac-16",
+      "issueId": "#4",
+      "criterion": "A score answer is rejected when its value disagrees with its own distribution.",
+      "evidence": {
+        "summary": "An earlier draft dropped the coherence check; the current code has no comparison left and no test covers it.",
+        "diffExcerpts": ["+ return { type: 'score', score: a.score, ...common }"],
+        "deterministicTestResults": ["ok 1 - a score answer is accepted"]
+      },
+      "evidenceRefs": ["src/providers/system-one.ts", "test/provider.test.ts#score-coherence"],
+      "scripted": { "criterionTestable": 0.92, "satisfied": 0.18, "evidenceSufficiency": 2, "offScope": 0.04, "needsDeeperVerification": 0.4 },
+      "expected": "needs-verification",
+      "rationale": "A green test for the removal is worse than silence: the code shown cannot perform the required comparison. The criterion is decidable and refuted, so a deeper pass and a real implementation are both required."
+    },
+    {
+      "id": "other-test-config-shape-not-range",
+      "group": "adversarial",
+      "category": "other-test-or-scope",
+      "criterionId": "ac-17",
+      "issueId": "#4",
+      "criterion": "A numeric setting outside its accepted interval is rejected with a configuration error.",
+      "evidence": {
+        "summary": "Settings parsing is covered.",
+        "diffExcerpts": ["+ return { ...overrides }"],
+        "deterministicTestResults": ["ok 1 - settings defaults and invalid configuration"]
+      },
+      "evidenceRefs": ["test/settings.test.ts"],
+      "scripted": { "criterionTestable": 0.92, "satisfied": 0.88, "evidenceSufficiency": 1, "offScope": 0.05, "needsDeeperVerification": 0.15 },
+      "expected": "insufficient-evidence",
+      "rationale": "The test name is the very one a previous change introduced and it does not mention a range or a rejection. The criterion is not refuted, only unevidenced, so the action is to supply the real assertion."
+    },
+    {
+      "id": "other-test-green-in-another-package",
+      "group": "adversarial",
+      "category": "other-test-or-scope",
+      "criterionId": "ac-18",
+      "issueId": "#4",
+      "criterion": "The plugin manifest declares the tools capability exactly once.",
+      "evidence": {
+        "summary": "Manifest wiring is done.",
+        "diffExcerpts": ["+ capabilities: ['settings', 'tools', 'skills']"],
+        "deterministicTestResults": ["ok 1 - skills load without any provider call"]
+      },
+      "evidenceRefs": ["test/skills.test.ts"],
+      "scripted": { "criterionTestable": 0.91, "satisfied": 0.86, "evidenceSufficiency": 1, "offScope": 0.06, "needsDeeperVerification": 0.18 },
+      "expected": "insufficient-evidence",
+      "rationale": "The excerpt supports the criterion and the test log comes from a different subject. Nothing contradicts it; the honest reading is that the decisive test was not supplied."
+    },
+    {
+      "id": "other-test-trace-failure-for-sibling-metric",
+      "group": "adversarial",
+      "category": "other-test-or-scope",
+      "criterionId": "ac-19",
+      "issueId": "#4",
+      "criterion": "Every gate verdict in the report is one of the four documented verdicts.",
+      "evidence": {
+        "summary": "Verdict enumeration was tightened and neighbouring tests were run in the same pass.",
+        "diffExcerpts": ["+ const VERDICTS = new Set(['met', 'unmet', 'undecided', 'unusable'])"],
+        "deterministicTestResults": [
+          "ok 1 - every emitted verdict belongs to the declared set",
+          "ok 2 - the summary groups runs by mode and variant"
+        ]
+      },
+      "evidenceRefs": ["src/verify/policy.ts", "test/verify-policy.test.ts#verdicts"],
+      "scripted": { "criterionTestable": 0.9, "satisfied": 0.87, "evidenceSufficiency": 1, "offScope": 0.07, "needsDeeperVerification": 0.22 },
+      "expected": "insufficient-evidence",
+      "rationale": "The first green line is relevant but the change also touched an unrelated grouping helper, so the evidence for this criterion alone is indirect. Insufficient evidence is the honest call: no refutation, no direct proof."
+    },
+    {
+      "id": "off-scope-wholesale-rename-in-a-documentation-only-task",
+      "group": "adversarial",
+      "category": "off-scope-change",
+      "criterionId": "ac-20",
+      "issueId": "#4",
+      "criterion": "A documentation example is added showing how to configure the plugin.",
+      "evidence": {
+        "summary": "The example was added, and the same commit also rewrote the contributor guide and moved two guides to a new directory.",
+        "diffExcerpts": [
+          "+ ## Configuring the plugin",
+          "- ## Contributing",
+          "- see docs/CONTRIBUTING.md for the old workflow",
+          "+ docs/getting-started.md: moved",
+          "+ docs/contributing.md: moved"
+        ],
+        "deterministicTestResults": ["ok 1 - the example renders in the docs build"]
+      },
+      "evidenceRefs": ["docs/ARCHITECTURE.md"],
+      "scripted": { "criterionTestable": 0.93, "satisfied": 0.9, "evidenceSufficiency": 2, "offScope": 0.9, "needsDeeperVerification": 0.2 },
+      "expected": "off-scope",
+      "rationale": "The criterion is met, but a documentation-only task that relocates the contributor guide is unrelated behaviour. Off-scope outranks a positive reading of the criterion itself."
+    },
+    {
+      "id": "off-scope-refactor-plus-backwards-compatible-field",
+      "group": "adversarial",
+      "category": "off-scope-change",
+      "criterionId": "ac-21",
+      "issueId": "#4",
+      "criterion": "The report records the provider latency in milliseconds.",
+      "evidence": {
+        "summary": "Latency is recorded, and the same change replaced the whole formatter module and reordered every field of the report.",
+        "diffExcerpts": [
+          "+ latencyMs: response.latencyMs ?? 0,",
+          "- export function formatReport(report) { return JSON.stringify(report, null, 2) }",
+          "+ export const formatReport = (report) => stableStringify(report)"
+        ],
+        "deterministicTestResults": ["ok 1 - the report exposes latencyMs"]
+      },
+      "evidenceRefs": ["src/verify/tool.ts", "test/verify-tool.test.ts#latency"],
+      "scripted": { "criterionTestable": 0.92, "satisfied": 0.91, "evidenceSufficiency": 2, "offScope": 0.92, "needsDeeperVerification": 0.25 },
+      "expected": "off-scope",
+      "rationale": "Replacing a shared formatter is unrelated to recording a number, even though the number is present. The correct next action is to split the change, not to accept it."
+    },
+    {
+      "id": "off-scope-dependency-bump-in-a-bugfix-commit",
+      "group": "adversarial",
+      "category": "off-scope-change",
+      "criterionId": "ac-22",
+      "issueId": "#4",
+      "criterion": "The retry loop gives up after the configured number of attempts.",
+      "evidence": {
+        "summary": "The retry cap is in place; the commit also bumps three unrelated dependencies and changes the default log level.",
+        "diffExcerpts": [
+          "+ for (let attempt = 0; attempt < maxAttempts; attempt += 1) {",
+          "- \"typescript\": \"^5.8.0\"",
+          "+ \"typescript\": \"^5.9.2\"",
+          "+ const DEFAULT_LOG_LEVEL = 'debug'"
+        ],
+        "deterministicTestResults": ["ok 1 - the loop stops at the configured maximum"]
+      },
+      "evidenceRefs": ["src/providers/system-one.ts", "package.json"],
+      "scripted": { "criterionTestable": 0.91, "satisfied": 0.89, "evidenceSufficiency": 2, "offScope": 0.85, "needsDeeperVerification": 0.22 },
+      "expected": "off-scope",
+      "rationale": "A dependency bump and a default log level are unrelated behaviour in a bugfix commit. The criterion being met does not make the change in scope."
+    },
+    {
+      "id": "ambiguous-criterion-quality-word-without-a-measure",
+      "group": "adversarial",
+      "category": "ambiguous-criterion",
+      "criterionId": "ac-23",
+      "issueId": "#4",
+      "criterion": "Make the code more robust.",
+      "evidence": {
+        "summary": "Several defensive branches were added and the whole suite still passes.",
+        "diffExcerpts": ["+ if (!payload) return { ok: false, reason: 'empty' }"],
+        "deterministicTestResults": ["ok 1 - the full suite passes"]
+      },
+      "evidenceRefs": ["src/tool.ts"],
+      "scripted": { "criterionTestable": 0.12, "satisfied": 0.6, "evidenceSufficiency": 1, "offScope": 0.1, "needsDeeperVerification": 0.4 },
+      "expected": "unknown",
+      "expectedReason": "criterion_not_testable",
+      "rationale": "No state of the code can make the word robust clearly true or clearly false, so the correct action is to rewrite the criterion with an observable property. A deeper verification pass cannot help here."
+    },
+    {
+      "id": "ambiguous-outcome-criterion-without-a-threshold",
+      "group": "adversarial",
+      "category": "ambiguous-criterion",
+      "criterionId": "ac-24",
+      "issueId": "#4",
+      "criterion": "Latency should improve significantly.",
+      "evidence": {
+        "summary": "A micro-benchmark was added showing a small improvement on one machine.",
+        "diffExcerpts": ["+ const before = 41.2, after = 38.7"]
+      },
+      "evidenceRefs": ["benchmark/results/harness/report.json"],
+      "scripted": { "criterionTestable": 0.15, "satisfied": 0.55, "evidenceSufficiency": 1, "offScope": 0.08, "needsDeeperVerification": 0.5 },
+      "expected": "unknown",
+      "expectedReason": "criterion_not_testable",
+      "rationale": "The criterion names an outcome but no threshold, so three percent and thirty percent would both be called significant. The evidence is real; the criterion is what cannot be decided."
+    },
+    {
+      "id": "needs-deeper-live-endpoint-not-exercised",
+      "group": "negative",
+      "category": "needs-deeper-verification",
+      "criterionId": "ac-25",
+      "issueId": "#4",
+      "criterion": "A non-2xx response body is never echoed back to the caller.",
+      "evidence": {
+        "summary": "The error path was rewritten to discard the upstream body; every test uses an in-process stub, so no real runtime has been exercised.",
+        "diffExcerpts": [
+          "+ if (!response.ok) {",
+          "+   await response.body?.cancel()",
+          "+   throw new ProviderError('http', `System One HTTP ${response.status}`)",
+          "+ }"
+        ],
+        "deterministicTestResults": ["ok 1 - a 500 response yields an http error"]
+      },
+      "evidenceRefs": ["src/providers/system-one.ts", "test/provider.test.ts#http"],
+      "scripted": { "criterionTestable": 0.9, "satisfied": 0.87, "evidenceSufficiency": 2, "offScope": 0.04, "needsDeeperVerification": 0.85 },
+      "expected": "needs-verification",
+      "rationale": "The code looks right and nothing refutes the criterion, but every observation comes from a stub: a real runtime may stream the body differently. A deeper pass against a live endpoint is the right next action."
+    },
+    {
+      "id": "needs-deeper-hardcoded-guard-against-configurable-setting",
+      "group": "negative",
+      "category": "needs-deeper-verification",
+      "criterionId": "ac-26",
+      "issueId": "#4",
+      "criterion": "The cache entry lifetime is read from the configured TTL rather than a constant.",
+      "evidence": {
+        "summary": "Expiry is implemented and the unit test passes, but the default was chosen arbitrarily and no setting is exposed yet.",
+        "diffExcerpts": ["+ const expiresAt = Date.now() + DEFAULT_TTL_MS"],
+        "deterministicTestResults": ["ok 1 - an entry expires after the configured lifetime"]
+      },
+      "evidenceRefs": ["src/cache/index.ts", "test/cache.test.ts#ttl"],
+      "scripted": { "criterionTestable": 0.89, "satisfied": 0.85, "evidenceSufficiency": 2, "offScope": 0.05, "needsDeeperVerification": 0.85 },
+      "expected": "needs-verification",
+      "rationale": "The criterion is only met in appearance: the lifetime comes from a hard-coded default, so a deeper reading of the settings layer would find the gap. Nothing is refuted, so the answer is a deeper pass rather than insufficient evidence."
+    },
+    {
+      "id": "needs-deeper-partial-parse-accepted-against-the-spec",
+      "group": "negative",
+      "category": "needs-deeper-verification",
+      "criterionId": "ac-27",
+      "issueId": "#4",
+      "criterion": "A choice answer naming a value outside the criteria is refused.",
+      "evidence": {
+        "summary": "The refusal was added for arrays of criteria; the object form of the criteria is only covered by a hand-written test double, never by a runtime.",
+        "diffExcerpts": [
+          "+ const labels = Array.isArray(q.criteria) ? q.criteria : Object.keys(q.criteria)",
+          "+ if (typeof a.choice !== 'string' || !labels.includes(a.choice)) throw new ProviderError('invalid_response', 'Invalid choice')"
+        ],
+        "deterministicTestResults": ["ok 1 - an array-criteria runtime rejects an unknown choice"]
+      },
+      "evidenceRefs": ["src/providers/system-one.ts", "test/provider.test.ts#choice"],
+      "scripted": { "criterionTestable": 0.9, "satisfied": 0.83, "evidenceSufficiency": 2, "offScope": 0.04, "needsDeeperVerification": 0.86 },
+      "expected": "needs-verification",
+      "rationale": "One runtime shape is genuinely covered and the other only passes against a double, so a superficial fix is plausible and a deeper pass across both shapes is warranted."
+    },
+    {
+      "id": "needs-deeper-gate-closes-only-on-happy-path",
+      "group": "negative",
+      "category": "needs-deeper-verification",
+      "criterionId": "ac-28",
+      "issueId": "#4",
+      "criterion": "The decision cache key includes the model identifier so two models never share an entry.",
+      "evidence": {
+        "summary": "The key is built from the endpoint and the request body; the tests only ever run against a single model.",
+        "diffExcerpts": ["+ return `${this.settings.endpoint}|${JSON.stringify(request)}`"],
+        "deterministicTestResults": ["ok 1 - the same request twice hits the cache"]
+      },
+      "evidenceRefs": ["src/cache/index.ts", "test/cache.test.ts#key"],
+      "scripted": { "criterionTestable": 0.91, "satisfied": 0.88, "evidenceSufficiency": 2, "offScope": 0.05, "needsDeeperVerification": 0.84 },
+      "expected": "needs-verification",
+      "rationale": "Nothing is refuted and the test is green, but a single-model run cannot show the key separates models. A deeper verification with a second model is the next action."
+    },
+    {
+      "id": "needs-deeper-timeout-army-versus-real-clock",
+      "group": "negative",
+      "category": "needs-deeper-verification",
+      "criterionId": "ac-29",
+      "issueId": "#4",
+      "criterion": "The request really stops being sent when the timeout elapses.",
+      "evidence": {
+        "summary": "An AbortSignal timeout is wired into the fetch call and the unit test uses a fake transport that returns instantly, so no real delay was ever observed.",
+        "diffExcerpts": [
+          "+ const timeout = AbortSignal.timeout(this.settings.timeoutMs)",
+          "+ const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout"
+        ],
+        "deterministicTestResults": ["ok 1 - an already aborted signal short-circuits"]
+      },
+      "evidenceRefs": ["src/providers/system-one.ts", "test/provider.test.ts#timeout"],
+      "scripted": { "criterionTestable": 0.9, "satisfied": 0.86, "evidenceSufficiency": 2, "offScope": 0.04, "needsDeeperVerification": 0.87 },
+      "expected": "needs-verification",
+      "rationale": "The wiring is visible and nothing contradicts it, but the only test never lets a clock run out, so a deeper run against a slow endpoint is needed before claiming the guarantee."
+    },
+    {
+      "id": "not-implemented-no-symbol-in-the-change",
+      "group": "negative",
+      "category": "criterion-not-implemented",
+      "criterionId": "ac-30",
+      "issueId": "#4",
+      "criterion": "The egress policy blocks an automatic call to a remote endpoint before any socket is opened.",
+      "evidence": {
+        "summary": "The endpoint classifier was extracted into its own module and covered by unit tests.",
+        "diffExcerpts": [
+          "+ export function resolveEndpointClass(endpoint, declared) {",
+          "+   const host = new URL(endpoint).hostname",
+          "+   return declared ?? (isPrivate(host) ? 'private' : 'remote')",
+          "+ }"
+        ],
+        "deterministicTestResults": [
+          "ok 1 - a loopback endpoint classifies as local",
+          "ok 2 - a documentation host classifies as remote"
+        ]
+      },
+      "evidenceRefs": ["src/egress.ts", "test/egress.test.ts#classify"],
+      "scripted": { "criterionTestable": 0.93, "satisfied": 0.12, "evidenceSufficiency": 2, "offScope": 0.04, "needsDeeperVerification": 0.3 },
+      "expected": "needs-verification",
+      "rationale": "Classification is only half the criterion: the block itself never appears in the change. The work is incomplete, which is a redoing of the task, not a request for more evidence."
+    },
+    {
+      "id": "not-implemented-guard-missing-from-the-parser",
+      "group": "negative",
+      "category": "criterion-not-implemented",
+      "criterionId": "ac-31",
+      "issueId": "#4",
+      "criterion": "A payload whose answers are missing entirely produces an invalid_response error.",
+      "evidence": {
+        "summary": "A summary is confident and a test log is present, but nothing in the excerpt reads a missing answers field.",
+        "diffExcerpts": ["+ const payload = JSON.parse(raw)"],
+        "deterministicTestResults": ["ok 1 - a well formed payload is accepted"]
+      },
+      "evidenceRefs": ["src/providers/system-one.ts"],
+      "scripted": { "criterionTestable": 0.92, "satisfied": 0.1, "evidenceSufficiency": 2, "offScope": 0.03, "needsDeeperVerification": 0.7 },
+      "expected": "needs-verification",
+      "rationale": "The criterion is decidable and the shown code cannot satisfy it: the required guard is simply absent. Redo the work."
+    },
+    {
+      "id": "not-implemented-test-updated-without-the-source",
+      "group": "negative",
+      "category": "criterion-not-implemented",
+      "criterionId": "ac-32",
+      "issueId": "#4",
+      "criterion": "A question the transport cannot normalize is dropped rather than answered with a default.",
+      "evidence": {
+        "summary": "The test was updated to expect the question to be missing, and the normalizer was left untouched.",
+        "diffExcerpts": [
+          "- assert.equal(Object.keys(answers).length, 3)",
+          "+ assert.equal(Object.keys(answers).length, 2)"
+        ],
+        "deterministicTestResults": ["ok 1 - an unknown question type yields two answers"]
+      },
+      "evidenceRefs": ["test/provider.test.ts#unknown-type"],
+      "scripted": { "criterionTestable": 0.9, "satisfied": 0.14, "evidenceSufficiency": 2, "offScope": 0.05, "needsDeeperVerification": 0.6 },
+      "expected": "needs-verification",
+      "rationale": "The change adjusts the test to accept the very behaviour the criterion forbids. The criterion is refuted by its own evidence, so the implementation must change."
+    },
+    {
+      "id": "not-implemented-validation-only-in-the-tool-layer",
+      "group": "negative",
+      "category": "criterion-not-implemented",
+      "criterionId": "ac-33",
+      "issueId": "#4",
+      "criterion": "The adapter itself, not a caller, refuses a payload whose answers are not an object.",
+      "evidence": {
+        "summary": "The adapter delegates the check to a shared request validator, and the test covers the tool layer.",
+        "diffExcerpts": [
+          "+ const validated = validateRequest(request)",
+          "+ return this.transport(this.settings.endpoint, { body: JSON.stringify({ ...validated, ...(model ? { model } : {}) }) })"
+        ],
+        "deterministicTestResults": ["ok 1 - the tool rejects a payload that is not an object"]
+      },
+      "evidenceRefs": ["src/providers/system-one.ts", "test/provider.test.ts#payload"],
+      "scripted": { "criterionTestable": 0.91, "satisfied": 0.62, "evidenceSufficiency": 1, "offScope": 0.06, "needsDeeperVerification": 0.35 },
+      "expected": "insufficient-evidence",
+      "rationale": "The excerpt is the whole of the decision-bearing material: it shows a delegated validation call and a transport call, neither of which implements the object check the criterion names, and the only test that exists exercises a different layer. The criterion is not refuted, so the correct action is to supply the evidence that would decide it."
+    },
+    {
+      "id": "not-implemented-stale-comment-replaces-the-check",
+      "group": "negative",
+      "category": "criterion-not-implemented",
+      "criterionId": "ac-34",
+      "issueId": "#4",
+      "criterion": "The response size limit is enforced while the body is being read.",
+      "evidence": {
+        "summary": "A comment documents the limit, and the reader loop shown carries no counter.",
+        "diffExcerpts": [
+          "+ // responses larger than 2 MB are refused",
+          "+ while (true) { const { done, value } = await reader.read(); if (done) break; chunks.push(value) }"
+        ]
+      },
+      "evidenceRefs": ["src/providers/system-one.ts"],
+      "scripted": { "criterionTestable": 0.9, "satisfied": 0.16, "evidenceSufficiency": 2, "offScope": 0.04, "needsDeeperVerification": 0.45 },
+      "expected": "needs-verification",
+      "rationale": "A comment that promises a check is not a check, and the loop shown is decidably missing it. The task is incomplete."
+    },
+    {
+      "id": "positive-usage-token-parse-boundaries",
+      "group": "positive",
+      "category": "direct-positive-evidence",
+      "criterionId": "ac-35",
+      "issueId": "#4",
+      "criterion": "A usage string that is not of the form number followed by a unit character is rejected.",
+      "evidence": {
+        "summary": "The token parser checks the unit and the boundary, and both cases are asserted.",
+        "diffExcerpts": [
+          "+ const UNIT = /^(?<count>\\d+)(?<unit>[a-z])$/",
+          "+ if (!UNIT.test(token)) return null",
+          "+ return { count: Number(UNIT.exec(token).groups.count), unit: UNIT.exec(token).groups.unit }"
+        ],
+        "deterministicTestResults": [
+          "ok 1 - 12m parses to a count and a unit",
+          "ok 2 - 12 parses to null"
+        ]
+      },
+      "evidenceRefs": ["src/discovery/read.ts", "test/discovery-read.test.ts#usage"],
+      "scripted": { "criterionTestable": 0.92, "satisfied": 0.94, "evidenceSufficiency": 2, "offScope": 0.03, "needsDeeperVerification": 0.06 },
+      "expectedUnderCalibratedPolicy": "pass-candidate",
+      "expected": "unknown",
+      "rationale": "The rejection path and the accepted path are both visible, and both are named in the test log. Only the uncalibrated policy keeps this out of a positive status."
+    },
+    {
+      "id": "positive-skill-load-without-settings",
+      "group": "positive",
+      "category": "direct-positive-evidence",
+      "criterionId": "ac-36",
+      "issueId": "#4",
+      "criterion": "Loading a skill performs no network request and reads no settings.",
+      "evidence": {
+        "summary": "The load path returns a constant prompt and the test asserts the fetch spy was never called.",
+        "diffExcerpts": [
+          "+ load: async () => ({ content: [{ type: 'text', text: SEMANTIC_VERIFICATION_SKILL.prompt }] }),",
+          "+ const calls = 0",
+          "+ assert.equal(calls, 0)"
+        ],
+        "deterministicTestResults": ["ok 1 - skill registration never reads settings or performs a request"]
+      },
+      "evidenceRefs": ["src/skills/source.ts", "test/skills.test.ts#registration"],
+      "scripted": { "criterionTestable": 0.93, "satisfied": 0.95, "evidenceSufficiency": 2, "offScope": 0.02, "needsDeeperVerification": 0.05 },
+      "expectedUnderCalibratedPolicy": "pass-candidate",
+      "expected": "unknown",
+      "rationale": "The behaviour is visible in the code and asserted directly by the named test, with no unrelated behaviour in the excerpt."
+    },
+    {
+      "id": "partial-evidence-long-report-without-the-failing-assertion",
+      "group": "negative",
+      "category": "partial-evidence",
+      "criterionId": "ac-37",
+      "issueId": "#4",
+      "criterion": "A verdict outside the documented set is impossible to produce.",
+      "evidence": {
+        "summary": "A consolidated test log is supplied: every assertion of the test file is listed, but none exercises the verdict enumeration.",
+        "diffExcerpts": [
+          "+ import test from 'node:test'",
+          "+ import assert from 'node:assert/strict'",
+          "+ import { evaluateVerifyPolicy } from '../src/verify/policy.ts'",
+          "+ const answers = { satisfied: { type: 'noul', noul: 0.95 } }"
+        ],
+        "deterministicTestResults": [
+          "ok 1 - a met gate keeps its verdict",
+          "ok 2 - an unmet gate keeps its verdict",
+          "ok 3 - an undecided gate keeps its verdict",
+          "ok 4 - an unusable gate keeps its verdict"
+        ]
+      },
+      "evidenceRefs": ["test/verify-policy.test.ts"],
+      "scripted": { "criterionTestable": 0.9, "satisfied": 0.79, "evidenceSufficiency": 1, "offScope": 0.05, "needsDeeperVerification": 0.22 },
+      "expected": "insufficient-evidence",
+      "rationale": "A lot of evidence was supplied and none of it bears on the enumeration question. The criterion is not refuted; the evidence is simply off target."
+    },
+    {
+      "id": "contradictory-non-json-accepted",
+      "group": "adversarial",
+      "category": "contradictory-evidence",
+      "criterionId": "ac-38",
+      "issueId": "#4",
+      "criterion": "A non-JSON body from the provider is rejected as an invalid response.",
+      "evidence": {
+        "summary": "The change makes the transport tolerant of a plain-text body instead of refusing it, and the test now asserts that tolerance.",
+        "diffExcerpts": [
+          "- let payload; try { payload = JSON.parse(raw) } catch { throw new ProviderError('invalid_response', 'Provider returned invalid JSON') }",
+          "+ let payload; try { payload = JSON.parse(raw) } catch { payload = { answers: {}, raw } }"
+        ],
+        "deterministicTestResults": ["ok 1 - a plain text body is tolerated"]
+      },
+      "evidenceRefs": ["src/providers/system-one.ts", "test/provider.test.ts#invalid-json"],
+      "scripted": { "criterionTestable": 0.93, "satisfied": 0.1, "evidenceSufficiency": 2, "offScope": 0.05, "needsDeeperVerification": 0.3 },
+      "expected": "needs-verification",
+      "rationale": "The diff shows the rejection being deleted and a green test protecting the opposite behaviour. The criterion is refuted by the change itself."
+    },
+    {
+      "id": "contradictory-secret-echoed-in-error-message",
+      "group": "adversarial",
+      "category": "contradictory-evidence",
+      "criterionId": "ac-39",
+      "issueId": "#4",
+      "criterion": "An upstream error message included in a tool result is bounded and sanitized.",
+      "evidence": {
+        "summary": "A new branch concatenates the whole upstream body into the error message, and the test asserts the full text is present.",
+        "diffExcerpts": [
+          "+ throw new ProviderError('http', `System One HTTP ${response.status}: ${raw}`)"
+        ],
+        "deterministicTestResults": ["ok 1 - the error message contains the entire upstream body"]
+      },
+      "evidenceRefs": ["src/providers/system-one.ts", "test/provider.test.ts#http"],
+      "scripted": { "criterionTestable": 0.92, "satisfied": 0.09, "evidenceSufficiency": 2, "offScope": 0.04, "needsDeeperVerification": 0.35 },
+      "expected": "needs-verification",
+      "rationale": "The evidence shows an unbounded body being echoed, which is the exact opposite of the criterion. Nothing about this case is a gap in evidence: the work is wrong and must be redone."
+    },
+    {
+      "id": "off-scope-test-helper-rewrite-within-a-fix",
+      "group": "adversarial",
+      "category": "off-scope-change",
+      "criterionId": "ac-40",
+      "issueId": "#4",
+      "criterion": "The failing test for a rejected endpoint now asserts the configuration error code.",
+      "evidence": {
+        "summary": "The assertion was corrected, and the same commit rewrote the shared test harness, changed the assertion library in four other files and reformatted the whole test directory.",
+        "diffExcerpts": [
+          "+ assert.equal(JSON.parse(result.error).code, 'configuration')",
+          "- export async function runTool(args) { return tool.execute(args, ctx) }",
+          "+ export const runTool = (args) => tool.execute(args, ctx)",
+          "- const assert = require('assert')",
+          "+ import assert from 'node:assert/strict'"
+        ],
+        "deterministicTestResults": ["ok 1 - the error code is configuration"]
+      },
+      "evidenceRefs": ["test/provider.test.ts", "test/helpers/registry.ts"],
+      "scripted": { "criterionTestable": 0.92, "satisfied": 0.9, "evidenceSufficiency": 2, "offScope": 0.88, "needsDeeperVerification": 0.2 },
+      "expected": "off-scope",
+      "rationale": "Rewriting a shared harness and converting an assertion library across the suite is unrelated to correcting one assertion. The criterion is met and the change is still not in scope."
+    },
+    {
+      "id": "partial-no-evidence-submitted-at-all",
+      "group": "negative",
+      "category": "partial-evidence",
+      "criterionId": "ac-41",
+      "issueId": "#4",
+      "criterion": "The advisory report records the number of bytes the assembled evidence occupied.",
+      "evidence": {},
+      "evidenceRefs": [],
+      "scripted": { "criterionTestable": 0.9, "satisfied": 0.5, "evidenceSufficiency": 0, "offScope": 0.04, "needsDeeperVerification": 0.3 },
+      "expected": "needs-verification",
+      "labelAudit": "Labelled needs-verification, not insufficient-evidence, and the content is the reason. With no evidence at all there is no reading on which the criterion could hold, so a provider can only answer that it is not satisfied; that is a decisive negative and the policy routes it to needs-verification. Calling this a gap in the evidence would claim the work might already be done, which nothing here supports. AGENTS.md invariant 7 is the governing rule: a provider answer that carries no support must never resolve to a benign reading.",
+      "rationale": "The caller submitted the criterion alone: no code, no test output, no summary. Nothing supports the criterion, so it is not satisfied on this submission and the work must be done and evidenced. The absence of evidence is the finding here, not a reason to stay silent."
     }
   ]
 }

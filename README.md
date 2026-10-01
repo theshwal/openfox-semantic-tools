@@ -312,7 +312,7 @@ The result is always advisory:
 
 | Status | Meaning |
 | --- | --- |
-| `unknown` | Not decided: missing evidence, uncertainty band, or no calibration |
+| `unknown` | Not decided: missing evidence, uncertainty band, uncommitted answer, or no calibration |
 | `needs-verification` | The criterion does not look satisfied, or a deeper pass is advised |
 | `insufficient-evidence` | The evidence does not directly address the criterion |
 | `off-scope` | The change touches unrelated behaviour |
@@ -361,6 +361,24 @@ and the policy under test are identical. It is excluded from CI.
 ```bash
 SEMANTIC_ENDPOINT=... npm run verify:experiment -- --live
 ```
+
+### Replaying the recorded campaigns
+
+```bash
+npm run verify:replay                   # offline, no credentials
+```
+
+Two live `verify-0.2.1` campaigns are committed as sanitized, number-only
+snapshots under `benchmark/snapshots/verify-0.2.1/`, with a readable companion
+at `benchmark/snapshots/provider-smoke-2026-10-01.md`. They carry the observed
+status, the reasons and the per-gate numbers, and nothing else: no state, no
+evidence, no criterion text, no endpoint, no credential.
+
+The replay re-derives those recorded numbers under the frozen `verify-0.2.1`
+rules and under the shipped policy. The frozen rules must reproduce the status
+each run recorded — if they do not, the comparison column means nothing, and
+the replay fails. This is **arithmetic on recorded numbers, not a measurement**:
+it never writes a rate and never claims a false-pass count.
 
 ## Usage skill
 

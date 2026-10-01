@@ -217,7 +217,11 @@ test('the plugin registers no transition handler and no hook', async () => {
 test('a positive verdict is still unreachable, so no workflow can skip verification', () => {
   // The strongest possible answers must still not produce a pass, which is what
   // makes an advisory-only template the only safe integration today.
+  // `criterionTestable` is part of the answer set since verify-0.3.0: leaving it
+  // out would make the answer set unusable and prove nothing about the gate
+  // that actually blocks the positive.
   const best = {
+    criterionTestable: { type: 'noul', probability: 1 },
     satisfied: { type: 'noul', probability: 1 },
     evidenceSufficiency: { type: 'score', score: 2, probabilities: { 0: 0, 1: 0, 2: 1 } },
     offScope: { type: 'noul', probability: 0 },
