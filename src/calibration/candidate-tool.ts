@@ -1,7 +1,7 @@
 import type { PluginTool } from 'openfox/plugin'
 
 import { deriveCandidateProfile, type LabelledCalibrationCase, type ProviderIdentity } from './profile.js'
-import { VERIFY_POLICY_VERSION, type GateId } from '../verify/policy.js'
+import { VERIFY_POLICY_VERSION, type GateId, type VerifyStatus } from '../verify/policy.js'
 
 const GATE_IDS: readonly GateId[] = [
   'criterionTestable',
@@ -19,8 +19,9 @@ function parseCases(value: unknown): LabelledCalibrationCase[] {
     }
     const record = entry as Record<string, unknown>
     if (typeof record.id !== 'string' || !record.id.trim()) throw new Error(`cases[${index}].id is required`)
-    if (typeof record.expectedStatus !== 'string' || !record.expectedStatus.trim()) {
-      throw new Error(`cases[${index}].expectedStatus is required`)
+    const allowedStatuses: VerifyStatus[] = ['pass-candidate', 'needs-verification', 'insufficient-evidence', 'off-scope', 'unknown']
+    if (typeof record.expectedStatus !== 'string' || !allowedStatuses.includes(record.expectedStatus as VerifyStatus)) {
+      throw new Error(`cases[${index}].expectedStatus is invalid`)
     }
     if (record.gates === null || typeof record.gates !== 'object' || Array.isArray(record.gates)) {
       throw new Error(`cases[${index}].gates is required`)
@@ -34,7 +35,7 @@ function parseCases(value: unknown): LabelledCalibrationCase[] {
       }
       gates[id] = value
     }
-    return { id: record.id, expectedStatus: record.expectedStatus, gates }
+    return { id: record.id, expectedStatus: record.expectedStatus as VerifyStatus, gates }
   })
 }
 
