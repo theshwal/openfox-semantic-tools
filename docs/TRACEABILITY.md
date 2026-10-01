@@ -120,6 +120,25 @@ Proof kinds used below:
 | 7.16 | "A live run must persist what an analysis needs, and nothing sensitive." | F: `scripts/verify-experiment.ts` per-case `observedNumbers`; T: `test/verify-experiment.test.ts` "a live run persists the numbers the analysis needs, and nothing else" and "the persisted live numbers carry no state, no evidence and no secret" | verified |
 | 7.17 | "A question's polarity must match the gate that reads it." | F: `src/verify/questions.ts` `offScope`; T: `test/verify-tool.test.ts` "the offScope question states one polarity, matching its high-is-risk gate" | verified |
 
+## Issue #27 — provider calibration profiles and self-test
+
+| # | Requirement (issue text) | Proof | Verdict |
+| --- | --- | --- | --- |
+| 27.1 | "Generic semantic policy structure remains provider-neutral." | F: `src/calibration/profile.ts` overlays numeric gate data onto `VerifyPolicy`; routing remains in `src/verify/policy.ts` | verified |
+| 27.2 | "Numeric gate calibration can vary by runtime/model profile." | F: `CalibrationProfile.gateOverrides`; T: `test/calibration-profile.test.ts` "precedence is explicit override > active profile > conservative defaults" | verified |
+| 27.3 | "Explicit user settings override shipped profile defaults." | T: `test/calibration-profile.test.ts` "precedence is explicit override > active profile > conservative defaults"; T: `test/verify-tool.test.ts` "verification resolves explicit calibration overrides above an active profile" | verified |
+| 27.4 | "A runtime can be used with no profile via conservative generic defaults." | T: `test/calibration-profile.test.ts` "inactive or absent profiles never change the conservative defaults" | verified |
+| 27.5 | "Profiles carry provenance/freshness metadata and can be marked stale/unverified." | F: `src/calibration/profile.ts` `CalibrationProfile`, `CalibrationProfileStatus`, `assessProfileFreshness`; T: `test/calibration-profile.test.ts` "profile freshness is visible for provider/model/version drift" | verified |
+| 27.6 | "A provider/model change cannot silently inherit a supposedly validated profile without a visible freshness decision." | F: `src/verify/tool.ts` disables stale/unverified profiles before policy resolution and reports `calibration.freshness`; T: `test/calibration-profile.test.ts` "profile freshness is visible for provider/model/version drift" | verified |
+| 27.7 | "A user can run a provider self-test against the actual configured endpoint/model." | F: `src/calibration/self-test.ts` uses `parseSettings` and `SystemOneHttpProvider`; T: `test/calibration-tools.test.ts` "provider self-test uses only embedded synthetic state and never changes settings" | verified |
+| 27.8 | "Self-test reports protocol compatibility separately from semantic/calibration behavior." | F: `src/calibration/self-test.ts` returns separate `protocol`, `activeProfile`, `semanticSmoke`, `gateObservations` and `profileComparison`; `protocol.scope` states `smoke-not-conformance` | verified |
+| 27.9 | "Self-test can identify categories/questions that should remain on fallback." | F: `src/calibration/self-test.ts` `warnings`, `fallbackCategories`, `recommendation`; T: `test/calibration-tools.test.ts` "provider self-test uses only embedded synthetic state and never changes settings" | verified |
+| 27.10 | "Users can provide a labelled local test set and derive a candidate profile without changing plugin source." | F: `src/calibration/candidate-tool.ts`; F: `src/calibration/profile.ts` `deriveCandidateProfile`; T: `test/calibration-profile.test.ts` "a user-labelled set yields an inactive observation-only candidate" | verified |
+| 27.11 | "Candidate profiles require explicit opt-in before use." | F: generated candidates are `active: false`, `calibrated: false`; T: `test/calibration-tools.test.ts` "candidate tool returns an inactive JSON profile and never activates it" | verified |
+| 27.12 | "No secrets or private repository content are persisted by the built-in self-test." | F: `src/calibration/self-test.ts` uses embedded synthetic states and has no persistence path; T: `test/calibration-tools.test.ts` "provider self-test uses only embedded synthetic state and never changes settings" | verified |
+| 27.13 | "Tests prove precedence: explicit override > calibration profile > conservative defaults." | T: `test/calibration-profile.test.ts` "precedence is explicit override > active profile > conservative defaults" | verified |
+| 27.14 | "Documentation states clearly that provider/model behavior can change over time and that shipped profiles are dated observations, not guarantees." | F: `docs/CALIBRATION.md`; F: README "Provider calibration and self-test" section | verified |
+
 ## Scope discipline
 
 | Requirement | Proof | Verdict |
@@ -136,7 +155,7 @@ Proof kinds used below:
 Counts are recomputed from the tables above by
 `test/traceability.test.ts`, so they cannot silently drift.
 
-- Verified: 41 requirements.
+- Verified: 55 requirements.
 - Verified with a documented deviation: 1 (#14.18, one skill instead of two).
 - **Unverified: 4** — the real-provider false-pass rate (4.18), the
   OpenFox end-to-end savings metrics (4.19), the unreached `pass-candidate`
