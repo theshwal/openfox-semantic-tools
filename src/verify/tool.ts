@@ -5,6 +5,7 @@ import { parseSettings } from '../settings.js'
 import { buildVerifyState } from './state.js'
 import { buildVerifyRequest } from './questions.js'
 import { DEFAULT_POLICY, evaluateVerifyPolicy, type VerifyPolicy, type VerifyStatus } from './policy.js'
+import { parseCalibrationOverrides, parseCalibrationProfile, resolveVerifyPolicy } from '../calibration/profile.js'
 import type { DecisionAnswer, DecisionResponse, DecisionRequest } from '../decision/types.js'
 
 export interface VerifyReport {
@@ -54,7 +55,6 @@ export function createVerifyTool(
   readSettings: (projectId?: string) => Record<string, unknown>,
   options: VerifyToolOptions = {},
 ): PluginTool {
-  const policy = options.policy ?? DEFAULT_POLICY
   const transport = options.transport ?? fetch
   return {
     name: 'semantic_verify_task',
@@ -89,7 +89,13 @@ export function createVerifyTool(
           args.criterion as string,
           typeof args.model === 'string' ? args.model : undefined,
         )
-        const provider = new SystemOneHttpProvider(parseSettings(readSettings(context.projectId)), transport)
+        const rawSettings = readSettings(context.projectId)
+        const provider = new SystemOneHttpProvider(parseSettings(rawSettings), transport)
+        const policy = options.policy ?? resolveVerifyPolicy(
+          DEFAULT_POLICY,
+          parseCalibrationProfile(rawSettings.calibrationProfileJson),
+          parseCalibrationOverrides(rawSettings.calibrationOverridesJson),
+        )
         // Repository/session-derived content: always automatic, never explicit.
         const response: DecisionResponse = await provider.decide(request, {
           signal: context.signal,
