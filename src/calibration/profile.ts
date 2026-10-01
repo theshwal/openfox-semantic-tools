@@ -202,6 +202,14 @@ function mergeGate(gate: VerifyGate, ...layers: Array<GateCalibrationOverride | 
   if (undecided) {
     const [low, high] = undecided
     if (low < min || high > max || low > high) throw new Error(`Calibration band for ${gate.id} is outside its range`)
+    // Keep the gate contract true after a threshold-only override: the
+    // undecided interval always shares the decisive threshold edge.
+    undecided = gate.direction === 'at-least'
+      ? [low, threshold]
+      : [threshold, high]
+    if (undecided[0] > undecided[1]) {
+      throw new Error(`Calibration band for ${gate.id} does not contain its threshold edge`)
+    }
   }
   return { ...gate, threshold, undecided }
 }
