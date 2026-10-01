@@ -109,6 +109,7 @@ export function createProviderSelfTestTool(
           presetId: settings.presetId ?? 'custom',
           ...(settings.model ? { model: settings.model } : {}),
           ...(runtimeVersion ? { runtimeVersion } : {}),
+          policyVersion: DEFAULT_POLICY.version,
         })
         const policy = resolveVerifyPolicy(DEFAULT_POLICY, profile, explicit)
         const provider = new SystemOneHttpProvider(settings, transport)
