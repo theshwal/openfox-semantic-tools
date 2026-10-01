@@ -79,11 +79,11 @@ negative verdict. It carries a code and nothing else.
 ## Provider calibration
 
 When a provider/model or its version changed, or before relying on an active
-calibration profile, use `semantic_provider_self_test` if that tool is allowed.
+calibration profile, use \`semantic_provider_self_test\` if that tool is allowed.
 It uses embedded synthetic examples only and reports profile freshness, gate
 ranges and fallback categories; it never changes settings.
 
-`semantic_calibration_candidate` can turn an operator-owned labelled numeric
+\`semantic_calibration_candidate\` can turn an operator-owned labelled numeric
 set into an inactive profile candidate. Treat that output as material for human
 review: it does not invent thresholds, activate itself or prove model quality.
 
