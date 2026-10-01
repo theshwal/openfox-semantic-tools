@@ -884,9 +884,19 @@ try {
     (p: any) => p.packageName === PLUGIN_NAME || p.id === PLUGIN_NAME,
   )
   record('the host loaded the installed plugin', listed?.loaded === true, `source=${listed?.source}`)
+  // Asserted BY NAME against the host's real tool registry, never by a count:
+  // later lots legitimately add plugin tools (calibration), so a pinned total
+  // would fail for an unrelated reason. The four decision tools this lot covers
+  // must be present; the calibration tools are covered by their own tests.
+  const EXPECTED_TOOLS = [
+    'semantic_decide',
+    'semantic_verify_task',
+    'semantic_search',
+    'semantic_scan',
+  ]
   record(
-    'the host counts the four plugin tools and one skill source',
-    listed?.contributions?.tools === 4 && listed?.contributions?.skillSources === 1,
+    'the host counts the plugin tools and exactly one skill source',
+    (listed?.contributions?.tools ?? 0) >= EXPECTED_TOOLS.length && listed?.contributions?.skillSources === 1,
     `tools=${listed?.contributions?.tools} skillSources=${listed?.contributions?.skillSources}`,
   )
 
@@ -902,16 +912,28 @@ try {
   // otherwise be misread as a plugin defect.
   step('waiting for the host tool registry to expose the plugin tools')
   let exposed = false
+  let registeredTools: string[] = []
   for (let attempt = 0; attempt < 40; attempt += 1) {
     const body = (await (await fetch(`${base}/api/tools`, { signal: AbortSignal.timeout(5_000) })).json()) as any
-    const names = (Array.isArray(body) ? body : body.tools ?? []).map((t: any) => t.name ?? t.id)
-    if (names.includes('semantic_decide') && names.includes('semantic_verify_task')) {
+    registeredTools = (Array.isArray(body) ? body : body.tools ?? []).map((t: any) => t.name ?? t.id)
+    // Checked BY NAME against the real registry, never by a count: the plugin
+    // legitimately grew tools in later lots, so a pinned total would fail for an
+    // unrelated reason. Each of the four decision tools is also really invoked
+    // in the scenarios below, which is the behavioural proof.
+    if (EXPECTED_TOOLS.every((name) => registeredTools.includes(name))) {
       exposed = true
       break
     }
     await new Promise((r) => setTimeout(r, 500))
   }
-  record('the host tool registry exposes the plugin tools', exposed, 'semantic_decide + semantic_verify_task')
+  const missingTools = EXPECTED_TOOLS.filter((name) => !registeredTools.includes(name))
+  record(
+    'the host tool registry exposes every expected plugin tool BY NAME',
+    exposed,
+    missingTools.length
+      ? `missing: ${missingTools.join(', ')}`
+      : `all present: ${registeredTools.filter((n) => n.startsWith('semantic_')).join(', ')}`,
+  )
   if (!exposed) throw new Error('the host never exposed the plugin tools in its tool registry')
 
   // 5. Plugin settings point at the loopback System One stub. Secrets go only to
