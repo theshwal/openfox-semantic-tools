@@ -4,6 +4,8 @@ import { createDiscoveryTool } from './discovery/tool.js'
 import { DEFAULT_BACKEND_ID, PRESETS } from './presets/index.js'
 import { SKILL_SOURCE } from './skills/source.js'
 import { ADVISORY_VERIFICATION_WORKFLOW, listAdvisoryWorkflows } from './workflow/templates.js'
+import { createProviderSelfTestTool } from './calibration/self-test.js'
+import { createCalibrationCandidateTool } from './calibration/candidate-tool.js'
 
 /**
  * Advisory workflow templates, exported as reference data.
@@ -50,6 +52,36 @@ export const SETTINGS: PluginSettingsSchema = {
       description: {
         en: 'Optional provider model id. Leave empty to use the backend default.',
         fr: 'Identifiant de modèle optionnel. Laisser vide pour utiliser le modèle par défaut du backend.',
+      },
+      default: '',
+    },
+    {
+      key: 'runtimeVersion',
+      type: 'text',
+      label: { en: 'Runtime/model version', fr: 'Version runtime/modèle' },
+      description: {
+        en: 'Optional runtime or model revision used only to detect stale calibration profiles.',
+        fr: 'Révision runtime ou modèle optionnelle, utilisée uniquement pour détecter les profils de calibration obsolètes.',
+      },
+      default: '',
+    },
+    {
+      key: 'calibrationProfileJson',
+      type: 'textarea',
+      label: { en: 'Calibration profile (JSON)', fr: 'Profil de calibration (JSON)' },
+      description: {
+        en: 'Optional versioned profile. It affects verification only when its own active field is true; stale/unverified status remains visible in the self-test.',
+        fr: 'Profil versionné optionnel. Il n\'agit sur la vérification que si son champ active vaut true ; un état stale/unverified reste visible dans le self-test.',
+      },
+      default: '',
+    },
+    {
+      key: 'calibrationOverridesJson',
+      type: 'textarea',
+      label: { en: 'Calibration overrides (JSON)', fr: 'Overrides de calibration (JSON)' },
+      description: {
+        en: 'Explicit operator overrides. These take precedence over an active profile and the conservative defaults.',
+        fr: 'Overrides explicites de l\'opérateur. Ils sont prioritaires sur un profil actif et sur les valeurs conservatrices par défaut.',
       },
       default: '',
     },
@@ -156,6 +188,8 @@ export function register(registry: PluginRegistry): void {
   registry.registerTool(createVerifyTool(readSettings))
   registry.registerTool(createDiscoveryTool('semantic_search', readSettings))
   registry.registerTool(createDiscoveryTool('semantic_scan', readSettings))
+  registry.registerTool(createProviderSelfTestTool(readSettings))
+  registry.registerTool(createCalibrationCandidateTool())
   // Skills carry usage guidance only; they never grant tool access.
   registry.registerSkillSource(SKILL_SOURCE)
 }
