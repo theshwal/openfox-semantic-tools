@@ -96,7 +96,7 @@ Proof kinds used below:
 | # | Requirement (issue text) | Proof | Verdict |
 | --- | --- | --- | --- |
 | 14.14 | "Plugin skills do **not** grant tool access." | F: prompt states it does not grant access; F: `src/index.ts` comment; T: `test/skills.test.ts` "the skill teaches when NOT to use the tool and how to fall back" | verified |
-| 14.15 | "Document the expected agent configuration and test behavior when: skill available but tool not allowed; tool allowed but skill not loaded; both available." | F: README "Usage skill" section; T: `test/skills.test.ts` "the skill source is registered through the public plugin API" (skill loads independently of settings) and `test/register.test.ts` "every semantic tool reads global settings only" (tools work without the skill) | verified |
+| 14.15 | "Document the expected agent configuration and test behavior when: skill available but tool not allowed; tool allowed but skill not loaded; both available." | F: README "Usage skill"; T: `test/skills.test.ts`; R: `npm run harness:agent-e2e` runs all three cases on the real host — denied (refusal, no provider request), allowed-without-loading, and allowed-with-`load_skill` | verified |
 | 14.16 | "The skill text should not assume a tool is callable if it is unavailable." | F: prompt "Limits you must keep" — explicitly tells the agent not to work around an unavailable tool | verified |
 
 ### Tests
@@ -104,12 +104,12 @@ Proof kinds used below:
 | # | Requirement (issue text) | Proof | Verdict |
 | --- | --- | --- | --- |
 | 14.17 | "skill source registration" | T: `test/skills.test.ts` "the skill source is registered through the public plugin API" | verified |
-| 14.18 | "both skill metadata entries are discoverable" (issue assumed two skills) | T: `test/skills.test.ts` "the verification skill is discoverable with concise metadata". **Deviation:** only one skill is published; `semantic-code-discovery` is deliberately withheld until #5 exists | verified with documented deviation |
-| 14.19 | "prompts load correctly" | T: `test/skills.test.ts` "the verification skill is discoverable with concise metadata" | verified |
+| 14.18 | "both skill metadata entries are discoverable" (issue assumed two skills) | T: `test/skills.test.ts` "the discovery skill is published now that its tools exist" and "the verification skill is discoverable with concise metadata" | verified — `semantic-code-discovery` now ships with #5 |
+| 14.19 | "prompts load correctly" | T: `test/skills.test.ts` "the verification skill is discoverable with concise metadata"; R: `npm run harness:agent-e2e` — both skills load through the host's real `load_skill` tool | verified |
 | 14.20 | "no provider-specific endpoint/model names leak into skill guidance" | T: `test/skills.test.ts` "the skill is provider-neutral: no provider, endpoint, URL or model id" | verified |
 | 14.21 | "skill registration is independent of provider availability" | T: `test/skills.test.ts` "skill registration never reads settings or performs a request" | verified |
 | 14.22 | "plugin manifest declares `skills` once implemented" | T: `test/skills.test.ts` "the manifest declares the skills capability exactly once" | verified |
-| 14.23 | "Where practical, add an integration fixture demonstrating that OpenFox can discover and load the plugin skill through the normal `load_skill` path." | — | **unverified** — requires a running OpenFox instance; out of scope for an offline unit suite. Not implemented. |
+| 14.23 | "Where practical, add an integration fixture demonstrating that OpenFox can discover and load the plugin skill through the normal `load_skill` path." | R: `npm run harness:agent-e2e` on an isolated OpenFox `2.0.160`: a real agent turn calls `load_skill` for `semantic-verification` and `semantic-code-discovery` (observed tool calls `load_skill, load_skill, semantic_verify_task, semantic_search, semantic_scan, step_done`) | verified |
 | 14.24 | "`npm run check` passes." | R: `npm run check` → 251 tests pass, typecheck and build succeed | verified |
 
 ## Provider evaluation baseline — requirements carried by this lot
@@ -139,6 +139,34 @@ Proof kinds used below:
 | 27.13 | "Tests prove precedence: explicit override > calibration profile > conservative defaults." | T: `test/calibration-profile.test.ts` "precedence is explicit override > active profile > conservative defaults" | verified |
 | 27.14 | "Documentation states clearly that provider/model behavior can change over time and that shipped profiles are dated observations, not guarantees." | F: `docs/CALIBRATION.md`; F: README "Provider calibration and self-test" section | verified |
 
+## Issue #2 — real isolated OpenFox agent
+
+Proof for this section comes from `npm run harness:agent-e2e`
+(`scripts/agent-e2e.ts`): a real OpenFox `2.0.160` host, the built package
+installed into a temporary `configDir`, real agent turns driven only through the
+public `/mcp` endpoint, a scripted OpenAI-compatible LLM and a deterministic
+System One stub, both on loopback. 67/67 checks pass, reproduced over three
+consecutive runs.
+
+| # | Requirement (issue text) | Proof | Verdict |
+| --- | --- | --- | --- |
+| 2.1 | "Install/build the package in an isolated host; do not use production configuration or sessions DB." | R: harness sets `HOME`, `XDG_CONFIG_HOME` and `XDG_DATA_HOME` to a fresh temp tree and removes it in `finally`; T: `test/harness-isolation.test.ts` | verified |
+| 2.2 | "An allowed agent executes noul, choice and score, including a mixed batch, against a local deterministic System One stub." | R: observed wire body carries all three question ids in one request; the tool result is `{"answers":{"is_boolean":{"type":"noul","probability":0.75},"which_side":{"type":"choice","choice":"tenant_scoped",…},"how_bad":{"type":"score","score":2,…}}}` | verified |
+| 2.3 | "Demonstrate that an agent without permission cannot invoke the tool." | R: the denied agent's call is refused by the host with the allow-list message, and the System One stub records **zero** requests for that turn | verified — see finding H2 for the caveat |
+| 2.4 | "Failures/cancellation remain failed results on the real host path." | R: provider 5xx → `{"code":"http","message":"System One HTTP 500"}`; hanging provider → `{"code":"timeout","message":"Semantic provider timed out"}`; a stopped turn produces no answer and no cache hit. Each uses a distinct state string, so a warmed cache cannot mask it | verified |
+| 2.5 | "Record the released OpenFox version and reproducible commands; no paid provider credential is required." | R: `benchmark/results/agent-e2e/report.json` records `openfoxVersion: 2.0.160`; the only key is a loopback fixture value | verified |
+| 2.6 | Workflow advice must reach the normal verifier in every state (issue #12) | R: `npm run harness:agent-e2e` launches the real workflow three times — advice ACTIVE, advice DISABLED, provider 5xx. For each, it proves the **verifier turn itself ran**: a model request carrying the verifier step's own prompt that consumed a real scripted answer (not the harness's no-script placeholder), plus `step_done` returned by that same turn. A `currentStepId` projection is deliberately not used as proof | verified |
+
+### Host findings (behaviour, not plugin defects)
+
+| # | Finding | Evidence |
+| --- | --- | --- |
+| H1 | `registry.context` is readable only **during** `register()`. The host clears it in `endPlugin()`, so a tool that closes over `registry.context` fails on its first real execution. This was a **real defect in this plugin**, found only by the E2E run. | Fixed in `src/index.ts` by capturing the context object during registration; `test/plugin-context-lifetime.test.ts` reproduces the lifecycle and fails on the old code. |
+| H2 | A plugin tool is treated as an "MCP" tool by the host, and it is denied **only** when the agent's `allowedTools` names at least one non-builtin tool (`hasMcpSpecific`). An agent whose allow-list contains builtins only has no plugin restriction at all. | The harness's denied agent therefore allows `semantic_scan` while omitting `semantic_decide`. This is host behaviour and is recorded rather than worked around. |
+| H3 | The advisory workflow's agent is baked into the workflow document, and the shipped default (`builder`) has no `semantic_verify_task` in its `allowedTools`, so the step can never use the tool its own prompt tells the agent to call. | Fixed in `src/workflow/templates.ts` by `advisoryWorkflowFor(agentId)`, with T: `test/workflow-template.test.ts` "the advisory step agent is opt-in, because a stock agent cannot use the tool". The E2E installs the opt-in form and proves the advice really runs. |
+| H4 | A workflow run leaves no terminal status on the public surface: `openfox_session_status` reports `workflow: null` once the run ends, so a completed run cannot be distinguished from a never-started one by status alone. | The harness therefore proves a step ran by a model request carrying that step's own prompt **that consumed a real scripted answer**, and proves the run ended by the host STOPPING to report an active workflow. A `currentStepId` poll is not sufficient: it can miss a step that really ran. |
+| H5 | `server.host` in `config.json` does **not** reliably control the bind: `runServe` resolves `env.server.host ?? globalConfig.server.host`, so without the documented `OPENFOX_HOST` override the host is expected to bind `0.0.0.0` and serve an **unauthenticated** API. | Fixed: the harness sets `OPENFOX_HOST=127.0.0.1` and asserts the REAL listener via `ss -ltnpH` (not the banner), failing closed if it is not loopback-only. Evidence: the precedence is read from the host source, and an independent verifier observed the pre-fix host reachable over the LAN (HTTP 200 on a private IPv4). A controlled A/B with the variable removed was **not** run, so the causal link is source-derived and observed, not experimentally isolated. Found by independent verification, not by the build. |
+
 ## Scope discipline
 
 | Requirement | Proof | Verdict |
@@ -155,10 +183,11 @@ Proof kinds used below:
 Counts are recomputed from the tables above by
 `test/traceability.test.ts`, so they cannot silently drift.
 
-- Verified: 55 requirements.
-- Verified with a documented deviation: 1 (#14.18, one skill instead of two).
-- **Unverified: 4** — the real-provider false-pass rate (4.18), the
-  OpenFox end-to-end savings metrics (4.19), the unreached `pass-candidate`
-  behaviour (4.9), and the `load_skill` integration fixture (14.23). Each
-  requires a live provider or a running OpenFox instance, and none is claimed
-  as satisfied.
+- Verified: 63 requirements.
+- Verified with a documented deviation: 0.
+- **Unverified: 3** — the real-provider false-pass rate (4.18), the
+  OpenFox end-to-end savings metrics (4.19), and the unreached `pass-candidate`
+  behaviour (4.9). Each requires a live provider run, and none is claimed as
+  satisfied. The functional `load_skill` path (14.23) is now verified against a
+  real isolated host; what remains unmeasured is decision quality (#9), which the
+  E2E deliberately does not claim.
