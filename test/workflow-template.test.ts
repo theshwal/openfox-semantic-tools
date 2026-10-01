@@ -207,7 +207,9 @@ test('the plugin registers no transition handler and no hook', async () => {
   assert.equal(registry.registerTransitionHandler, undefined)
   assert.equal(registry.registerHook, undefined)
   assert.deepEqual([...fake.tools.keys()].sort(), [
+    'semantic_calibration_candidate',
     'semantic_decide',
+    'semantic_provider_self_test',
     'semantic_scan',
     'semantic_search',
     'semantic_verify_task',
