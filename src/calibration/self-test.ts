@@ -174,9 +174,35 @@ export function createProviderSelfTestTool(
         }
 
         const gateObservations = observations(runs.map((run) => run.gates))
+        const profileComparison = Object.fromEntries(
+          DEFAULT_POLICY.gates.map((gate) => {
+            const observed = gateObservations[gate.id]
+            const reference = profile?.gateObservations?.[gate.id]
+            if (!observed || !reference) return [gate.id, { comparable: false }]
+            const withinRecordedRange =
+              observed.min >= reference.min && observed.max <= reference.max
+            return [
+              gate.id,
+              {
+                comparable: true,
+                withinRecordedRange,
+                observed: { min: observed.min, max: observed.max },
+                recorded: { min: reference.min, max: reference.max },
+              },
+            ]
+          }),
+        )
         const warnings: string[] = []
         if (freshness !== 'matched') warnings.push(`profile_${freshness}`)
         if (profile && !profile.active) warnings.push('profile_inactive')
+        for (const [id, comparison] of Object.entries(profileComparison)) {
+          if (
+            'comparable' in comparison &&
+            comparison.comparable === true &&
+            'withinRecordedRange' in comparison &&
+            comparison.withinRecordedRange === false
+          ) warnings.push(`profile_range_drift:${id}`)
+        }
         for (const run of runs) {
           if (!run.matched) warnings.push(`smoke_mismatch:${run.id}`)
           if (run.gates.some((gate) => gate.verdict === 'unusable')) {
@@ -205,15 +231,17 @@ export function createProviderSelfTestTool(
                   id: profile.id,
                   status: profile.status,
                   active: profile.active,
+                  applied: Boolean(profile.active && freshness === 'matched'),
                   freshness,
                 }
-              : { id: null, status: 'unverified', active: false, freshness },
+              : { id: null, status: 'unverified', active: false, applied: false, freshness },
             semanticSmoke: {
               matched: runs.filter((run) => run.matched).length,
               total: runs.length,
               cases: runs.map(({ gates, ...run }) => run),
             },
             gateObservations,
+            profileComparison,
             warnings: [...new Set(warnings)],
             fallbackCategories: [...new Set(fallbackCategories)],
             recommendation:
