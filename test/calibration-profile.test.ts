@@ -37,7 +37,7 @@ test('precedence is explicit override > active profile > conservative defaults',
   const criterion = resolved.gates.find((gate) => gate.id === 'criterionTestable')!
 
   assert.equal(satisfied.threshold, 0.75, 'explicit override wins')
-  assert.deepEqual(satisfied.undecided, [0.55, 0.8], 'profile still supplies unspecified fields')
+  assert.deepEqual(satisfied.undecided, [0.55, 0.75], 'profile supplies the low edge while the explicit threshold remains the decisive edge')
   assert.equal(offScope.threshold, 0.3, 'profile overrides the default')
   assert.equal(criterion.threshold, DEFAULT_POLICY.gates.find((gate) => gate.id === 'criterionTestable')!.threshold)
   assert.equal(resolved.calibrated, true)
