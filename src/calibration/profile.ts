@@ -1,4 +1,4 @@
-import type { GateId, VerifyGate, VerifyPolicy } from '../verify/policy.js'
+import type { GateId, VerifyGate, VerifyPolicy, VerifyStatus } from '../verify/policy.js'
 
 export type CalibrationProfileStatus =
   | 'observed'
@@ -38,6 +38,7 @@ export interface CalibrationProfile {
   readonly calibrated?: boolean
   readonly gateOverrides?: Partial<Record<GateId, GateCalibrationOverride>>
   readonly gateObservations?: Partial<Record<GateId, GateObservation>>
+  readonly labelSummary?: Readonly<Partial<Record<VerifyStatus, number>>>
 }
 
 export interface PolicyCalibrationOverrides {
@@ -261,7 +262,7 @@ export function assessProfileFreshness(
 
 export interface LabelledCalibrationCase {
   readonly id: string
-  readonly expectedStatus: string
+  readonly expectedStatus: VerifyStatus
   readonly gates: Readonly<Record<GateId, number>>
 }
 
@@ -291,6 +292,10 @@ export function deriveCandidateProfile(
 ): CalibrationProfile {
   if (!input.cases.length) throw new Error('At least one labelled calibration case is required')
   const gateObservations: Partial<Record<GateId, GateObservation>> = {}
+  const labelSummary: Partial<Record<VerifyStatus, number>> = {}
+  for (const entry of input.cases) {
+    labelSummary[entry.expectedStatus] = (labelSummary[entry.expectedStatus] ?? 0) + 1
+  }
   for (const id of GATE_IDS) {
     const values = input.cases.map((entry) => entry.gates[id])
     if (values.some((value) => !finite(value))) throw new Error(`Invalid gate value for ${id}`)
@@ -312,5 +317,6 @@ export function deriveCandidateProfile(
     active: false,
     calibrated: false,
     gateObservations,
+    labelSummary,
   }
 }
