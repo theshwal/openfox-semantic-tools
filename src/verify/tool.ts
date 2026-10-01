@@ -107,6 +107,7 @@ export function createVerifyTool(
           presetId: settings.presetId ?? 'custom',
           ...(settings.model ? { model: settings.model } : {}),
           ...(runtimeVersion ? { runtimeVersion } : {}),
+          policyVersion: DEFAULT_POLICY.version,
         })
         // A stale/unverified profile is visible but never applied. Explicit
         // operator overrides remain explicit and therefore still take priority.
