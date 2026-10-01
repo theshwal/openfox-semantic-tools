@@ -98,35 +98,46 @@ Do **not** normalize all three question types into a single `boolean + confidenc
 
 For example, a yes/no probability and a choice confidence are not automatically interchangeable. Thresholds belong to the specific use case.
 
-## 4. V0 OpenFox contribution
+## 4. What the plugin contributes today
 
-V0 should expose one primitive:
+Six tools, all registered through the public Plugin API v2:
 
-```text
-semantic_decide
-```
+| Tool | Module | Kind |
+| --- | --- | --- |
+| `semantic_decide` | `src/tool.ts` | typed primitive, not a verdict |
+| `semantic_verify_task` | `src/verify/tool.ts` | advisory |
+| `semantic_search` | `src/discovery/tool.ts` | advisory |
+| `semantic_scan` | `src/discovery/tool.ts` | advisory |
+| `semantic_provider_self_test` | `src/calibration/self-test.ts` | advisory |
+| `semantic_calibration_candidate` | `src/calibration/candidate-tool.ts` | advisory |
 
-It receives:
+Two skill sources (`src/skills/source.ts`) teach when those tools are worth
+calling. `semantic_decide` receives:
 
 - state;
 - one or more typed questions;
 - optionally a model override.
 
-It returns provider-neutral structured results.
-
-It should not decide what probability means "safe", "complete" or "correct". Higher-level tools own that policy.
+It returns provider-neutral structured results and does **not** decide what a
+probability means. Every higher-level tool owns its own policy, and none of them
+is wired into a workflow transition or a hook.
 
 ### Settings
 
-Suggested initial settings:
+Global plugin settings:
 
-- backend/preset: hosted Jev or custom System One endpoint;
-- endpoint;
-- optional model;
-- API key (secret);
-- timeout.
+- `backend` (a label, never a preset with guessed defaults) and `endpoint` (the
+  full POST URL, required);
+- optional `model`;
+- `apiKey` (secret);
+- `timeoutMs`;
+- `endpointClass` override and `egressPolicy`;
+- `cacheEnabled`, `cacheTtlMs`, `cacheMaxEntries` (off by default);
+- `calibrationProfileJson`, `calibrationOverridesJson`, `runtimeVersion`.
 
-Avoid a single global "confidence threshold": different use cases require different calibration.
+There is deliberately **no global "confidence threshold"**: different use cases
+require different calibration, and a single shared number would be wrong for at
+least one of them.
 
 ## 5. Higher-level use cases
 
@@ -188,9 +199,12 @@ The main design question is whether repository chunking + decision calls actuall
 
 Purpose: score historical messages/tool outputs against the current goal and remove or compress low-value items before the main LLM call.
 
-OpenFox `develop` currently has a public `registerMessageTransform` contribution that can mutate messages/system prompt before LLM dispatch. This is a much cleaner integration point than observational hooks.
+OpenFox `develop` currently has a public `registerMessageTransform` contribution that can mutate messages/system prompt before LLM dispatch. This would be a much cleaner integration point than observational hooks.
 
-However the transform is not in the 2.0.157 compatibility baseline. Treat this feature as a later experiment after the API lands in a release.
+However, **this is blocked**: the API is in no released OpenFox version. It is
+absent from `v2.0.157` and from `v2.0.160`, both checked directly against
+`src/plugin/index.ts`. Treat this feature as a later experiment, and only after
+the API lands in a release.
 
 Design rules:
 
@@ -251,14 +265,19 @@ OpenFox 2.0.157:
 - Plugin API v2;
 - tools;
 - settings;
+- skills;
 - hooks;
 - workflow transition handlers.
 
-V0 must fit here.
+The plugin stays inside this surface and never needs a host patch. Both `2.0.157`
+and `2.0.160` were validated by loading the built package into a real isolated
+host, which confirmed the same six tools, one skill source and thirteen settings
+fields, with zero hooks and zero transitions.
 
 ### Future capability
 
-OpenFox `develop` exposes `registerMessageTransform` and the `transforms` capability. Before using it:
+OpenFox `develop` exposes `registerMessageTransform` and the `transforms`
+capability. It is **not** in `v2.0.157` or `v2.0.160`. Before using it:
 
 - verify the API in an actual release;
 - update package compatibility;

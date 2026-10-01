@@ -109,7 +109,7 @@ Proof kinds used below:
 | 14.20 | "no provider-specific endpoint/model names leak into skill guidance" | T: `test/skills.test.ts` "the skill is provider-neutral: no provider, endpoint, URL or model id" | verified |
 | 14.21 | "skill registration is independent of provider availability" | T: `test/skills.test.ts` "skill registration never reads settings or performs a request" | verified |
 | 14.22 | "plugin manifest declares `skills` once implemented" | T: `test/skills.test.ts` "the manifest declares the skills capability exactly once" | verified |
-| 14.23 | "Where practical, add an integration fixture demonstrating that OpenFox can discover and load the plugin skill through the normal `load_skill` path." | R: `npm run harness:agent-e2e` on an isolated OpenFox `2.0.160`: a real agent turn calls `load_skill` for `semantic-verification` and `semantic-code-discovery` (observed tool calls `load_skill, load_skill, semantic_verify_task, semantic_search, semantic_scan, step_done`) | verified |
+| 14.23 | "Where practical, add an integration fixture demonstrating that OpenFox can discover and load the plugin skill through the normal `load_skill` path." | R: `npm run harness:agent-e2e` on isolated OpenFox `2.0.157` **and** `2.0.160`, 67/67 on each: a real agent turn calls `load_skill` for `semantic-verification` and `semantic-code-discovery` (observed tool calls `load_skill, load_skill, semantic_verify_task, semantic_search, semantic_scan, step_done`) | verified |
 | 14.24 | "`npm run check` passes." | R: `npm run check` exits 0 — typecheck, typecheck:tests, the full test suite with 0 failures and 0 skips, and the build. The exact count is deliberately not cited here, because it changes whenever another lot lands and a stale number is worse than none | verified |
 
 ## Provider evaluation baseline — requirements carried by this lot
@@ -142,11 +142,12 @@ Proof kinds used below:
 ## Issue #2 — real isolated OpenFox agent
 
 Proof for this section comes from `npm run harness:agent-e2e`
-(`scripts/agent-e2e.ts`): a real OpenFox `2.0.160` host, the built package
-installed into a temporary `configDir`, real agent turns driven only through the
-public `/mcp` endpoint, a scripted OpenAI-compatible LLM and a deterministic
-System One stub, both on loopback. 67/67 checks pass, reproduced over three
-consecutive runs.
+(`scripts/agent-e2e.ts`): a real OpenFox host, the built package installed into
+a temporary `configDir`, real agent turns driven only through the public
+`/mcp` endpoint, a scripted OpenAI-compatible LLM and a deterministic
+System One stub, both on loopback. **67/67 checks pass on both declared
+releases** — `2.0.157` (tree `/tmp/of-harness-2.0.157`) and `2.0.160` (tree
+`/tmp/of-harness-2.0.160-clean`), each re-run for this lot.
 
 | # | Requirement (issue text) | Proof | Verdict |
 | --- | --- | --- | --- |
@@ -154,8 +155,35 @@ consecutive runs.
 | 2.2 | "An allowed agent executes noul, choice and score, including a mixed batch, against a local deterministic System One stub." | R: observed wire body carries all three question ids in one request; the tool result is `{"answers":{"is_boolean":{"type":"noul","probability":0.75},"which_side":{"type":"choice","choice":"tenant_scoped",…},"how_bad":{"type":"score","score":2,…}}}` | verified |
 | 2.3 | "Demonstrate that an agent without permission cannot invoke the tool." | R: the denied agent's call is refused by the host with the allow-list message, and the System One stub records **zero** requests for that turn | verified — see finding H2 for the caveat |
 | 2.4 | "Failures/cancellation remain failed results on the real host path." | R: provider 5xx → `{"code":"http","message":"System One HTTP 500"}`; hanging provider → `{"code":"timeout","message":"Semantic provider timed out"}`; a stopped turn produces no answer and no cache hit. Each uses a distinct state string, so a warmed cache cannot mask it | verified |
-| 2.5 | "Record the released OpenFox version and reproducible commands; no paid provider credential is required." | F: `scripts/setup-harness.sh` pins `OPENFOX_VERSION=2.0.160`, and `scripts/agent-e2e.ts` records it in its report; a run also writes `benchmark/results/agent-e2e/report.json` locally, which is gitignored and therefore NOT cited as durable proof. The only key is a loopback fixture value, so no paid credential is needed | verified |
+| 2.5 | "Record the released OpenFox version and reproducible commands; no paid provider credential is required." | F: `scripts/setup-harness.sh` takes the version from `OPENFOX_VERSION`, refuses to reuse a tree holding a different release, and prints the version **read back from the installed tree** rather than the one requested; `scripts/agent-e2e.ts` and `scripts/openfox-harness.ts` likewise read `node_modules/openfox/package.json`. Observed on two separate clean trees: `openfox@2.0.157` and `openfox@2.0.160`, 20/20 harness checks and 67/67 agent-e2e checks each. A run also writes `benchmark/results/agent-e2e/report.json` locally, which is gitignored and therefore NOT cited as durable proof. The only key is a loopback fixture value, so no paid credential is needed | verified |
 | 2.6 | Workflow advice must reach the normal verifier in every state (issue #12) | R: `npm run harness:agent-e2e` launches the real workflow three times — advice ACTIVE, advice DISABLED, provider 5xx. For each, it proves the **verifier turn itself ran**: a model request carrying the verifier step's own prompt that consumed a real scripted answer (not the harness's no-script placeholder), plus `step_done` returned by that same turn. A `currentStepId` projection is deliberately not used as proof | verified |
+
+## Issue #13 — release readiness (CI, packaging, install compatibility)
+
+Both ends of the declared support range were validated by installing the
+package into a **real isolated OpenFox host**, in a separate throwaway tree per
+version (`scripts/openfox-harness.ts`, `npm run harness`). Each run reports the
+version it read back from `node_modules/openfox/package.json`; no version string
+in the harness or its report is hardcoded. Each release reported the same six
+tools, one skill source and thirteen settings fields, with zero hooks and zero
+transitions.
+
+| # | Requirement | Proof | Verdict |
+| --- | --- | --- | --- |
+| 13.1 | Verify installation/invocation against the declared minimum. | R: `npm run harness` with `HARNESS_PKG_DIR=/tmp/of-harness-2.0.157` → "Harness: 20/20 checks passed", first line "isolated OpenFox package present — openfox@2.0.157"; `npm run harness:agent-e2e` on the same tree → 67/67 | verified |
+| 13.2 | Verify against the target release in a **separate** clean tree. | R: same commands with `HARNESS_PKG_DIR=/tmp/of-harness-2.0.160-clean` → "Harness: 20/20 checks passed", `openfox@2.0.160`, agent-e2e 67/67 | verified |
+| 13.3 | Report the real installed version, never a hardcoded one. | F: `scripts/openfox-harness.ts` uses the read-back `installedVersion` for the report field, the scope string and the finding detail; F: `scripts/setup-harness.sh` prints the read-back version and fails if it differs from the requested one; F: `scripts/agent-e2e.ts` reads the same file. A `2.0.160` literal remains only in prose comments describing the host contract under test | verified |
+| 13.4 | Attempt the declared minimum; only raise it on demonstrated incompatibility. | T: `test/skill-api-compat.test.ts` "the compatibility baseline recorded in the docs is unchanged" asserts `peerDependencies.openfox === '>=2.0.157'`; R: the minimum passes 20/20 harness and 67/67 agent-e2e checks on a real host, so it is **not** raised | verified |
+| 13.5 | No private API workaround. | F: only the public `openfox/plugin` API is imported; R: both hosts loaded the package through normal discovery and the public settings route, with no host patch and no privileged access | verified |
+| 13.6 | Reproducible source-checkout → offline checks → absolute local-path install recipe, **executed**, not only described. | F: `docs/INSTALLATION.md`, Recipe A. R: `npm run harness` calls the host's own `POST /api/plugins/install` with `{ path }` on the full checkout and observes `success: true`, then asserts `dist/index.js` exists **inside the host's copy** under `<configDir>/plugins/<basename>/` — proving `buildIfNeeded()` rebuilt it. A copy-by-hand would skip the installer, so the harness no longer does that. Checked against `src/server/routes/plugins.ts` and `src/server/plugins/install.ts` at `v2.0.157` and `v2.0.160` | verified |
+| 13.7 | Document that a GitHub tree/tag URL does not pin the installer or a ref. | F: `docs/INSTALLATION.md`, "What the host actually does": `parseGithubUrl()` keeps only `owner/repo` and the clone is `--depth 1` from default-branch HEAD | verified |
+| 13.8 | Document that a packed tarball is NOT installable. | F: `docs/INSTALLATION.md`, Recipe B: the `files` allowlist ships only `dist`, `README.md`, `docs`, so no `src/` and no `tsconfig.json`. The manifest still declares `scripts.build`, so `buildIfNeeded()` compiles, `tsc` fails, and in both released hosts the error is not caught: the install is rejected with HTTP 500. Recipe A is the only supported path | verified |
+| 13.9 | No new distribution subsystem, no mandatory npm publication. | F: `package.json` declares no `publishConfig`, no publish script; `npm view openfox-semantic-tools` → 404 | verified |
+| 13.10 | ESM/declarations, API v2, Node >= 24, packaged contents, no private credentials. | R: `npm pack --dry-run` lists the packed contents; T: `npm run check` compiles `src/` and `test/`; F: `package.json` `type: module`, `main`/`types`, `engines.node >=24`, `openfox.apiVersion: 2`; the harness recorded `tools=6 skillSources=1 settingsFields=13` from the host itself | verified |
+| 13.11 | First release version prepared, not published. | F: `package.json` `version: 0.1.0`; no tag and no release exist on the remote (`git ls-remote --tags` empty, `gh release list` empty), because publication belongs to the delivery workflow | verified |
+| 13.12 | Contributor instructions, offline, no paid key. | F: `docs/CONTRIBUTING.md` | verified |
+| 13.13 | The harness bind must be observed, not assumed. | F: `scripts/openfox-harness.ts` sets `OPENFOX_HOST=127.0.0.1` as an explicit override and reads the real listener with `ss -ltnpH`, failing closed when the bind cannot be read or is not loopback-only. R: both runs recorded "the isolated host is bound to loopback only - listening on 127.0.0.1:<port>". The override is defence in depth, not a fix: the released host resolves `env.server.host ?? globalConfig.server.host ?? "127.0.0.1"` and this harness already seeds `server.host`. No LAN-exposure incident is established or claimed by this patch | verified |
+| 13.14 | The installer's npm must not write outside the temporary tree. | F: `scripts/openfox-harness.ts` drops `npm_config_prefix` and `NPM_CONFIG_PREFIX` from the host child environment, alongside the `HOME`/`XDG_*` overrides, so `buildIfNeeded()`'s `npm install` resolves under the temporary HOME. This is isolation of the trial, not a plugin feature | verified |
 
 ### Host findings (behaviour, not plugin defects)
 
@@ -183,7 +211,7 @@ consecutive runs.
 Counts are recomputed from the tables above by
 `test/traceability.test.ts`, so they cannot silently drift.
 
-- Verified: 63 requirements.
+- Verified: 77 requirements.
 - Verified with a documented deviation: 0.
 - **Unverified: 3** — the real-provider false-pass rate (4.18), the
   OpenFox end-to-end savings metrics (4.19), and the unreached `pass-candidate`

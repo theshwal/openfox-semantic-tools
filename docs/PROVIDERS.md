@@ -170,10 +170,18 @@ was found — `choice` with array criteria was rejected while object-map criteri
 worked. That single run is a **declaration with a provenance**, recorded in the
 hosted preset, not a certification of the runtime.
 
-Not verified: behaviour against Kev, Laya, system-one, sys1, jev-rs, local-jev,
-Lichen or EdgeJev. Only the hosted endpoint has ever been reached, and only
-once, which is far too little to characterise any runtime. Real per-runtime
+Not verified as a **conformance** run: the `kev` and `laya` presets. Two live
+campaigns did reach those runtimes — see the committed number-only snapshots in
+`benchmark/snapshots/verify-0.2.1/` — but they were `verify-0.2.1` **policy**
+campaigns of 7 cases each, not the 13-case conformance matrix. They prove
+transport wiring and report shape for those runtimes, and nothing about their
+protocol coverage. A conformance deviation list for `kev`, `laya`, system-one,
+sys1, jev-rs, local-jev, Lichen or EdgeJev does not exist. Real per-runtime
 deviations must be recorded here as they are measured, not assumed.
+
+`semantic_provider_self_test` does not fill that gap either. It runs an embedded
+synthetic smoke test and reports `protocol.scope: "smoke-not-conformance"`
+explicitly; it is a readiness check, not a conformance suite.
 
 ## Provider presets
 
@@ -184,9 +192,9 @@ capabilities, so switching backends can never change an OpenFox tool contract.
 | Preset | Endpoint | Status |
 | --- | --- | --- |
 | `custom` (default) | required, operator-supplied | Any System One-compatible endpoint. No assumptions applied. |
-| `jev-hosted` | required, operator-supplied | Observed once. See the capabilities note below. |
-| `kev` | required, operator-supplied | Declared, unverified |
-| `laya` | required, operator-supplied | Declared, unverified |
+| `jev-hosted` | required, operator-supplied | One conformance run observed. See the capabilities note below. |
+| `kev` | required, operator-supplied | Declared; a 7-case `verify` campaign exists, no conformance run |
+| `laya` | required, operator-supplied | Declared; a 7-case `verify` campaign exists, no conformance run |
 | `system-one` | required, operator-supplied | Declared, unverified |
 | `sys1` | required, operator-supplied | Declared, unverified |
 | `jev-rs` | required, operator-supplied | Declared, unverified |

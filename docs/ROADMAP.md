@@ -2,7 +2,8 @@
 
 This roadmap exists to keep development sequential and evidence-driven.
 
-Current implementation and the adjusted delivery order are recorded in [IMPLEMENTATION.md](./IMPLEMENTATION.md). CI/package validation is moved forward to the V0 milestone; publication remains gated.
+Current implementation and the adjusted delivery order are recorded in
+[IMPLEMENTATION.md](./IMPLEMENTATION.md). Publication remains gated.
 
 ## Phase 0 — bootstrap
 
@@ -16,21 +17,19 @@ Already present in the repository:
 
 ## Phase 1 — V0 primitive
 
-Do these in order:
+Done:
 
 1. **#1 — generic System One HTTP adapter**
 2. **#2 — OpenFox `semantic_decide` tool**
 3. **#3 — reproducible evaluation harness**
 
-Exit criteria:
+Exit criteria, all met:
 
-- plugin installs in OpenFox;
+- plugin loads in OpenFox;
 - `semantic_decide` works against a configurable endpoint;
 - `noul`, `choice`, `score` and batched questions work;
 - errors fail safely;
 - measurements can be recorded reproducibly.
-
-Do not start workflow automation before this phase is stable.
 
 ## Phase 2 — interoperability and provider evidence
 
@@ -39,10 +38,12 @@ Do not start workflow automation before this phase is stable.
 6. **#9 — Jev vs Kev vs Laya vs jev-rs benchmark**
 7. **#10 — explicit/bounded data egress policy**
 
-These issues answer two architectural questions:
-
-- Is one generic transport really sufficient?
-- Which backend(s) are useful for OpenFox workloads?
+#7, #8 and #10 are implemented. Conformance is reproducible in CI against a
+local stub; beyond that, one hosted live run exists, plus two live 7-case
+`verify-0.2.1` campaigns against Kev and Laya that are **verification**
+campaigns, not the conformance matrix. Those snapshots are not a quality
+certification: dated comparison observations are scoped in #9, which remains
+open, and no runtime is claimed better than another.
 
 Presets must remain thin. Provider benchmarks must use the same fixtures.
 
@@ -50,39 +51,46 @@ Presets must remain thin. Provider benchmarks must use the same fixtures.
 
 8. **#4 — semantic_verify_task** — implemented as an advisory experiment; no
    false-pass measurement yet, so no positive verdict is reachable.
-9. **#5 — semantic_scan / semantic_search**
-10. **#14 — plugin skills for semantic tool usage**
-    - `semantic-verification` ships with #4;
-    - `semantic-code-discovery` stays unpublished until #5 exists, so guidance
-      is never advertised for a tool the agent cannot call;
-    - skills teach decision boundaries, not provider details.
+9. **#5 — semantic_scan / semantic_search** — implemented, advisory, candidates
+   only.
+10. **#14 — plugin skills for semantic tool usage** — both halves shipped:
+    `semantic-verification` and `semantic-code-discovery`, each with the tools
+    it describes. They teach decision boundaries, not provider details.
 
 Primary goal:
 
 > reduce expensive generative work without losing task quality, then teach OpenFox when to use the proven semantic capabilities.
 
-Promotion into normal agent usage requires measured results and the matching skill guidance.
+Promotion into normal agent usage still requires measured results. Everything
+today is opt-in and advisory.
 
 ## Phase 4 — conditional automation / optimization
 
-11. **#12 — workflow integration for semantic_verify_task**
-    - only after #4 demonstrates acceptable false-pass behavior.
-    - the tool currently registers no transition handler, so this is still
-      open; #4 ships advisory-only.
+11. **#12 — workflow integration for semantic_verify_task** — shipped as an
+    **opt-in workflow file**, not as a plugin gate. The plugin registers no
+    transition handler and no hook, and the workflow's deterministic checks and
+    normal verifier always run. Making the agent that owns the step actually
+    carry `semantic_verify_task` is an operator decision
+    (`advisoryWorkflowFor(agentId)`).
 
-12. **#11 — semantic decision cache**
-    - only after correctness and provider identity/key semantics are stable.
+12. **#11 — semantic decision cache** — shipped, disabled by default, inert on
+    error. Stays off until a benchmark shows a real repeated-call benefit.
 
-13. **#6 — context relevance/message transforms**
-    - only after the public message-transform API exists in a released OpenFox version.
-
-These are deliberately conditional. They may be closed as not planned if evidence is weak.
+13. **#6 — context relevance/message transforms** — **blocked**. The
+    `registerMessageTransform` API exists only on OpenFox `develop`; it is not
+    in any released 2.0.0.x version (`v2.0.157` and `v2.0.160` were both
+    checked against `src/plugin/index.ts`). Do not start before it ships in a
+    release.
 
 ## Phase 5 — distribution
 
-14. **#13 — CI, packaging and first usable release**
+14. **#13 — CI, packaging and first usable release** — in progress. CI, the
+    offline suite, the isolated-host harnesses and the install recipes are in
+    place; the release tag and registry submission are the remaining steps and
+    belong to the delivery workflow.
 
-A curated OpenFox registry submission should happen only after V0 is installable, tested and useful outside the author's machine.
+A curated OpenFox registry submission should happen only after this is
+installable, tested and useful outside the author's machine.
 
 ## Dependency graph
 
