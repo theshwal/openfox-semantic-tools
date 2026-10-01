@@ -16,7 +16,7 @@ Proof kinds used below:
 
 | # | Requirement (issue text) | Proof | Verdict |
 | --- | --- | --- | --- |
-| 4.1 | "a bounded semantic check after implementation/tests and before spending another full verifier pass" | F: `src/verify/tool.ts` takes exactly one criterion plus bounded evidence; T: `test/verify-tool.test.ts` "one batched call asks exactly the four policy questions"; T: `test/verify-state.test.ts` "oversized evidence is rejected rather than silently truncated" | verified |
+| 4.1 | "a bounded semantic check after implementation/tests and before spending another full verifier pass" | F: `src/verify/tool.ts` takes exactly one criterion plus bounded evidence; T: `test/verify-tool.test.ts` "one batched call asks every policy question exactly once"; T: `test/verify-state.test.ts` "oversized evidence is rejected rather than silently truncated" | verified |
 | 4.2 | "This is an **experiment**, not an automatic completion gate." | F: `src/verify/tool.ts` registers no transition handler/hook; the report sets `advisory: true`; T: `test/verify-tool.test.ts` "the production report is advisory and never a positive verdict" and "a calibrated policy can surface a positive status as a candidate only" (asserts the report never claims task completion) | verified |
 
 ### Inputs: one criterion, evidence/diff excerpts, deterministic test results, short summary
@@ -32,7 +32,7 @@ Proof kinds used below:
 
 | # | Requirement (issue text) | Proof | Verdict |
 | --- | --- | --- | --- |
-| 4.7 | "Batch several questions where useful" (criterion satisfied / evidence sufficient / off-scope / deeper verification) | F: `src/verify/questions.ts` builds the four questions with policy gate ids; T: `test/verify-tool.test.ts` "one batched call asks exactly the four policy questions" asserts a single provider call carrying exactly those four ids | verified |
+| 4.7 | "Batch several questions where useful" (criterion satisfied / evidence sufficient / off-scope / deeper verification) | F: `src/verify/questions.ts` builds the four questions with policy gate ids; T: `test/verify-tool.test.ts` "one batched call asks every policy question exactly once" asserts a single provider call carrying exactly those four ids | verified |
 
 ### Policy stays outside the provider adapter
 
@@ -45,7 +45,7 @@ Proof kinds used below:
 | # | Requirement (issue text) | Proof | Verdict |
 | --- | --- | --- | --- |
 | 4.9 | "strong + safe result -> candidate to skip/limit a verifier pass" | F: `VerifyStatus 'pass-candidate'`; T: `test/verify-policy.test.ts` "an uncalibrated policy can never emit a positive verdict" — the code path exists but is unreachable without a measured calibration | **unverified** (code path implemented; behaviour unmeasured) |
-| 4.10 | "uncertain -> normal OpenFox verifier" | T: `test/verify-policy.test.ts` "values inside the uncertainty band are undecided, not a pass" → `status: 'unknown'`; README documents the fallback | verified |
+| 4.10 | "uncertain -> normal OpenFox verifier" | T: `test/verify-policy.test.ts` "values inside the uncertainty band are undecided, not a pass", "a decisively uncommitted criterion is a distinct unknown, never a verdict", `test/verify-policy-replay.test.ts` "a hesitant answer is read for what it says, not for how the runtime felt" → `status: 'unknown'`; README documents the fallback | verified |
 | 4.11 | "negative -> targeted builder/verifier follow-up" | F: statuses `off-scope`, `insufficient-evidence`, `needs-verification`; T: `test/verify-policy.test.ts` "a decisive failure routes to the documented follow-up status" | verified |
 | 4.12 | "provider failure -> normal OpenFox path" | T: `test/verify-tool.test.ts` "provider failures never surface as a positive or negative verdict", "cancellation and timeouts stay failures with their own codes" | verified |
 | 4.13 | "Do not enable automatic 'done' behavior in this issue." | F: no `registerTransitionHandler`, no `registerHook`, no `step_done` in `src/`; T: `test/verify-tool.test.ts` asserts `advisory: true` and no completion wording | verified |
@@ -54,7 +54,7 @@ Proof kinds used below:
 
 | # | Requirement (issue text) | Proof | Verdict |
 | --- | --- | --- | --- |
-| 4.14 | "Experiment can run on a labeled fixture set." | F: `fixtures/verify/cases.json` (positive / negative / adversarial); R: `npm run verify:experiment` → "7/7 fixtures matched the labelled policy status"; T: `test/verify-experiment.test.ts` "the labelled suite is reproduced offline with no credentials" | verified (plumbing only; the quality metric itself is 4.18) |
+| 4.14 | "Experiment can run on a labeled fixture set." | F: `fixtures/verify/cases.json` (41 fixtures in 8 declared families); F: `scripts/verify-fixture-set.ts` is the single schema/balance contract; R: `npm run verify:experiment` → "41/41 fixtures matched the labelled policy status"; T: `test/verify-experiment.test.ts` "the labelled suite is reproduced offline with no credentials" and "a fixture set that breaks the schema rules refuses to run at all"; T: `test/verify-fixture-set.test.ts` "the shipped fixture set loads, and is balanced, unique and justified" | verified (plumbing only; the quality metric itself is 4.18) |
 | 4.15 | "Results are persisted in the evaluation format." | F: `scripts/verify-experiment.ts` writes `report.json`, `runs.json` via `validateRecord`, and `summary.md` via `summarize`; T: `test/verify-experiment.test.ts` "the persisted RunRecords keep every unmeasured metric null, never zero" | verified |
 | 4.16 | "README is updated only with measured findings." | README states `measured: false`, `falsePassRate: null`, "not reachable today"; R: report field `falsePassRate === null`; T: `test/verify-experiment.test.ts` "a scripted transport can never produce a positive status or a false-pass claim" | verified |
 | 4.17 | "Automatic workflow integration is a separate decision/issue after evidence exists." | F: no transition/hook registration; `docs/ROADMAP.md` keeps #12 conditional; `docs/IMPLEMENTATION.md` records #12 as still open | verified |
@@ -110,12 +110,22 @@ Proof kinds used below:
 | 14.21 | "skill registration is independent of provider availability" | T: `test/skills.test.ts` "skill registration never reads settings or performs a request" | verified |
 | 14.22 | "plugin manifest declares `skills` once implemented" | T: `test/skills.test.ts` "the manifest declares the skills capability exactly once" | verified |
 | 14.23 | "Where practical, add an integration fixture demonstrating that OpenFox can discover and load the plugin skill through the normal `load_skill` path." | — | **unverified** — requires a running OpenFox instance; out of scope for an offline unit suite. Not implemented. |
-| 14.24 | "`npm run check` passes." | R: `npm run check` → 122 tests pass, typecheck and build succeed | verified |
+| 14.24 | "`npm run check` passes." | R: `npm run check` → 251 tests pass, typecheck and build succeed | verified |
+
+## Provider evaluation baseline — requirements carried by this lot
+
+| # | Requirement (issue text) | Proof | Verdict |
+| --- | --- | --- | --- |
+| 7.15 | "The `score` gate follows the documented `E[level]` contract, without weakening a guard." | F: `docs/SCORE-CONTRACT.md` option A; F: `src/verify/policy.ts` `DIRECT_EVIDENCE_THRESHOLD`; T: `test/verify-policy.test.ts` "direct evidence means the expectation reached the top level, per the score contract" and "the band between the rungs never reads as direct evidence" | verified |
+| 7.16 | "A live run must persist what an analysis needs, and nothing sensitive." | F: `scripts/verify-experiment.ts` per-case `observedNumbers`; T: `test/verify-experiment.test.ts` "a live run persists the numbers the analysis needs, and nothing else" and "the persisted live numbers carry no state, no evidence and no secret" | verified |
+| 7.17 | "A question's polarity must match the gate that reads it." | F: `src/verify/questions.ts` `offScope`; T: `test/verify-tool.test.ts` "the offScope question states one polarity, matching its high-is-risk gate" | verified |
 
 ## Scope discipline
 
 | Requirement | Proof | Verdict |
 | --- | --- | --- |
+| A larger fixture set may not become a fatter claim | F: `fixtures/verify/cases.json` carries no `pass-candidate` label and no threshold; F: `scripts/verify-fixture-set.ts` refuses `positive_label_before_calibration`; T: `test/verify-fixture-set.test.ts` "the suite covers every status the uncalibrated policy can emit" and "a pass-candidate label is refused while the policy is uncalibrated" | verified |
+| A suite may not be padded with paraphrases | F: `scripts/verify-fixture-set.ts` `LEXICAL_DUPLICATE_THRESHOLD`; T: `test/verify-fixture-set.test.ts` "a lexically duplicated criterion is refused, so the suite cannot be padded" and "a duplicated label on unrelated content is NOT a duplicate" | verified |
 | No workflow gate in this lot | `src/` registers only settings, tools and a skill source; no `registerTransitionHandler`, no `registerHook` | verified |
 | Reuse Lot 1 transport / egress / settings | `src/verify/tool.ts` imports `SystemOneHttpProvider`, `parseSettings`, `ProviderError`; T: `test/verify-tool.test.ts` "repository-derived evidence is always sent with an automatic origin" and "an explicit semantic_decide call stays allowed under the same policy" | verified |
 | No secret or provider detail in the skill | T: `test/skills.test.ts` provider-neutrality test; T: `test/verify-tool.test.ts` "the API key is never echoed in the report or the error" | verified |
@@ -126,7 +136,7 @@ Proof kinds used below:
 Counts are recomputed from the tables above by
 `test/traceability.test.ts`, so they cannot silently drift.
 
-- Verified: 38 requirements.
+- Verified: 41 requirements.
 - Verified with a documented deviation: 1 (#14.18, one skill instead of two).
 - **Unverified: 4** — the real-provider false-pass rate (4.18), the
   OpenFox end-to-end savings metrics (4.19), the unreached `pass-candidate`

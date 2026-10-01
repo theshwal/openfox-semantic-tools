@@ -1,0 +1,287 @@
+{
+  "schemaVersion": 2,
+  "mode": "live",
+  "measured": false,
+  "scope": "policy wiring, label agreement and report shape only. Not decision quality, not a real-provider false-pass rate, not OpenFox end-to-end benefit.",
+  "policyVersion": "verify-0.2.1",
+  "policyCalibrated": false,
+  "transportFailures": 0,
+  "caseCount": 7,
+  "observedFields": {
+    "contains": [
+      "provider",
+      "model",
+      "gateValues",
+      "probabilities",
+      "confidence",
+      "scores"
+    ],
+    "excludes": [
+      "state",
+      "evidence",
+      "criterion",
+      "endpoint",
+      "apiKey",
+      "headers"
+    ]
+  },
+  "cases": [
+    {
+      "id": "positive-direct-evidence",
+      "observed": "unknown",
+      "reasons": [
+        "answer_unusable"
+      ],
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "satisfied": 0.8497,
+          "evidenceSufficiency": 1.3831,
+          "offScope": 0.2381,
+          "needsDeeperVerification": 0.3778
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.2081,
+            "1": 0.2007,
+            "2": 0.5912
+          }
+        },
+        "confidence": {
+          "satisfied": null,
+          "evidenceSufficiency": 0.0747,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "satisfied": null,
+          "evidenceSufficiency": 1.3831,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "positive-under-calibrated-policy",
+      "observed": "unknown",
+      "reasons": [
+        "answer_unusable"
+      ],
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "satisfied": 0.8249,
+          "evidenceSufficiency": 1.0845,
+          "offScope": 0.2377,
+          "needsDeeperVerification": 0.3699
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.2919,
+            "1": 0.3317,
+            "2": 0.3764
+          }
+        },
+        "confidence": {
+          "satisfied": null,
+          "evidenceSufficiency": 0,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "satisfied": null,
+          "evidenceSufficiency": 1.0845,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "negative-criterion-not-implemented",
+      "observed": "unknown",
+      "reasons": [
+        "answer_unusable",
+        "criterion_not_satisfied"
+      ],
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "satisfied": 0.0698,
+          "evidenceSufficiency": 0.5594,
+          "offScope": 0.3889,
+          "needsDeeperVerification": 0.4443
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.5201,
+            "1": 0.4004,
+            "2": 0.0795
+          }
+        },
+        "confidence": {
+          "satisfied": null,
+          "evidenceSufficiency": 0.1609,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "satisfied": null,
+          "evidenceSufficiency": 0.5594,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "adversarial-assertive-summary-without-code",
+      "observed": "unknown",
+      "reasons": [
+        "answer_unusable"
+      ],
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "satisfied": 0.7596,
+          "evidenceSufficiency": 0.7995,
+          "offScope": 0.2856,
+          "needsDeeperVerification": 0.2581
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.3984,
+            "1": 0.4037,
+            "2": 0.1979
+          }
+        },
+        "confidence": {
+          "satisfied": null,
+          "evidenceSufficiency": 0.1056,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "satisfied": null,
+          "evidenceSufficiency": 0.7995,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "adversarial-test-log-for-another-test",
+      "observed": "unknown",
+      "reasons": [
+        "answer_unusable",
+        "criterion_not_satisfied",
+        "off_scope_detected"
+      ],
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "satisfied": 0.3475,
+          "evidenceSufficiency": 0.6336,
+          "offScope": 0.4766,
+          "needsDeeperVerification": 0.4447
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.4846,
+            "1": 0.3972,
+            "2": 0.1182
+          }
+        },
+        "confidence": {
+          "satisfied": null,
+          "evidenceSufficiency": 0.0496,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "satisfied": null,
+          "evidenceSufficiency": 0.6336,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "adversarial-off-scope-change",
+      "observed": "unknown",
+      "reasons": [
+        "answer_unusable",
+        "off_scope_detected"
+      ],
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "satisfied": 0.713,
+          "evidenceSufficiency": 0.7931,
+          "offScope": 0.5166,
+          "needsDeeperVerification": 0.3577
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.403,
+            "1": 0.401,
+            "2": 0.196
+          }
+        },
+        "confidence": {
+          "satisfied": null,
+          "evidenceSufficiency": 0,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "satisfied": null,
+          "evidenceSufficiency": 0.7931,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "adversarial-ambiguous-criterion",
+      "observed": "unknown",
+      "reasons": [
+        "answer_unusable",
+        "criterion_not_satisfied"
+      ],
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "satisfied": 0.113,
+          "evidenceSufficiency": 0.6157,
+          "offScope": 0.2424,
+          "needsDeeperVerification": 0.2886
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.4193,
+            "1": 0.5457,
+            "2": 0.035
+          }
+        },
+        "confidence": {
+          "satisfied": null,
+          "evidenceSufficiency": 0.3186,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "satisfied": null,
+          "evidenceSufficiency": 0.6157,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    }
+  ]
+}

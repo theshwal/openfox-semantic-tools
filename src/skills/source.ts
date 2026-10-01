@@ -61,8 +61,9 @@ your excerpts instead of relying on a cut.
 
 The result is always advisory. It never means the task is complete.
 
-- \`unknown\`: the evidence is missing, inside the uncertainty band, or the
-  policy is not calibrated. Treat it as "not decided".
+- \`unknown\`: the evidence is missing, inside the uncertainty band, the answer
+  was not committed to, or the policy is not calibrated. Treat it as "not
+  decided".
 - \`needs-verification\`: the criterion does not look satisfied, or a deeper
   pass is recommended. Fix it, or run the normal verifier.
 - \`insufficient-evidence\`: the supplied evidence does not directly address

@@ -21,7 +21,11 @@ export function normalizeResponse(payload: unknown, request: DecisionRequest): R
     if (a.confidence !== undefined && !probability(a.confidence)) throw new ProviderError('invalid_response', 'Invalid confidence')
     if (q.type === 'noul') {
       if (!probability(a.noul)) throw new ProviderError('invalid_response', 'Invalid noul probability')
-      return [id, { type: 'noul', probability: a.noul }]
+      // The declared confidence is kept on every question type, including
+      // `noul`. It is telemetry and no use case reads it as a policy input, but
+      // dropping it here would have made a `noul` answer the one shape a later
+      // analysis could not correlate with the others.
+      return [id, { type: 'noul', probability: a.noul, ...(a.confidence === undefined ? {} : { confidence: a.confidence as number }) }]
     }
     const labels = q.type === 'score' ? Object.keys(q.criteria) : Array.isArray(q.criteria) ? q.criteria : Object.keys(q.criteria)
     if (!isRecord(a.probabilities) || Object.keys(a.probabilities).length !== labels.length || labels.some(k => !Object.hasOwn(a.probabilities as object, k) || !probability((a.probabilities as Record<string, unknown>)[k]))) throw new ProviderError('invalid_response', 'Invalid probability distribution')

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { createVerifyTool, type VerifyReport } from '../src/verify/tool.ts'
-import { VERIFY_QUESTION_IDS } from '../src/verify/questions.ts'
+import { buildVerifyQuestions, VERIFY_QUESTION_IDS } from '../src/verify/questions.ts'
 import { VERIFY_POLICY_VERSION } from '../src/verify/policy.ts'
 import { DEFAULT_POLICY } from '../src/verify/policy.ts'
 
@@ -23,8 +23,10 @@ const answers = (
   sufficiency: 0 | 1 | 2,
   offScope: number,
   needsDeeper: number,
+  testable = 0.95,
 ) => ({
   answers: {
+    [VERIFY_QUESTION_IDS.criterionTestable]: { type: 'noul', noul: testable },
     [VERIFY_QUESTION_IDS.satisfied]: { type: 'noul', noul: satisfied },
     [VERIFY_QUESTION_IDS.evidenceSufficiency]: {
       type: 'score',
@@ -49,7 +51,7 @@ function stubTransport(payload: unknown) {
   return { transport, seen }
 }
 
-test('one batched call asks exactly the four policy questions', async () => {
+test('one batched call asks every policy question exactly once', async () => {
   const { transport, seen } = stubTransport(answers(0.95, 2, 0.02, 0.05))
   const tool = createVerifyTool(() => ({ endpoint: 'http://localhost/v1/systemone' }), { transport })
   const result = await tool.execute(args, ctx)
@@ -57,6 +59,7 @@ test('one batched call asks exactly the four policy questions', async () => {
   assert.equal(result.success, true)
   assert.equal(seen.length, 1, 'a single provider call must cover every question')
   assert.deepEqual(Object.keys(seen[0].body.questions).sort(), [
+    'criterionTestable',
     'evidenceSufficiency',
     'needsDeeperVerification',
     'offScope',
@@ -65,6 +68,89 @@ test('one batched call asks exactly the four policy questions', async () => {
   assert.equal(seen[0].body.state.acceptanceCriterion, args.criterion)
   // The evidence rubric must stay an ordered array for the common contract.
   assert.ok(Array.isArray(seen[0].body.questions.evidenceSufficiency.criteria))
+})
+
+test('an undecidable criterion is a dedicated unknown, never a verdict', async () => {
+  // "Improve performance" has no state in which it is true and none in which it
+  // is false. Every other answer about it is noise, so the policy must stop
+  // there with its own reason rather than report a follow-up nobody can act on.
+  const { criterionTestable } = buildVerifyQuestions('Improve performance.')
+  assert.equal(criterionTestable.type, 'noul')
+  const instructions = (criterionTestable as { instructions: string }).instructions
+  assert.ok(instructions.includes('Improve performance.'), 'the criterion text must be quoted back')
+  assert.match(instructions.toLowerCase(), /could some concrete state of the code make it/)
+
+  const gate = DEFAULT_POLICY.gates.find((entry) => entry.id === 'criterionTestable')!
+  // Phrased so a HIGH answer means "decidable", matching the gate's polarity.
+  assert.equal(gate.polarity, 'high-is-good')
+  assert.equal(gate.direction, 'at-least')
+
+  for (const payload of [answers(0.99, 2, 0.01, 0.01, 0.1), answers(0.01, 2, 0.9, 0.95, 0.1)]) {
+    const report = JSON.parse(
+      (
+        await createVerifyTool(() => ({ endpoint: 'http://localhost/v1/systemone' }), {
+          transport: stubTransport(payload).transport,
+          policy: { ...DEFAULT_POLICY, calibrated: true },
+        }).execute(args, ctx)
+      ).output!,
+    ) as VerifyReport
+    assert.equal(report.status, 'unknown')
+    assert.equal(report.reasons[0], 'criterion_not_testable')
+  }
+})
+
+test('the declared confidence is reported as telemetry and decides nothing', async () => {
+  // A runtime that says it is certain and a runtime that says it is not must
+  // produce the same status from the same numbers. The confidence is kept in
+  // the report so a later calibrated run can correlate the two.
+  const withConfidence = (confidence: number) => ({
+    answers: {
+      [VERIFY_QUESTION_IDS.criterionTestable]: { type: 'noul', noul: 0.95, confidence },
+      [VERIFY_QUESTION_IDS.satisfied]: { type: 'noul', noul: 0.99, confidence },
+      [VERIFY_QUESTION_IDS.evidenceSufficiency]: {
+        type: 'score',
+        score: 2,
+        probabilities: { 0: 0, 1: 0, 2: 1 },
+        confidence,
+      },
+      [VERIFY_QUESTION_IDS.offScope]: { type: 'noul', noul: 0.01, confidence },
+      [VERIFY_QUESTION_IDS.needsDeeperVerification]: { type: 'noul', noul: 0.01, confidence },
+    },
+  })
+  const run = async (payload: unknown, calibrated: boolean) => {
+    const tool = createVerifyTool(() => ({ endpoint: 'http://localhost/v1/systemone' }), {
+      transport: stubTransport(payload).transport,
+      policy: { ...DEFAULT_POLICY, calibrated },
+    })
+    return JSON.parse((await tool.execute(args, ctx)).output!) as VerifyReport
+  }
+
+  const certain = await run(withConfidence(0.99), true)
+  const selfDoubting = await run(withConfidence(0), true)
+  assert.equal(certain.status, 'pass-candidate')
+  assert.equal(selfDoubting.status, 'pass-candidate', 'a declared 0 must not change the status')
+  assert.equal(selfDoubting.telemetry.declaredConfidence.satisfied, 0)
+  assert.equal(certain.telemetry.declaredConfidence.satisfied, 0.99)
+  // Telemetry is numbers only, and the shipped policy still cannot pass.
+  assert.equal((await run(withConfidence(0.99), false)).status, 'unknown')
+})
+
+test('the offScope question states one polarity, matching its high-is-risk gate', () => {
+  // The gate is `high-is-risk` with `at-most`, so a HIGH answer must mean
+  // "off scope". A question phrased as "is the change staying on scope?" makes
+  // a high answer mean the opposite of what the policy reads, which is how a
+  // single polarity gets lost.
+  const gate = DEFAULT_POLICY.gates.find((entry) => entry.id === 'offScope')!
+  assert.equal(gate.polarity, 'high-is-risk')
+  assert.equal(gate.direction, 'at-most')
+  const { offScope } = buildVerifyQuestions('Timeouts are bounded.')
+  assert.equal(offScope.type, 'noul')
+  const instructions = (offScope as { instructions: string }).instructions.toLowerCase()
+  assert.match(instructions, /high only when unrelated behaviour is genuinely changed/)
+  // The wording must not ask whether the change stays on scope: that inverts
+  // the polarity of the very question the gate depends on.
+  assert.doesNotMatch(instructions, /staying on scope/)
+  assert.doesNotMatch(instructions, /answer high only when unrelated behaviour is genuinely touched/)
 })
 
 test('the production report is advisory and never a positive verdict', async () => {

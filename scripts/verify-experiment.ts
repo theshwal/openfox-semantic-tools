@@ -20,32 +20,18 @@ import { VERIFY_QUESTION_IDS } from '../src/verify/questions.ts'
 import { DEFAULT_POLICY, evaluateVerifyPolicy, type VerifyStatus } from '../src/verify/policy.ts'
 import { summarize, validateRecord, type RunRecord } from '../src/evaluation/records.ts'
 import { SystemOneHttpProvider } from '../src/providers/system-one.ts'
-import type { DecisionRequest } from '../src/decision/types.ts'
+import { loadVerifyFixtureSet, type LoadedFixtureCase } from './verify-fixture-set.ts'
+import type { DecisionAnswer, DecisionRequest } from '../src/decision/types.ts'
 
 interface ScriptedAnswer {
+  criterionTestable: number
   satisfied: number
   evidenceSufficiency: number
   offScope: number
   needsDeeperVerification: number
 }
 
-interface FixtureCase {
-  id: string
-  group: string
-  criterionId: string
-  issueId?: string
-  criterion: string
-  evidence?: {
-    summary?: string
-    diffExcerpts?: string[]
-    deterministicTestResults?: string[]
-  }
-  evidenceRefs?: string[]
-  scripted: ScriptedAnswer
-  expected: VerifyStatus
-  expectedUnderCalibratedPolicy?: VerifyStatus
-  rationale: string
-}
+type FixtureCase = LoadedFixtureCase & { scripted: ScriptedAnswer }
 
 const FIXTURE_PATH = resolve(import.meta.dirname, '../fixtures/verify/cases.json')
 
@@ -87,6 +73,7 @@ function toolInput(fixture: FixtureCase): Record<string, unknown> {
 interface CaseOutcome {
   id: string
   group: string
+  category: string
   issueId: string | null
   criterionId: string
   observed: VerifyStatus
@@ -94,6 +81,7 @@ interface CaseOutcome {
   expectedUnderCalibratedPolicy: VerifyStatus | null
   observedUnderCalibratedPolicy: VerifyStatus | null
   matched: boolean
+  matchedReason: boolean | null
   matchedUnderCalibratedPolicy: boolean | null
   advisory: boolean
   policyVersion: string
@@ -101,6 +89,79 @@ interface CaseOutcome {
   reasons: string[]
   rationale: string
   reportId: string | null
+  /**
+   * Label changes, carried in the artifact so a future reader can see which
+   * labels were re-examined and why. An audit that is not recorded is
+   * indistinguishable from a label that was quietly adjusted.
+   */
+  labelAudit?: string
+  /**
+   * The NUMERIC answers observed for each gate, plus the provider/model the
+   * runtime reported. This is what an analysis of a live run needs: the
+   * previous report said "unknown" without recording the numbers that produced
+   * it, so the `answer_unusable` cases could not be diagnosed from the
+   * artifact at all.
+   *
+   * Numbers only, by construction: no state, no evidence, no criterion text,
+   * no endpoint, no credential. The gate ids and the rubric are public
+   * constants; the values are probabilities the runtime already returned.
+   */
+  observedNumbers?: ObservedNumbers
+}
+
+/** Which provider/model answered, and what each gate was told numerically. */
+export interface ObservedNumbers {
+  provider: string
+  model: string | null
+  /** Gate id -> the value the policy read, or null when the answer was unusable. */
+  gateValues: Record<string, number | null>
+  /** Gate id -> the raw probabilities the runtime returned for that answer. */
+  probabilities: Record<string, Record<string, number>>
+  /** Gate id -> the declared confidence, when the runtime stated one. */
+  confidence: Record<string, number | null>
+  /** Gate id -> the raw `score` the runtime returned for a `score` answer. */
+  scores: Record<string, number | null>
+}
+
+/**
+ * Reduces a provider answer set to the numbers an analysis needs.
+ *
+ * Only finite numbers and their plain maps are kept. Anything that is not a
+ * number is dropped rather than stringified, so no text from a response can
+ * reach the persisted artifact: a runtime echoing submitted state inside a
+ * field would otherwise be persisted verbatim.
+ */
+function observedNumbers(
+  provider: string,
+  model: string | undefined,
+  answers: Record<string, DecisionAnswer>,
+): ObservedNumbers {
+  const gateValues: Record<string, number | null> = {}
+  const probabilities: Record<string, Record<string, number>> = {}
+  const confidence: Record<string, number | null> = {}
+  const scores: Record<string, number | null> = {}
+  for (const [id, answer] of Object.entries(answers)) {
+    const record = answer as unknown as Record<string, unknown>
+    gateValues[id] =
+      typeof record.probability === 'number' && Number.isFinite(record.probability)
+        ? record.probability
+        : typeof record.score === 'number' && Number.isFinite(record.score)
+          ? record.score
+          : null
+    scores[id] =
+      typeof record.score === 'number' && Number.isFinite(record.score) ? record.score : null
+    confidence[id] =
+      typeof record.confidence === 'number' && Number.isFinite(record.confidence) ? record.confidence : null
+    const masses = record.probabilities
+    if (masses !== null && typeof masses === 'object' && !Array.isArray(masses)) {
+      const kept: Record<string, number> = {}
+      for (const [level, mass] of Object.entries(masses as Record<string, unknown>)) {
+        if (typeof mass === 'number' && Number.isFinite(mass)) kept[level] = mass
+      }
+      probabilities[id] = kept
+    }
+  }
+  return { provider, model: model ?? null, gateValues, probabilities, confidence, scores }
 }
 
 // Only two arguments exist. Anything else is a mistake (a mistyped flag, a
@@ -119,7 +180,20 @@ if (positional.length > 1) {
 }
 const out = resolve(positional[0] ?? 'benchmark/results/verify')
 
-const parsed = JSON.parse(await readFile(FIXTURE_PATH, 'utf8')) as { cases: FixtureCase[] }
+const fixtureSet = loadVerifyFixtureSet(JSON.parse(await readFile(FIXTURE_PATH, 'utf8')))
+if (fixtureSet.problems.length > 0) {
+  // A campaign run on an unbalanced or duplicated suite would produce a
+  // comparison nobody could interpret, so the run stops before any call. The
+  // loader names every offending fixture, so this is actionable on its own.
+  for (const issue of fixtureSet.problems) {
+    console.error(`fixture ${issue.caseId ?? '<file>'}: [${issue.code}] ${issue.detail}`)
+  }
+  throw new Error(
+    `${FIXTURE_PATH} has ${fixtureSet.problems.length} schema or balance problem(s); the run was refused`,
+  )
+}
+const fixtures = fixtureSet.cases as readonly FixtureCase[]
+const parsed = { cases: fixtures }
 
 if (live && !endpoint) {
   throw new Error('--live requires SEMANTIC_ENDPOINT to be set to a verified full POST endpoint')
@@ -160,7 +234,8 @@ for (const fixture of parsed.cases) {
     outcomes.push({
       id: fixture.id,
       group: fixture.group,
-      issueId: fixture.issueId ?? null,
+      category: fixture.category,
+      issueId: fixture.issueId,
       criterionId: fixture.criterionId,
       // A failed call is not a verdict. It is recorded as its own observation.
       observed: 'unknown',
@@ -168,6 +243,7 @@ for (const fixture of parsed.cases) {
       expectedUnderCalibratedPolicy: fixture.expectedUnderCalibratedPolicy ?? null,
       observedUnderCalibratedPolicy: null,
       matched: false,
+      matchedReason: null,
       matchedUnderCalibratedPolicy: null,
       advisory: true,
       policyVersion: DEFAULT_POLICY.version,
@@ -175,6 +251,7 @@ for (const fixture of parsed.cases) {
       reasons: [`provider_failure:${code}`],
       rationale: fixture.rationale,
       reportId: null,
+      ...(fixture.labelAudit ? { labelAudit: fixture.labelAudit } : {}),
     })
     records.push({
       task: `verify:${fixture.id}`,
@@ -202,13 +279,16 @@ for (const fixture of parsed.cases) {
   outcomes.push({
     id: fixture.id,
     group: fixture.group,
-    issueId: fixture.issueId ?? null,
+    category: fixture.category,
+    issueId: fixture.issueId,
     criterionId: fixture.criterionId,
     observed: report.status,
     expected: fixture.expected,
     expectedUnderCalibratedPolicy: fixture.expectedUnderCalibratedPolicy ?? null,
     observedUnderCalibratedPolicy: calibratedReport.status,
     matched: report.status === fixture.expected,
+    matchedReason:
+      fixture.expectedReason === undefined ? null : report.reasons.includes(fixture.expectedReason),
     matchedUnderCalibratedPolicy:
       fixture.expectedUnderCalibratedPolicy === undefined
         ? null
@@ -219,6 +299,11 @@ for (const fixture of parsed.cases) {
     reasons: report.reasons,
     rationale: fixture.rationale,
     reportId: report.reportId,
+    ...(fixture.labelAudit ? { labelAudit: fixture.labelAudit } : {}),
+    // A live run is the only mode whose numbers are measurements rather than
+    // authored values, so only it records them. A fixture run would persist
+    // numbers this script itself wrote, which is a tautology, not evidence.
+    ...(live ? { observedNumbers: observedNumbers(report.provider, report.model, report.answers) } : {}),
   })
 
   records.push({
@@ -248,11 +333,12 @@ for (const fixture of parsed.cases) {
 records.forEach(validateRecord)
 
 const mismatches = outcomes.filter((o) => !o.matched)
+const reasonMismatches = outcomes.filter((o) => o.matchedReason === false)
 const calibratedMismatches = outcomes.filter((o) => o.matchedUnderCalibratedPolicy === false)
 const observedPositive = outcomes.filter((o) => o.observed === 'pass-candidate')
 
 const report = {
-  schemaVersion: 1,
+  schemaVersion: live ? 2 : 1,
   mode: live ? 'live' : 'fixture',
   measured: false,
   scope:
@@ -271,8 +357,26 @@ const report = {
   policyCalibrated: DEFAULT_POLICY.calibrated,
   transportFailures,
   caseCount: outcomes.length,
+  /**
+   * How the suite is built, so a reader can tell a balanced comparison from a
+   * result dominated by one kind of case. Recorded on every run because the
+   * balance, not the provider, is what makes the numbers readable.
+   */
+  fixtureFamilies: fixtureSet.familyCounts,
+  expectedStatusCounts: fixtureSet.statusCounts,
   matched: outcomes.filter((o) => o.matched).length,
   mismatches: mismatches.map((o) => ({ id: o.id, expected: o.expected, observed: o.observed })),
+  /**
+   * A label without a reason is a label that cannot be diagnosed. In a LIVE
+   * run the reason is observed, so a mismatch is a real disagreement; in a
+   * fixture run it is deliberately not asserted, because the numbers that
+   * produced the reason were authored by this script.
+   */
+  reasonMismatches: reasonMismatches.map((o) => ({
+    id: o.id,
+    expectedReason: (parsed.cases.find((c) => c.id === o.id) as FixtureCase | undefined)?.expectedReason,
+    observedReasons: o.reasons,
+  })),
   calibratedMismatches: calibratedMismatches.map((o) => ({
     id: o.id,
     expected: o.expectedUnderCalibratedPolicy,
@@ -281,6 +385,18 @@ const report = {
   // A positive status is structurally unreachable with the shipped policy.
   observedPositiveStatuses: observedPositive.map((o) => o.id),
   cases: outcomes,
+  ...(live
+    ? {
+        /**
+         * The contract of the per-case `observedNumbers` block, stated so a
+         * reader never has to infer it: numbers only, and only from a live run.
+         */
+        observedFields: {
+          contains: ['provider', 'model', 'gateValues', 'probabilities', 'confidence', 'scores'],
+          excludes: ['state', 'evidence', 'criterion', 'endpoint', 'apiKey', 'headers'],
+        },
+      }
+    : {}),
 }
 
 function measuredReason(isLive: boolean): string {
@@ -302,5 +418,10 @@ console.log(
 )
 
 if (mismatches.length > 0 || calibratedMismatches.length > 0 || observedPositive.length > 0) {
+  process.exitCode = 1
+}
+// A reason disagreement is only meaningful when the provider supplied the
+// answers. A fixture run asserts nothing about the reason.
+if (live && reasonMismatches.length > 0) {
   process.exitCode = 1
 }
