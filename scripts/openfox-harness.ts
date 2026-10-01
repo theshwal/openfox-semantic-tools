@@ -13,9 +13,9 @@
  * WHAT THIS DOES NOT PROVE
  * - NOT a live provider run: no hosted endpoint is contacted, so it says nothing
  *   about decision quality or a false-pass rate.
- * - NOT a tool execution. OpenFox 2.0.160 exposes no HTTP route to invoke a
- *   plugin tool: tools run inside the agent loop, which needs a live model turn
- *   and therefore a configured LLM provider.
+ * - NOT a tool execution. The OpenFox release under test exposes no HTTP route
+ *   to invoke a plugin tool: tools run inside the agent loop, which needs a
+ *   live model turn and therefore a configured LLM provider.
  * - NOT an `allowedTools` enforcement check: that is decided by the agent
  *   configuration and a model turn.
  *
@@ -28,12 +28,12 @@
  *   configDir, exactly as the documented local-path install does.
  */
 
-import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { access } from 'node:fs/promises'
-import { spawn } from 'node:child_process'
+import { access, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { execFile, spawn } from 'node:child_process'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 
 const PROJECT = resolve(import.meta.dirname, '..')
 const PLUGIN_NAME = 'openfox-semantic-tools'
@@ -114,10 +114,12 @@ const dataHome = join(root, 'data')
 const home = join(root, 'home')
 for (const dir of [configHome, dataHome, home]) await mkdir(dir, { recursive: true })
 
-// openfox resolves configDir as `${XDG_CONFIG_HOME}/openfox`; the documented
-// local-path install target is `{configDir}/plugins/<basename>`.
-const pluginRoot = join(configHome, 'openfox', 'plugins', PLUGIN_NAME)
-await mkdir(pluginRoot, { recursive: true })
+// openfox resolves configDir as `${XDG_CONFIG_HOME}/openfox`. The host copies a
+// local-path install to `{configDir}/plugins/<basename(sourcePath)>`, so the
+// target follows the project directory name and is NOT created here: letting the
+// installer create it is the point.
+const pluginRoot = join(configHome, 'openfox', 'plugins', basename(PROJECT))
+await mkdir(join(configHome, 'openfox', 'plugins'), { recursive: true })
 
 const stub = await startStub()
 const findings: Array<{ name: string; ok: boolean; detail: string }> = []
@@ -146,17 +148,27 @@ try {
   record('npm run build', buildOk, 'compiled dist/ exists')
   if (!buildOk) throw new Error('build failed')
 
-  // 2. Install by copying the package into the isolated configDir, as the
-  //    documented installFromPath does (excluding node_modules/.git).
-  await cp(join(PROJECT, 'dist'), join(pluginRoot, 'dist'), { recursive: true })
-  for (const file of ['package.json', 'README.md']) {
-    await cp(join(PROJECT, file), join(pluginRoot, file))
-  }
-  const installedManifest = JSON.parse(await readFile(join(pluginRoot, 'package.json'), 'utf8'))
+  // 2. Read the manifest from the real project directory, so the assertions
+  //    below are about the tree a user would install, not a copy of it.
+  const manifest = JSON.parse(await readFile(join(PROJECT, 'package.json'), 'utf8'))
   record(
     'manifest declares skills capability',
-    installedManifest.openfox?.capabilities?.includes('skills') === true,
-    `capabilities=${JSON.stringify(installedManifest.openfox?.capabilities)}`,
+    manifest.openfox?.capabilities?.includes('skills') === true,
+    `capabilities=${JSON.stringify(manifest.openfox?.capabilities)}`,
+  )
+  record(
+    'the project directory carries the build config the installer needs',
+    existsSync(join(PROJECT, 'tsconfig.json')) && typeof manifest.scripts?.build === 'string',
+    `scripts.build=${JSON.stringify(manifest.scripts?.build)}`,
+  )
+  // The installer must build from source, so it needs a source tree. Installing
+  // the PACKED artifact instead would prove nothing about the local-path recipe:
+  // `npm pack` ships only `dist`/`README.md`/`docs`, with no `src/` and no
+  // `tsconfig.json`. See docs/INSTALLATION.md.
+  record(
+    'the install source is a full checkout, not a packed tarball',
+    existsSync(join(PROJECT, 'src')) && existsSync(join(PROJECT, 'tsconfig.json')),
+    `PROJECT=${PROJECT}`,
   )
 
   // 3. Configure plugin settings for the stub endpoint, in the isolated DB only.
@@ -165,6 +177,13 @@ try {
     HOME: home,
     XDG_CONFIG_HOME: configHome,
     XDG_DATA_HOME: dataHome,
+    // The installer's `npm install` / `npm run build` inherit this environment.
+    // An inherited prefix points npm at a real installation tree, so the build
+    // would write outside the temporary HOME it is supposed to be confined to.
+    // Both spellings are dropped (npm lowercases its config env); nothing else
+    // is read, and no value is printed. This is isolation of the trial only.
+    npm_config_prefix: undefined,
+    NPM_CONFIG_PREFIX: undefined,
   }
   // NOT an OS-assigned ephemeral port handed to OpenFox. OpenFox 2.0.160
   // resolves its port with `portCandidates(preferred, fallback)` in
@@ -187,6 +206,12 @@ try {
         // Without this the CLI re-executes itself with a larger heap, and that
         // grandchild outlives a kill aimed at the direct child.
         OPENFOX_HEAP_INCREASED: '1',
+        // Explicit loopback override. The released host already resolves
+        // `env.server.host ?? globalConfig.server.host ?? "127.0.0.1"` and the
+        // seeded config sets server.host, so this is defence in depth, not a
+        // fix for an observed exposure. The listener assertion below is what
+        // actually proves the bind.
+        OPENFOX_HOST: '127.0.0.1',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     },
@@ -216,7 +241,72 @@ try {
     throw new Error('isolated server did not become ready')
   }
 
-  // 4. The plugin must be discovered and loaded by the real host.
+  // The real bind address is inspected, not inferred: a non-loopback bind would
+  // publish this run's port beyond the machine. Fails closed when the listener
+  // cannot be read, so a missing `ss` stops the run instead of passing it.
+  const listener = await readListenerForPort(port)
+  const loopbackOnly =
+    listener !== null &&
+    listener.length > 0 &&
+    listener.every((e) => e.address === '127.0.0.1' || e.address === '::1')
+  record(
+    'the isolated host is bound to loopback only',
+    loopbackOnly,
+    listener === null
+      ? `could not read the listener for port ${port}`
+      : listener.length === 0
+        ? `no listening socket found for port ${port}`
+        : `listening on ${listener.map((e) => `${e.address}:${e.port}`).join(', ')}`,
+  )
+  if (!loopbackOnly) {
+    server.kill('SIGTERM')
+    await new Promise((r) => setTimeout(r, 500))
+    server.kill('SIGKILL')
+    throw new Error('refusing to continue: the isolated host is not loopback-only')
+  }
+
+  // 4. Install through the host's OWN public install route, from the full
+  //    checkout at an absolute path. This is `POST /api/plugins/install` with
+  //    `{ path }` (src/server/routes/plugins.ts), which calls
+  //    `host.installFromPath()` -> `installPluginFromPath()` -> the copy plus
+  //    `buildIfNeeded()` rebuild. Copying dist/ into the plugins directory by
+  //    hand would skip the installer and prove nothing about it.
+  const installRes = await fetch(`${base}/api/plugins/install`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: PROJECT }),
+  })
+  const installBody = (await installRes.json().catch(() => ({}))) as Record<string, any>
+  record(
+    'the host installer accepts a full checkout by absolute path',
+    installRes.ok && installBody.success === true,
+    `status=${installRes.status}${installBody.error ? ` error=${String(installBody.error).slice(0, 200)}` : ''}`,
+  )
+  if (!installRes.ok || installBody.success !== true) {
+    throw new Error(`local-path install failed: ${JSON.stringify(installBody).slice(0, 500)}`)
+  }
+  // `installFromDirectory()` loads the package and calls `applyContributions()`
+  // itself, so a loaded plugin needs no enable call and no host restart. This
+  // asserts that end state rather than assuming it: the contributions below
+  // must already be visible.
+  record(
+    'no enable step or host restart is needed after the install',
+    installBody.plugin?.loaded === true,
+    `diagnostic.loaded=${String(installBody.plugin?.loaded)}`,
+  )
+  // The installer must have produced the build itself. `buildIfNeeded()` runs
+  // `npm install` then `npm run build` inside the COPY, so the built entry has
+  // to exist under the plugins directory, not in the project we started from.
+  const installedEntry = join(pluginRoot, 'dist', 'index.js')
+  record(
+    'the installer rebuilt the plugin inside its own copy',
+    await exists(installedEntry),
+    `entry=${installedEntry}`,
+  )
+  if (!(await exists(installedEntry))) {
+    throw new Error(`the installer did not build dist/index.js at ${installedEntry}`)
+  }
+
   const pluginsRes = await fetch(`${base}/api/plugins`)
   const pluginsBody: unknown = await pluginsRes.json()
   if (process.env.HARNESS_DEBUG) console.log('GET /api/plugins ->', JSON.stringify(pluginsBody).slice(0, 2000))
@@ -226,10 +316,14 @@ try {
   const listed = plugins.find(
     (p: Record<string, any>) => p.packageName === PLUGIN_NAME || p.id === PLUGIN_NAME,
   )
+  // The installer names the directory after the source basename, but the host
+  // keys the API by the manifest packageName. Using the reported id keeps the
+  // settings/tool URLs correct whichever directory the source was cloned into.
+  const pluginId = String(listed?.packageName ?? listed?.id ?? PLUGIN_NAME)
   record(
     'plugin is discovered by the real host',
     Boolean(listed),
-    listed ? `source=${listed.source}` : 'not present in /api/plugins',
+    listed ? `source=${listed.source} id=${pluginId}` : 'not present in /api/plugins',
   )
   if (listed) {
     record('plugin is loaded by the real host', listed.loaded === true, `loaded=${listed.loaded}`)
@@ -273,23 +367,30 @@ try {
     `source=${semanticSkill?.source}`,
   )
 
-  // 6. Tools discovered through the real tool registry.
-  const toolsRes = await fetch(`${base}/api/tools`)
+  // 6. Tools discovered through the host's own plugin tool registry.
+  //    `GET /api/plugins/tools` is `{ tools: host.getPluginTools() }`
+  //    (src/server/routes/plugins.ts), and each entry carries the owning
+  //    `pluginId`. `/api/tools` reads a different, session-scoped registry, so
+  //    it is not evidence that a plugin contributed anything. Filtering on the
+  //    `pluginId` the host actually reported avoids attributing another
+  //    plugin's tools to this one, whatever the checkout directory is named.
+  const toolsRes = await fetch(`${base}/api/plugins/tools`)
   const toolsBody: unknown = await toolsRes.json()
-  if (process.env.HARNESS_DEBUG) console.log('GET /api/tools ->', JSON.stringify(toolsBody).slice(0, 2000))
+  if (process.env.HARNESS_DEBUG) console.log('GET /api/plugins/tools ->', JSON.stringify(toolsBody).slice(0, 2000))
   const tools = Array.isArray(toolsBody)
     ? (toolsBody as Array<Record<string, any>>)
     : ((toolsBody as any)?.tools ?? [])
-  const toolNames = tools.map((t: Record<string, any>) => t.name ?? t.id)
+  const ownTools = tools.filter((t: Record<string, any>) => t.pluginId === pluginId)
+  const toolNames = ownTools.map((t: Record<string, any>) => t.name ?? t.id)
   record(
     'semantic tools are registered by the real host',
     toolNames.includes('semantic_decide') && toolNames.includes('semantic_verify_task'),
-    `tools=${toolNames.filter((n: unknown) => String(n).startsWith('semantic_')).join(',') || 'none'}`,
+    `pluginId=${pluginId} tools=${toolNames.join(',') || 'none'}`,
   )
 
   // 7. A real tool invocation through the host, against the local stub.
   //    Configuration is written into the isolated store only.
-  const configured = await configureEndpoint(base, env, stub.url, apiKey)
+  const configured = await configureEndpoint(base, env, stub.url, apiKey, pluginId)
   record('plugin settings stored in the isolated instance', configured.ok, configured.detail)
 
   if (configured.ok) {
@@ -298,7 +399,7 @@ try {
     // a live model turn, which needs a configured LLM provider. That is out of
     // scope, so the harness records what it can actually prove and says so.
     const hasToolRoute = await fetch(
-      `${base}/api/plugins/${PLUGIN_NAME}/tools/semantic_verify_task`,
+      `${base}/api/plugins/${pluginId}/tools/semantic_verify_task`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' },
     )
       .then((r) => r.ok)
@@ -306,7 +407,7 @@ try {
     record(
       'tool execution is not reachable over HTTP (expected: agent loop only)',
       hasToolRoute === false,
-      'no /tools/:name route exists in OpenFox 2.0.160; executing the tool requires a live model turn',
+      `no /tools/:name route exists in OpenFox ${installedVersion}; executing the tool requires a live model turn`,
     )
     record(
       'no provider call was made by this harness',
@@ -322,7 +423,9 @@ try {
     JSON.stringify(
       {
         schemaVersion: 1,
-        openfoxVersion: '2.0.160',
+        // Read back from the installed tree, never hardcoded, so the report can
+        // only ever name the release the host actually ran.
+        openfoxVersion: installedVersion,
         isolation: {
           // No personal config, auth or session DB was read or written.
           home: 'temporary tree',
@@ -331,7 +434,7 @@ try {
           productionConfigTouched: false,
         },
         scope:
-          'Real OpenFox 2.0.160 host: manifest validation, ESM import of the built entry, register(), skill and tool discovery, settings persistence. ' +
+          `Real OpenFox ${installedVersion} host: manifest validation, ESM import of the built entry, register(), skill and tool discovery, settings persistence. ` +
           'NOT a live provider run, NOT a tool execution (no HTTP tool route exists; tools run in the agent loop), NOT a model-driven allowedTools check.',
         measured: false,
         findings,
@@ -364,6 +467,31 @@ async function exists(path: string): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+/**
+ * Reads the real listening socket for a port, so the bind address is observed
+ * rather than assumed. `ss` is not guaranteed to exist, so this is best-effort:
+ * when it cannot be read the caller fails closed rather than assuming loopback.
+ * Same approach as `scripts/agent-e2e.ts`.
+ */
+async function readListenerForPort(port: number): Promise<Array<{ address: string; port: number }> | null> {
+  const stdout = await new Promise<string>((resolveOut) => {
+    execFile('ss', ['-ltnpH'], { encoding: 'utf8', timeout: 10_000 }, (err, out) =>
+      resolveOut(err ? '' : String(out)),
+    )
+  })
+  if (!stdout) return null
+  return stdout
+    .split('\n')
+    .filter((line) => new RegExp(`:${port}\\s`).test(line) || new RegExp(`:${port}$`).test(line.trim()))
+    .map((line) => {
+      const local = line.trim().split(/\s+/)[3] ?? ''
+      const [address, portText] = local.startsWith('[')
+        ? [local.slice(1, local.indexOf(']')), local.slice(local.indexOf(']') + 2)]
+        : local.split(':')
+      return { address: address || 'unknown', port: Number(portText) }
+    })
 }
 
 /**
@@ -400,6 +528,7 @@ async function configureEndpoint(
   env: NodeJS.ProcessEnv,
   endpoint: string,
   token: string,
+  pluginId: string,
 ): Promise<{ ok: boolean; detail: string }> {
   const { readFile: read } = await import('node:fs/promises')
   let authorization: Record<string, string> = {}
@@ -414,7 +543,7 @@ async function configureEndpoint(
       /* try the next location */
     }
   }
-  const res = await fetch(`${base}/api/plugins/${PLUGIN_NAME}/settings`, {
+  const res = await fetch(`${base}/api/plugins/${pluginId}/settings`, {
     // OpenFox 2.0.160 exposes `PUT /api/plugins/:id/settings` (src/server/routes/plugins.ts).
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...authorization },

@@ -92,8 +92,9 @@ test('no proof is cited without the file or test that carries it', async () => {
 
   const cited = [...TRACE.matchAll(/`((?:test|src|scripts|docs|fixtures)\/[A-Za-z0-9._/-]+)`/g)]
     .map((m) => m[1])
-    // `src/plugin/index.ts` is an upstream OpenFox path, not a repository file.
-    .filter((p) => !p.startsWith('src/plugin/'))
+    // These are upstream OpenFox paths, not repository files. `src/plugin/`
+    // is the plugin API and `src/server/` is the host server (routes/plugins).
+    .filter((p) => !p.startsWith('src/plugin/') && !p.startsWith('src/server/'))
   assert.ok(cited.length > 20, `only ${cited.length} proof references found`)
 
   for (const path of new Set(cited)) {

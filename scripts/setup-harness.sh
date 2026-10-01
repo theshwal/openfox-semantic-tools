@@ -7,8 +7,21 @@ set -euo pipefail
 HARNESS_PKG_DIR="${HARNESS_PKG_DIR:-/tmp/of-harness-probe}"
 OPENFOX_VERSION="${OPENFOX_VERSION:-2.0.160}"
 
-if [ -f "$HARNESS_PKG_DIR/node_modules/openfox/package.json" ]; then
-  echo "openfox already present in $HARNESS_PKG_DIR"
+# The version actually installed in the tree is the version the harness will
+# load. Reusing a tree that holds a different release would make every reported
+# version claim false, so a mismatch is refused instead of silently accepted.
+installed_version() {
+  node -p "require('$1/node_modules/openfox/package.json').version" 2>/dev/null || true
+}
+
+PRESENT_VERSION="$(installed_version "$HARNESS_PKG_DIR")"
+if [ -n "$PRESENT_VERSION" ]; then
+  if [ "$PRESENT_VERSION" != "$OPENFOX_VERSION" ]; then
+    echo "refusing to reuse $HARNESS_PKG_DIR: it holds openfox@$PRESENT_VERSION, not openfox@$OPENFOX_VERSION" >&2
+    echo "use a separate HARNESS_PKG_DIR per version, e.g. HARNESS_PKG_DIR=/tmp/of-harness-$OPENFOX_VERSION" >&2
+    exit 1
+  fi
+  echo "openfox@$OPENFOX_VERSION already present in $HARNESS_PKG_DIR"
 else
   mkdir -p "$HARNESS_PKG_DIR"
   cd "$HARNESS_PKG_DIR"
@@ -24,6 +37,12 @@ if [ ! -f "$HARNESS_PKG_DIR/node_modules/better-sqlite3/build/Release/better_sql
   npm rebuild better-sqlite3
 fi
 
-node -p "require('$HARNESS_PKG_DIR/node_modules/openfox/package.json').version" \
-  | sed 's/^/openfox version: /'
+# The version is read back from the installed tree, never from the requested
+# one, so a report cannot claim a version that was not actually loaded.
+ACTUAL_VERSION="$(installed_version "$HARNESS_PKG_DIR")"
+if [ "$ACTUAL_VERSION" != "$OPENFOX_VERSION" ]; then
+  echo "failed to install openfox@$OPENFOX_VERSION (found: ${ACTUAL_VERSION:-none})" >&2
+  exit 1
+fi
+echo "openfox version: $ACTUAL_VERSION"
 echo "harness package tree: $HARNESS_PKG_DIR"

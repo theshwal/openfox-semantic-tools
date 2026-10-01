@@ -150,8 +150,7 @@ routes to its risk status, and when nothing is decisively unmet the status is
 The asymmetry this leaves open — the transport normalizes a `noul` answer
 without its `confidence`, so a live `noul` hesitation is invisible to the policy
 — is deliberately **not** fixed here. It is a transport-shape change in
-`src/providers/system-one.ts` and belongs to a separate batch; see
-`docs/LIVE-JEV-FINDINGS.md`.
+`src/providers/system-one.ts` and belongs to a separate batch.
 
 Everything the vendor warning covers is left in force, and the policy is still
 `calibrated: false`: the coherence check (`|score − E[level]| ≤ 0.01` plus a

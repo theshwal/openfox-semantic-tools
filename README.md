@@ -4,7 +4,11 @@ Experimental OpenFox plugin for **fast, typed semantic decisions** and, where it
 
 The project is intentionally provider-agnostic. The first transport target is the Jev / System One-style `POST /v1/systemone` API, so the same OpenFox tools can be backed by hosted Jev or by a compatible local/open-source runtime.
 
-> Status: V0 implementation — HTTP transport, `semantic_decide`, tests and fixture evaluation. Real provider quality and OpenFox runtime installation are still to be measured.
+> Status: six tools, two usage skills, presets, optional cache, egress,
+> calibration and advisory workflow, validated on OpenFox 2.0.157 and 2.0.160.
+> Dated provider observations are scoped in #9; no durable quality
+> certification or end-to-end savings claim is made. See
+> [Evaluation](#evaluation-what-counts-as-success).
 
 ## Why this exists
 
@@ -35,11 +39,12 @@ The goal is **not** to replace OpenFox's main model. The goal is to give OpenFox
 ```text
 OpenFox
   |
-  +-- semantic_decide          (V0 primitive)
-  +-- semantic_verify_task     (experiment)
-  +-- semantic_scan            (experiment)
-  +-- semantic_search          (experiment)
-  +-- context relevance        (experiment)
+  +-- semantic_decide            noul / choice / score, batched
+  +-- semantic_verify_task       advisory, one criterion per call
+  +-- semantic_search            advisory, caller-narrowed candidates
+  +-- semantic_scan              advisory, caller-narrowed candidates
+  +-- semantic_provider_self_test
+  +-- semantic_calibration_candidate
           |
           v
    use-case policy
@@ -56,39 +61,42 @@ OpenFox
 
 The provider layer should accept one state plus one or more typed questions in a single request. It must not hard-code task-specific thresholds.
 
-## V0 scope
+## What this plugin actually registers
 
-The first useful milestone is deliberately small:
+Six tools and two usage skills, all through the public Plugin API v2. Nothing
+below is planned; see [docs/ROADMAP.md](./docs/ROADMAP.md) for what is not.
 
-- OpenFox Plugin API v2 package.
-- Plugin settings for backend, endpoint, model, API key and timeout.
-- A generic `semantic_decide` tool.
-- One HTTP adapter for a System One-compatible endpoint.
-- Support for `noul`, `choice` and `score`.
-- Normalized errors, timeout/abort handling and tests.
-- A tiny evaluation harness comparing the semantic path with the normal OpenFox path.
+| Tool | Shape | Advisory? |
+| --- | --- | --- |
+| `semantic_decide` | One state plus batched `noul`/`choice`/`score` questions. | No — it returns typed answers, not verdicts. |
+| `semantic_verify_task` | One acceptance criterion plus bounded evidence. | Yes — never a pass. |
+| `semantic_search` | Ranks a caller-supplied file list by relevance to a query. | Yes — candidates only. |
+| `semantic_scan` | Scores a caller-supplied file list against a behavioural predicate. | Yes — candidates only. |
+| `semantic_provider_self_test` | Embedded synthetic smoke test against the configured endpoint. | Yes — never changes settings. |
+| `semantic_calibration_candidate` | Turns an operator-labelled case set into an inactive candidate profile. | Yes — never activates anything. |
 
-No automatic workflow gating in V0.
+| Skill | Covers |
+| --- | --- |
+| `semantic-verification` | When to use `semantic_verify_task`, and when to fall back. |
+| `semantic-code-discovery` | When `semantic_search`/`semantic_scan` reduce exploration. |
 
-## Candidate use cases
+Supporting features: global settings, provider presets with capability
+declarations, an optional decision cache (off by default), explicit endpoint
+classification and egress policy, a versioned calibration layer, and an opt-in
+advisory workflow file.
 
-| Use case | Purpose | Priority | Main risk |
-| --- | --- | --- | --- |
-| `semantic_verify_task` | Check issue/acceptance criteria against implementation evidence before another verifier pass | High | False pass |
-| `semantic_scan` | Rank functions/files by whether they exhibit a requested behavior | High | Candidate misses |
-| `semantic_search` | Find likely relevant code with less exploratory reading | Medium | Extra scan cost |
-| Context relevance | Keep/drop/rank old context before an LLM call | High potential | Removing useful context |
-| Model/skill routing | Pick a model or skill | Low for this project | Adds complexity without clear value |
+**What is not here:** no automatic verification gate, no hook, no workflow
+transition, no context mutation, and no message transform. The plugin registers
+zero hooks and zero transitions, which the real host confirms.
 
-`semantic_verify_task` is implemented as an advisory experiment together with
-its `semantic-verification` skill. No false-pass measurement exists yet, so it
-cannot currently produce a positive verdict.
+### The one hard blocker
 
-### Important OpenFox API note
-
-The stable Plugin API v2 already supports tools, settings, hooks and workflow transitions.
-
-OpenFox `develop` also currently exposes `registerMessageTransform`, which can mutate the pre-LLM message stream and is a natural future integration point for context reduction. That API is **not present in the v2.0.157 release** used as the initial compatibility baseline, so V0 must not depend on it. Re-check upstream before implementing the context-reduction experiment.
+OpenFox `develop` exposes `registerMessageTransform`, the natural hook for
+pre-LLM context reduction. That API was **absent from the two released versions
+checked here** (`v2.0.157` and `v2.0.160`, both read directly from
+`src/plugin/index.ts`), so context reduction is **blocked on the released-API
+issue** and is not implemented. Re-check upstream before starting it, and
+re-check further releases rather than assuming the whole line behaves alike.
 
 ## System One contract
 
@@ -127,6 +135,22 @@ Record at least:
 
 A feature that saves semantic-provider latency but makes the overall OpenFox task slower is a failure. A feature that saves tokens but increases false passes is also a failure.
 
+### What is actually measured today
+
+**No durable quality certification, and no end-to-end saving has been
+measured.** The shipped evidence is:
+
+- offline protocol conformance against a local stub (`npm run conformance:smoke`);
+- labelled fixtures replayed through a scripted transport (`npm run verify:experiment`);
+- replays of two committed number-only live snapshots (`npm run verify:replay`);
+- real-host plugin loading, settings, skills and tool registration on two
+  OpenFox releases (`npm run harness`, `npm run harness:agent-e2e`).
+
+Those live snapshots are dated observations scoped in #9, not a benchmark and
+not a certification. No false-pass rate exists. No token, cost or wall-time
+saving exists. Those fields stay `null` and are never written as zero. A
+measurement that was not made is unknown, not good.
+
 ## Safety and failure behavior
 
 - Provider failure must not silently become a positive decision.
@@ -137,53 +161,58 @@ A feature that saves semantic-provider latency but makes the overall OpenFox tas
 
 ## OpenFox compatibility
 
-Initial target:
-
 - OpenFox Plugin API: v2
 - Node.js: 24+
 - Language: TypeScript / ESM
-- Minimum compatibility baseline: OpenFox 2.0.157 for tools/settings
-- No OpenFox core patch required for V0
+- **Minimum validated release: OpenFox 2.0.157** (`>=2.0.157` in
+  `peerDependencies`)
+- No OpenFox core patch, public or private
+
+Both ends of the range were validated by installing the package into a **real
+isolated host** in a throwaway tree — including through the host's own
+`POST /api/plugins/install` local-path route, not a hand-made copy.
+
+| Check | `2.0.157` (minimum) | `2.0.160` |
+| --- | --- | --- |
+| `npm run harness` (install, load, skills, tools, settings) | 20/20 | 20/20 |
+| `npm run harness:agent-e2e` (real agent turns, permissions, workflow) | 67/67 | 67/67 |
+
+Both hosts reported the same six tools, one skill source and thirteen settings
+fields, and confirmed zero hooks and zero transitions. The versions above are
+read back from each installed tree, never hardcoded.
 
 Authoritative upstream references:
 
 - [OpenFox plugin contract](https://github.com/co-l/openfox/blob/develop/docs/PLUGINS.md)
-- [OpenFox plugin API source](https://github.com/co-l/openfox/blob/develop/src/plugin/index.ts)
+- [OpenFox plugin API source](https://github.com/co-l/openfox/blob/v2.0.160/src/plugin/index.ts)
 - [Reference plugin](https://github.com/co-l/openfox/tree/develop/examples/hello-plugin)
+- [Installation recipes](docs/INSTALLATION.md)
 
-## Development order
-
-1. Freeze the provider/request/response contract.
-2. Implement the generic System One HTTP adapter.
-3. Expose `semantic_decide` as an OpenFox tool.
-4. Add fixture-based provider tests and a minimal benchmark harness.
-5. Run real comparisons before promoting any higher-level use case.
-6. Add `semantic_verify_task` first if results justify it.
-7. Explore semantic scan/search.
-8. Explore pre-LLM context reduction only against an OpenFox release that officially exposes message transforms.
-
-See [AGENTS.md](./AGENTS.md), [docs/ROADMAP.md](./docs/ROADMAP.md), [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md), [docs/PROVIDERS.md](./docs/PROVIDERS.md), [docs/EVALUATION.md](./docs/EVALUATION.md) and [docs/TRACEABILITY.md](./docs/TRACEABILITY.md) before implementing.
-
-## Run the implemented V0
+## Run it locally
 
 ```bash
 npm ci --ignore-scripts
 npm run check
 npm run evaluate
 npm run verify:experiment
-npm pack
+npm pack --dry-run     # inspect the packed contents; see INSTALLATION.md
 ```
+
+See [docs/CONTRIBUTING.md](./docs/CONTRIBUTING.md) for the contributor loop.
 
 The two harnesses are separate because they need a throwaway OpenFox install
-first (`scripts/setup-harness.sh`, which never touches your own OpenFox):
+first (`scripts/setup-harness.sh`, which never touches your own OpenFox). Use
+one `HARNESS_PKG_DIR` per version:
 
 ```bash
-scripts/setup-harness.sh     # once: installs openfox into $HARNESS_PKG_DIR
-npm run harness              # plugin loading, settings, skills
-npm run harness:agent-e2e    # real agent turns, permissions, workflow runtime
+HARNESS_PKG_DIR=/tmp/of-harness-2.0.157 OPENFOX_VERSION=2.0.157 scripts/setup-harness.sh
+HARNESS_PKG_DIR=/tmp/of-harness-2.0.157 npm run harness    # loading, settings, skills
+HARNESS_PKG_DIR=/tmp/of-harness-2.0.157 npm run harness:agent-e2e  # real agent turns, permissions, workflow runtime
 ```
 
-The package entry is `dist/index.js`; `prepack` builds it. Install the built package through OpenFox's plugin installation flow, then enable it. Configure the **full POST endpoint**, optional model/API key, and timeout in global plugin settings. `backend` currently identifies the intended backend; it does not supply an inferred endpoint. No endpoint is selected automatically.
+Install the built package through OpenFox's plugin installation flow, then enable
+it. The exact recipes — and why a GitHub URL is not a pinned install — are in
+[docs/INSTALLATION.md](./docs/INSTALLATION.md).
 
 Allow the semantic tools you want in the agent's tool list. Tool registration does not grant access. Each usage skill ships with the tools it describes: `semantic-verification` with `semantic_verify_task`, `semantic-code-discovery` with `semantic_search` and `semantic_scan`.
 
@@ -232,11 +261,20 @@ hostname may resolve to loopback. It reports observations only —
 and the purely descriptive `providerLabelExplicitlyConfigured` — plus the
 `compatible` / `strictCompatible` verdicts and the authoritative `deviations`
 list. A `compatible: true` result against the stub says nothing about any hosted
-provider. One opt-in live campaign has reached the official hosted endpoint and
-recorded a single real deviation (`choice` with array criteria); the findings are
-in [live provider findings](docs/LIVE-JEV-FINDINGS.md) once that document is
-published, and every other candidate runtime remains unverified. See
-[providers and egress](docs/PROVIDERS.md).
+provider.
+
+One opt-in live campaign has reached the official hosted endpoint and recorded a
+single real deviation (`choice` with array criteria), which is why the hosted
+preset declares `choiceArrayCriteria: false`. That declaration describes **one
+observed run**, not a permanent property of the runtime.
+
+Two further live runs — 7-case `verify-0.2.1` campaigns against Kev and Laya —
+are committed as number-only snapshots. They are **verification** campaigns over
+the policy, not the conformance matrix, so no conformance deviation list exists
+for those runtimes. These seven-case verification snapshots are not a
+conformance matrix or a quality certification; dated comparison observations are
+scoped in #9, with no durable quality/savings claim.
+See [providers and egress](docs/PROVIDERS.md).
 
 ## Decision cache (optional, off by default)
 
@@ -408,8 +446,9 @@ agent's allowed tools.
 
 ### Permissions, as observed on a real host
 
-Verified with `npm run harness:agent-e2e` against an isolated OpenFox
-`2.0.160`; see `docs/TRACEABILITY.md` for the full evidence.
+Verified with `npm run harness:agent-e2e` against isolated OpenFox `2.0.157` and
+`2.0.160`, 67/67 checks on each; see `docs/TRACEABILITY.md` for the full
+evidence.
 
 | Configuration | Observed behaviour |
 | --- | --- |

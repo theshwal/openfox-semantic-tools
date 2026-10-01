@@ -1,6 +1,6 @@
 {
   "name": "openfox-semantic-tools",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Provider-agnostic semantic decision tools for OpenFox using Jev/System One-compatible endpoints.",
   "type": "module",
   "main": "./dist/index.js",
