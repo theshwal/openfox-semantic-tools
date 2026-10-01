@@ -116,4 +116,6 @@ test('a user-labelled set yields an inactive observation-only candidate', () => 
     median: 0.6,
     count: 2,
   })
+  assert.deepEqual(candidate.labelSummary, { unknown: 1, 'needs-verification': 1 })
+  assert.deepEqual(parseCalibrationProfile(JSON.stringify(candidate)), candidate, 'candidate must export/import without losing provenance')
 })
