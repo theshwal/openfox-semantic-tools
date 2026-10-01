@@ -49,6 +49,7 @@ export interface ProviderIdentity {
   readonly presetId: string
   readonly model?: string
   readonly runtimeVersion?: string
+  readonly policyVersion?: string
 }
 
 export type ProfileFreshness = 'matched' | 'stale' | 'unverified'
@@ -240,6 +241,7 @@ export function assessProfileFreshness(
 ): ProfileFreshness {
   if (!profile) return 'unverified'
   if (profile.status === 'stale' || profile.status === 'unverified') return profile.status
+  if (profile.policyVersion && identity.policyVersion && profile.policyVersion !== identity.policyVersion) return 'stale'
   if (profile.provider.presetId !== identity.presetId) return 'stale'
   if (profile.provider.model && profile.provider.model !== identity.model) return 'stale'
   if (profile.provider.runtimeVersion) {
