@@ -144,6 +144,25 @@ export function parseCalibrationProfile(value: unknown): CalibrationProfile | nu
     throw new Error('Calibration profile calibrated must be boolean')
   }
   const gateOverrides = parseGateOverrides(record.gateOverrides)
+  let labelSummary: Partial<Record<VerifyStatus, number>> | undefined
+  if (record.labelSummary !== undefined) {
+    if (record.labelSummary === null || typeof record.labelSummary !== 'object' || Array.isArray(record.labelSummary)) {
+      throw new Error('Calibration profile labelSummary must be an object')
+    }
+    const allowedVerifyStatuses: VerifyStatus[] = [
+      'pass-candidate', 'needs-verification', 'insufficient-evidence', 'off-scope', 'unknown',
+    ]
+    labelSummary = {}
+    for (const [status, count] of Object.entries(record.labelSummary as Record<string, unknown>)) {
+      if (!allowedVerifyStatuses.includes(status as VerifyStatus)) {
+        throw new Error(`Unknown calibration label status "${status}"`)
+      }
+      if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) {
+        throw new Error('Calibration label counts must be non-negative integers')
+      }
+      labelSummary[status as VerifyStatus] = count
+    }
+  }
   return {
     schemaVersion: 1,
     id: record.id as string,
@@ -171,6 +190,7 @@ export function parseCalibrationProfile(value: unknown): CalibrationProfile | nu
     ...(record.gateObservations && typeof record.gateObservations === 'object'
       ? { gateObservations: record.gateObservations as CalibrationProfile['gateObservations'] }
       : {}),
+    ...(labelSummary ? { labelSummary } : {}),
   }
 }
 
