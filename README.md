@@ -171,8 +171,16 @@ npm ci --ignore-scripts
 npm run check
 npm run evaluate
 npm run verify:experiment
-npm run harness:agent-e2e
 npm pack
+```
+
+The two harnesses are separate because they need a throwaway OpenFox install
+first (`scripts/setup-harness.sh`, which never touches your own OpenFox):
+
+```bash
+scripts/setup-harness.sh     # once: installs openfox into $HARNESS_PKG_DIR
+npm run harness              # plugin loading, settings, skills
+npm run harness:agent-e2e    # real agent turns, permissions, workflow runtime
 ```
 
 The package entry is `dist/index.js`; `prepack` builds it. Install the built package through OpenFox's plugin installation flow, then enable it. Configure the **full POST endpoint**, optional model/API key, and timeout in global plugin settings. `backend` currently identifies the intended backend; it does not supply an inferred endpoint. No endpoint is selected automatically.
