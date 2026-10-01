@@ -3,7 +3,7 @@ import { createVerifyTool } from './verify/tool.js'
 import { createDiscoveryTool } from './discovery/tool.js'
 import { DEFAULT_BACKEND_ID, PRESETS } from './presets/index.js'
 import { SKILL_SOURCE } from './skills/source.js'
-import { ADVISORY_VERIFICATION_WORKFLOW, listAdvisoryWorkflows } from './workflow/templates.js'
+import { ADVISORY_VERIFICATION_WORKFLOW, advisoryWorkflowFor, listAdvisoryWorkflows } from './workflow/templates.js'
 import { createProviderSelfTestTool } from './calibration/self-test.js'
 import { createCalibrationCandidateTool } from './calibration/candidate-tool.js'
 
@@ -16,7 +16,7 @@ import { createCalibrationCandidateTool } from './calibration/candidate-tool.js'
  * the semantic step leaves the deterministic checks and the normal verifier
  * intact.
  */
-export { ADVISORY_VERIFICATION_WORKFLOW, listAdvisoryWorkflows }
+export { ADVISORY_VERIFICATION_WORKFLOW, advisoryWorkflowFor, listAdvisoryWorkflows }
 import type {
   PluginRegistry,
   PluginSettingsSchema,
@@ -183,7 +183,15 @@ export const SETTINGS: PluginSettingsSchema = {
 
 export function register(registry: PluginRegistry): void {
   registry.registerSettings(SETTINGS)
-  const readSettings = () => registry.context.settings('global')
+  // `registry.context` is only readable WHILE a plugin is registering: the host
+  // clears it in `endPlugin()` right after `register()` returns. Reading it
+  // lazily from a tool closure would therefore throw
+  // "Plugin context is only available while a plugin is registering" on the
+  // first real execution, so the context object itself is captured now and used
+  // later. The object stays a live view of the plugin's settings; only the
+  // *accessor* is registration-scoped.
+  const context = registry.context
+  const readSettings = (projectId?: string) => context.settings('global', projectId)
   registry.registerTool(createDecisionTool(readSettings))
   registry.registerTool(createVerifyTool(readSettings))
   registry.registerTool(createDiscoveryTool('semantic_search', readSettings))

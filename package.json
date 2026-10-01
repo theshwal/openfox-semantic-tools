@@ -35,6 +35,7 @@
     "verify:experiment": "node --import tsx scripts/verify-experiment.ts",
     "verify:replay": "node --import tsx scripts/verify-policy-replay.ts",
     "harness": "node --import tsx scripts/openfox-harness.ts",
+    "harness:agent-e2e": "node --import tsx scripts/agent-e2e.ts",
     "workflow:install": "node dist/workflow/emit.js"
   },
   "peerDependencies": {

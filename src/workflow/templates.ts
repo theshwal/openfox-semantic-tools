@@ -151,3 +151,28 @@ export const ADVISORY_VERIFICATION_WORKFLOW: AdvisoryWorkflowFile = {
 export function listAdvisoryWorkflows(): readonly AdvisoryWorkflowFile[] {
   return [ADVISORY_VERIFICATION_WORKFLOW]
 }
+
+/**
+ * Builds the advisory workflow with the advisory step's agent chosen by the
+ * caller.
+ *
+ * The step is ADVISORY: it may call `semantic_verify_task`, but only if the
+ * agent running it actually has that tool in its `allowedTools`. A stock agent
+ * (`builder`, the default) does not, so with the default the step reports that
+ * the tool is unavailable and continues — which is safe, but means the semantic
+ * advice is never actually produced unless an operator opts in.
+ *
+ * `advisoryAgentId` therefore exists so an operator who WANTS the advice can
+ * point the step at an agent that really has the tool, instead of the workflow
+ * silently degrading to a no-op while still looking like it consulted a model.
+ */
+export function advisoryWorkflowFor(advisoryAgentId: string): AdvisoryWorkflowFile {
+  return {
+    ...ADVISORY_VERIFICATION_WORKFLOW,
+    steps: ADVISORY_VERIFICATION_WORKFLOW.steps.map((step) =>
+      step.id === 'semantic-advice' && advisoryAgentId
+        ? { ...step, agentId: advisoryAgentId }
+        : step,
+    ),
+  }
+}

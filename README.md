@@ -171,12 +171,13 @@ npm ci --ignore-scripts
 npm run check
 npm run evaluate
 npm run verify:experiment
+npm run harness:agent-e2e
 npm pack
 ```
 
 The package entry is `dist/index.js`; `prepack` builds it. Install the built package through OpenFox's plugin installation flow, then enable it. Configure the **full POST endpoint**, optional model/API key, and timeout in global plugin settings. `backend` currently identifies the intended backend; it does not supply an inferred endpoint. No endpoint is selected automatically.
 
-Allow the semantic tools you want in the agent's tool list. Tool registration does not grant access. The `semantic-verification` skill ships with `semantic_verify_task`; it is not published for tools that do not exist yet.
+Allow the semantic tools you want in the agent's tool list. Tool registration does not grant access. Each usage skill ships with the tools it describes: `semantic-verification` with `semantic_verify_task`, `semantic-code-discovery` with `semantic_search` and `semantic_scan`.
 
 Example tool arguments:
 
@@ -380,19 +381,57 @@ each run recorded — if they do not, the comparison column means nothing, and
 the replay fails. This is **arithmetic on recorded numbers, not a measurement**:
 it never writes a rate and never claims a false-pass count.
 
-## Usage skill
+## Usage skills
 
-The plugin registers a `semantic-verification` skill through the public
-`registerSkillSource` API (present in the Plugin API v2 baseline). It teaches
-when to use the check, when **not** to, which evidence to assemble, how to read
-each status, and when to fall back to the normal verifier. It states that tests,
-typechecks, linters and human review remain mandatory.
+The plugin registers two usage skills through the public `registerSkillSource`
+API (present in the Plugin API v2 baseline):
 
-The skill carries no provider name, endpoint, URL or model id, and it never
-implies it grants tool access: `semantic_verify_task` must still be listed in
-the agent's allowed tools. `semantic-code-discovery` is deliberately absent —
-its tools (`semantic_search`, `semantic_scan`) do not exist yet.
+- `semantic-verification` — when to use the check, when **not** to, which
+  evidence to assemble, how to read each status, and when to fall back to the
+  normal verifier. It states that tests, typechecks, linters and human review
+  remain mandatory.
+- `semantic-code-discovery` — when semantic search and scoring actually reduce
+  repository exploration, and when grep, symbols or tests already answer the
+  question.
 
+The skills carry no provider name, endpoint, URL or model id, and they never
+imply they grant tool access: the matching tools must still be listed in the
+agent's allowed tools.
+
+### Permissions, as observed on a real host
+
+Verified with `npm run harness:agent-e2e` against an isolated OpenFox
+`2.0.160`; see `docs/TRACEABILITY.md` for the full evidence.
+
+| Configuration | Observed behaviour |
+| --- | --- |
+| Skill loaded, tool not in `allowedTools` | the host refuses the call with an allow-list message; no provider request is made |
+| Tool in `allowedTools`, skill never loaded | the tool executes normally; the skill is guidance, not a precondition |
+| Tool in `allowedTools` and `load_skill` called | both skills load through the normal `load_skill` tool, then the tool executes |
+
+One host caveat is worth knowing: a plugin tool is only permission-checked when
+the agent's `allowedTools` names **at least one** non-builtin tool. An agent
+whose list is builtins-only is not restricted from plugin tools at all.
+
+### Advisory workflow: the agent is opt-in
+
+The advisory workflow's semantic step runs as the agent named in the workflow
+document. The shipped default is the stock `builder`, which does **not** have
+`semantic_verify_task` in its `allowedTools`, so the step reports the tool as
+unavailable and continues to the normal verifier. That is safe, but it means the
+advice is never actually produced.
+
+To really get the advice, write the workflow with an agent that has the tool:
+
+```ts
+import { advisoryWorkflowFor } from 'openfox-semantic-tools'
+
+const workflow = advisoryWorkflowFor('my-agent-with-verification')
+```
+
+Only the advisory step's `agentId` changes. The deterministic checks, the normal
+verifier and every transition condition are identical in both forms, so opting
+in cannot shorten verification.
 
 ## Provider calibration and self-test
 
