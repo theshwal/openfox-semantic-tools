@@ -100,7 +100,9 @@ test('the skill does not hard-code thresholds without evidence', () => {
   const prompt = SEMANTIC_VERIFICATION_SKILL.prompt
   // Policy numbers live in the versioned policy module, not in prompt prose.
   assert.ok(!/\b0\.\d{2,}\b/.test(prompt), 'no numeric threshold may appear in the skill')
-  assert.match(prompt, /not currently reachable/i)
+  assert.match(prompt, /calibration/i)
+  assert.ok(prompt.includes('semantic_provider_self_test'))
+  assert.ok(prompt.includes('semantic_calibration_candidate'))
 })
 
 test('the manifest declares the skills capability exactly once', async () => {

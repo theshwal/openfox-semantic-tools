@@ -69,11 +69,23 @@ The result is always advisory. It never means the task is complete.
 - \`insufficient-evidence\`: the supplied evidence does not directly address
   the criterion. Gather better evidence before concluding anything.
 - \`off-scope\`: the change touches behaviour unrelated to the criterion.
-- \`pass-candidate\`: not currently reachable. It requires a measured
-  calibration that does not exist yet.
+- \`pass-candidate\`: reachable only when the operator has explicitly activated
+  a calibration that marks the policy calibrated. It is still advisory and
+  never means the task is complete.
 
 A failed call (provider error, timeout, cancellation, blocked egress) is not a
 negative verdict. It carries a code and nothing else.
+
+## Provider calibration
+
+When a provider/model or its version changed, or before relying on an active
+calibration profile, use \`semantic_provider_self_test\` if that tool is allowed.
+It uses embedded synthetic examples only and reports profile freshness, gate
+ranges and fallback categories; it never changes settings.
+
+\`semantic_calibration_candidate\` can turn an operator-owned labelled numeric
+set into an inactive profile candidate. Treat that output as material for human
+review: it does not invent thresholds, activate itself or prove model quality.
 
 ## Limits you must keep
 

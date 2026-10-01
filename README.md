@@ -392,3 +392,21 @@ The skill carries no provider name, endpoint, URL or model id, and it never
 implies it grants tool access: `semantic_verify_task` must still be listed in
 the agent's allowed tools. `semantic-code-discovery` is deliberately absent —
 its tools (`semantic_search`, `semantic_scan`) do not exist yet.
+
+
+## Provider calibration and self-test
+
+Semantic-provider numeric scales are not treated as interchangeable. Verification now supports a versioned calibration profile plus explicit operator overrides with the precedence:
+
+`explicit override > active calibration profile > conservative defaults`.
+
+A profile is never applied unless its own `active` field is true, and a profile whose configured provider/model/version no longer matches is reported as stale/unverified and is not applied.
+
+Two advisory tools are available:
+
+- `semantic_provider_self_test` — runs a small embedded synthetic smoke test against the configured endpoint and reports protocol reachability, profile freshness, observed gate ranges, warnings and fallback categories. It reads no repository/session content and never changes settings.
+- `semantic_calibration_candidate` — turns an operator-owned labelled numeric case set into an inactive, observation-only candidate profile. It never invents thresholds or activates the result.
+
+Configure `calibrationProfileJson`, `calibrationOverridesJson`, and optionally `runtimeVersion` in plugin settings. See `docs/CALIBRATION.md` for the schema, freshness rules and safety model.
+
+The dated Jev/Kev/Laya snapshot is evidence for why this layer exists, not a leaderboard and not a built-in permissive profile.

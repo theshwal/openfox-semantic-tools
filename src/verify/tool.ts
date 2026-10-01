@@ -5,6 +5,7 @@ import { parseSettings } from '../settings.js'
 import { buildVerifyState } from './state.js'
 import { buildVerifyRequest } from './questions.js'
 import { DEFAULT_POLICY, evaluateVerifyPolicy, type VerifyPolicy, type VerifyStatus } from './policy.js'
+import { assessProfileFreshness, parseCalibrationOverrides, parseCalibrationProfile, resolveVerifyPolicy } from '../calibration/profile.js'
 import type { DecisionAnswer, DecisionResponse, DecisionRequest } from '../decision/types.js'
 
 export interface VerifyReport {
@@ -32,6 +33,12 @@ export interface VerifyReport {
    * analysis and never used to decide the status.
    */
   telemetry: ReturnType<typeof evaluateVerifyPolicy>['telemetry']
+  calibration: {
+    profileId: string | null
+    freshness: 'matched' | 'stale' | 'unverified'
+    applied: boolean
+    explicitOverrides: boolean
+  }
 }
 
 export interface VerifyToolOptions {
@@ -54,7 +61,6 @@ export function createVerifyTool(
   readSettings: (projectId?: string) => Record<string, unknown>,
   options: VerifyToolOptions = {},
 ): PluginTool {
-  const policy = options.policy ?? DEFAULT_POLICY
   const transport = options.transport ?? fetch
   return {
     name: 'semantic_verify_task',
@@ -89,7 +95,30 @@ export function createVerifyTool(
           args.criterion as string,
           typeof args.model === 'string' ? args.model : undefined,
         )
-        const provider = new SystemOneHttpProvider(parseSettings(readSettings(context.projectId)), transport)
+        const rawSettings = readSettings(context.projectId)
+        const settings = parseSettings(rawSettings)
+        const provider = new SystemOneHttpProvider(settings, transport)
+        const profile = parseCalibrationProfile(rawSettings.calibrationProfileJson)
+        const runtimeVersion =
+          typeof rawSettings.runtimeVersion === 'string' && rawSettings.runtimeVersion.trim()
+            ? rawSettings.runtimeVersion.trim()
+            : undefined
+        const freshness = assessProfileFreshness(profile, {
+          presetId: settings.presetId ?? 'custom',
+          ...(settings.model ? { model: settings.model } : {}),
+          ...(runtimeVersion ? { runtimeVersion } : {}),
+          policyVersion: DEFAULT_POLICY.version,
+        })
+        // A stale/unverified profile is visible but never applied. Explicit
+        // operator overrides remain explicit and therefore still take priority.
+        const applicableProfile =
+          profile && freshness === 'matched' ? profile : profile ? { ...profile, active: false } : null
+        const explicitCalibration = parseCalibrationOverrides(rawSettings.calibrationOverridesJson)
+        const policy = options.policy ?? resolveVerifyPolicy(
+          DEFAULT_POLICY,
+          applicableProfile,
+          explicitCalibration,
+        )
         // Repository/session-derived content: always automatic, never explicit.
         const response: DecisionResponse = await provider.decide(request, {
           signal: context.signal,
@@ -111,6 +140,12 @@ export function createVerifyTool(
           gates: decision.gates,
           reasons: [...decision.reasons],
           telemetry: decision.telemetry,
+          calibration: {
+            profileId: profile?.id ?? null,
+            freshness,
+            applied: Boolean(profile?.active && freshness === 'matched'),
+            explicitOverrides: rawSettings.calibrationOverridesJson !== undefined && rawSettings.calibrationOverridesJson !== '',
+          },
         }
         return { success: true, output: JSON.stringify(report) }
       } catch (error) {
