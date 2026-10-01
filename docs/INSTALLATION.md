@@ -1,15 +1,20 @@
 # Installation
 
-Two ways to get this plugin into OpenFox. Both need **no provider credential**
-and no account with any vendor.
+**One supported way to install this plugin: from a source checkout, by absolute
+local path.** Recipe A below is that path, and it is the one the harness
+executes. Recipe B documents the unsupported npm tarball and why it cannot
+work, because a `.tgz` in hand is a common dead end.
+
+Nothing here needs a **provider credential** or an account with any vendor.
 
 | Recipe | Use when |
 | --- | --- |
-| [A — source checkout, absolute local path](#a-source-checkout--absolute-local-path) | Always. This is the supported path and the one the harness executes. |
-| [B — packed tarball](#b-packed-tarball-not-installable) | Never, for installation. Documented because it fails, and why matters. |
+| [A — source checkout, absolute local path](#recipe-a--source-checkout-absolute-local-path) | Always. This is the supported path. |
+| [B — packed tarball](#recipe-b--packed-tarball-not-installable) | Never, for installation. Documented because it fails, and why matters. |
 
-Both end in the same host operation: OpenFox copies a directory into its plugins
-directory and builds it there.
+Both are described because both are attempted in practice; only A ends in a
+working install. The host operation they both meet is the same: OpenFox copies a
+directory into its plugins directory and builds it there.
 
 ## What the host actually does
 
@@ -168,7 +173,7 @@ To exercise the plugin inside a real OpenFox host, install the public OpenFox
 package into a throwaway tree first:
 
 ```bash
-HARNESS_PKG_DIR=/tmp/of-harness-2.0.160 scripts/setup-harness.sh
+HARNESS_PKG_DIR=/tmp/of-harness-2.0.160 OPENFOX_VERSION=2.0.160 scripts/setup-harness.sh
 HARNESS_PKG_DIR=/tmp/of-harness-2.0.160 npm run harness
 ```
 

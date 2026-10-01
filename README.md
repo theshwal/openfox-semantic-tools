@@ -4,10 +4,10 @@ Experimental OpenFox plugin for **fast, typed semantic decisions** and, where it
 
 The project is intentionally provider-agnostic. The first transport target is the Jev / System One-style `POST /v1/systemone` API, so the same OpenFox tools can be backed by hosted Jev or by a compatible local/open-source runtime.
 
-> Status: functionally complete on both supported OpenFox releases. Six tools,
-> two usage skills, presets, an optional decision cache, explicit egress
-> policy, a calibration layer and an opt-in advisory workflow. What is **not**
-> measured is decision quality and any token/cost/time saving: see
+> Status: six tools, two usage skills, presets, optional cache, egress,
+> calibration and advisory workflow, validated on OpenFox 2.0.157 and 2.0.160.
+> Dated provider observations are scoped in #9; no durable quality
+> certification or end-to-end savings claim is made. See
 > [Evaluation](#evaluation-what-counts-as-success).
 
 ## Why this exists
@@ -92,10 +92,11 @@ zero hooks and zero transitions, which the real host confirms.
 ### The one hard blocker
 
 OpenFox `develop` exposes `registerMessageTransform`, the natural hook for
-pre-LLM context reduction. That API is **not present in the released
-2.0.0.x line** (`v2.0.157` and `v2.0.160` were both checked directly against
+pre-LLM context reduction. That API was **absent from the two released versions
+checked here** (`v2.0.157` and `v2.0.160`, both read directly from
 `src/plugin/index.ts`), so context reduction is **blocked on the released-API
-issue** and is not implemented. Re-check upstream before starting it.
+issue** and is not implemented. Re-check upstream before starting it, and
+re-check further releases rather than assuming the whole line behaves alike.
 
 ## System One contract
 
@@ -136,8 +137,8 @@ A feature that saves semantic-provider latency but makes the overall OpenFox tas
 
 ### What is actually measured today
 
-**Nothing about decision quality, and no saving of any kind.** The shipped
-evidence is:
+**No durable quality certification, and no end-to-end saving has been
+measured.** The shipped evidence is:
 
 - offline protocol conformance against a local stub (`npm run conformance:smoke`);
 - labelled fixtures replayed through a scripted transport (`npm run verify:experiment`);
@@ -145,9 +146,10 @@ evidence is:
 - real-host plugin loading, settings, skills and tool registration on two
   OpenFox releases (`npm run harness`, `npm run harness:agent-e2e`).
 
-No false-pass rate exists. No token, cost or wall-time saving exists. Those
-fields stay `null` and are never written as zero. A measurement that was not
-made is unknown, not good.
+Those live snapshots are dated observations scoped in #9, not a benchmark and
+not a certification. No false-pass rate exists. No token, cost or wall-time
+saving exists. Those fields stay `null` and are never written as zero. A
+measurement that was not made is unknown, not good.
 
 ## Safety and failure behavior
 
@@ -203,7 +205,7 @@ first (`scripts/setup-harness.sh`, which never touches your own OpenFox). Use
 one `HARNESS_PKG_DIR` per version:
 
 ```bash
-HARNESS_PKG_DIR=/tmp/of-harness-2.0.157 scripts/setup-harness.sh
+HARNESS_PKG_DIR=/tmp/of-harness-2.0.157 OPENFOX_VERSION=2.0.157 scripts/setup-harness.sh
 HARNESS_PKG_DIR=/tmp/of-harness-2.0.157 npm run harness    # loading, settings, skills
 HARNESS_PKG_DIR=/tmp/of-harness-2.0.157 npm run harness:agent-e2e  # real agent turns, permissions, workflow runtime
 ```

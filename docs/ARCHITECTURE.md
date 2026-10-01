@@ -111,8 +111,9 @@ Six tools, all registered through the public Plugin API v2:
 | `semantic_provider_self_test` | `src/calibration/self-test.ts` | advisory |
 | `semantic_calibration_candidate` | `src/calibration/candidate-tool.ts` | advisory |
 
-Two skill sources (`src/skills/source.ts`) teach when those tools are worth
-calling. `semantic_decide` receives:
+Two skills (`semantic-verification`, `semantic-code-discovery`) are provided by
+one skill source (`src/skills/source.ts`), which teaches when those tools are
+worth calling. `semantic_decide` receives:
 
 - state;
 - one or more typed questions;
