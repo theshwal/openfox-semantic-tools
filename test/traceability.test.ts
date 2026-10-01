@@ -8,17 +8,20 @@ const TRACE = await readFile(resolve(import.meta.dirname, '../docs/TRACEABILITY.
 /**
  * Requirement rows are table lines whose first cell is an id or a label. The
  * header rows of each table are skipped, as is the `## Scope discipline` table,
- * which records invariants rather than issue requirements.
+ * which records invariants rather than issue requirements, and the host-findings
+ * table, which records observed host BEHAVIOUR rather than a requirement.
  */
 function requirementRows(): string[] {
   const lines = TRACE.split('\n')
   const scopeStart = lines.findIndex((l) => l.startsWith('## Scope discipline'))
+  const findingsStart = lines.findIndex((l) => l.startsWith('### Host findings'))
   const summaryStart = lines.findIndex((l) => l.startsWith('## Summary'))
   return lines
     .slice(0, summaryStart)
     .filter(
       (line, index) =>
         index < scopeStart &&
+        index < findingsStart &&
         line.startsWith('| ') &&
         line.endsWith('|') &&
         !line.startsWith('| ---') &&
@@ -39,15 +42,28 @@ test('every requirement row ends in a verdict, never an empty cell', () => {
 
 test('the summary counts match the tables', () => {
   const rows = requirementRows()
-  const verdictOf = (row: string) => row.split('|').at(-2)?.trim() ?? ''
 
   // Rows are classified by their final verdict cell so a requirement is counted
-  // exactly once, whatever prose the proof column contains.
-  const unverified = rows.filter((r) => verdictOf(r).startsWith('**unverified**')).length
-  const deviation = rows.filter((r) => verdictOf(r).includes('documented deviation')).length
-  const codePath = rows.filter((r) => verdictOf(r).includes('verified (code path')).length
-  const plain = rows.filter((r) => verdictOf(r) === 'verified').length
-  const plumbing = rows.filter((r) => verdictOf(r).includes('verified (plumbing only')).length
+  // exactly once, whatever prose the proof column contains. The buckets are
+  // mutually exclusive and matched by PREFIX, so a qualified verdict such as
+  // "verified — see finding H2" still counts as verified.
+  const verdictOf = (row: string) => row.split('|').at(-2)?.trim() ?? ''
+  const classified = rows.map(verdictOf).map((v) => {
+    if (v.startsWith('**unverified**')) return 'unverified'
+    if (v.startsWith('verified with a documented deviation')) return 'deviation'
+    if (v.startsWith('verified (code path')) return 'codePath'
+    if (v.startsWith('verified (plumbing only')) return 'plumbing'
+    if (v.startsWith('verified')) return 'verified'
+    return 'other'
+  })
+  const count = (kind: string) => classified.filter((c) => c === kind).length
+  const unverified = count('unverified')
+  const deviation = count('deviation')
+  const codePath = count('codePath')
+  const plumbing = count('plumbing')
+  const plain = count('verified')
+  const other = count('other')
+  assert.equal(other, 0, `every row must carry a known verdict, ${other} do not`)
 
   const summary = TRACE.slice(TRACE.indexOf('## Summary'))
   const claimed = {
@@ -119,9 +135,30 @@ test('every quoted test name exists in the cited test file', async () => {
 })
 
 test('the unverified requirements are the ones that genuinely need external evidence', () => {
-  for (const id of ['4.18', '4.19', '14.23']) {
+  // The calibration study (#9) is still unmeasured: no hosted-provider run has
+  // happened, so a false-pass rate is unknown by construction.
+  for (const id of ['4.18', '4.19']) {
     const row = requirementRows().find((r) => r.startsWith(`| ${id} |`))
     assert.ok(row, `row ${id} missing`)
     assert.ok(row.includes('**unverified**'), `${id} must stay unverified, not be claimed`)
   }
+})
+
+test('a real-host claim must cite the E2E harness, not a unit test', () => {
+  // 14.23 covers the normal `load_skill` path on a real host. It may only be
+  // claimed as verified when the row points at the isolated harness, because a
+  // unit test cannot exercise the host's skill loader.
+  const row = requirementRows().find((r) => r.startsWith('| 14.23 |'))
+  assert.ok(row, 'row 14.23 missing')
+  if (row.includes('**unverified**')) {
+    assert.ok(
+      !row.includes('harness:agent-e2e'),
+      '14.23 cannot claim harness evidence while it is still marked unverified',
+    )
+    return
+  }
+  assert.ok(
+    row.includes('harness:agent-e2e'),
+    '14.23 is verified, so it must cite the real-host harness as its proof',
+  )
 })

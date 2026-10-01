@@ -233,9 +233,14 @@ try {
   )
   if (listed) {
     record('plugin is loaded by the real host', listed.loaded === true, `loaded=${listed.loaded}`)
+    // Asserted as a LOWER BOUND, not an exact count: the plugin legitimately
+    // gained tools in later lots, and pinning the total would fail this harness
+    // for an unrelated reason. What must hold is that the four original
+    // decision tools are registered (their own behaviour is covered by
+    // `npm run harness:agent-e2e`) and that exactly one skill source ships.
     record(
       'host reports the tool, skill and settings contributions',
-      listed.contributions?.tools === 4 &&
+      (listed.contributions?.tools ?? 0) >= 4 &&
         listed.contributions?.skillSources === 1 &&
         listed.contributions?.settingsFields > 0,
       `tools=${listed.contributions?.tools} skillSources=${listed.contributions?.skillSources} settingsFields=${listed.contributions?.settingsFields}`,

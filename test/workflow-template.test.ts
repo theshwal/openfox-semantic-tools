@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { ADVISORY_VERIFICATION_WORKFLOW, listAdvisoryWorkflows } from '../src/workflow/templates.ts'
+import { ADVISORY_VERIFICATION_WORKFLOW, advisoryWorkflowFor, listAdvisoryWorkflows } from '../src/workflow/templates.ts'
 import { parseSettings } from '../src/settings.ts'
 import { DEFAULT_POLICY, evaluateVerifyPolicy } from '../src/verify/policy.ts'
 
@@ -178,6 +178,44 @@ test('the workflow is listed and uniquely identified', () => {
   const workflows = listAdvisoryWorkflows()
   assert.equal(workflows.length, 1)
   assert.equal(new Set(workflows.map((w) => w.metadata.id)).size, workflows.length)
+})
+
+test('the advisory step agent is opt-in, because a stock agent cannot use the tool', () => {
+  // The shipped default points at `builder`, which has no
+  // `semantic_verify_task` in its allowedTools: the step then reports the tool
+  // as unavailable and continues. That is safe, but it is NOT a silent
+  // no-op the operator asked for, so the agent must be selectable.
+  const defaultStep = ADVISORY_VERIFICATION_WORKFLOW.steps.find((s) => s.id === 'semantic-advice')
+  assert.equal(defaultStep?.agentId, 'builder')
+
+  const opted = advisoryWorkflowFor('reviewer-with-verification')
+  const optedStep = opted.steps.find((s) => s.id === 'semantic-advice')
+  assert.equal(optedStep?.agentId, 'reviewer-with-verification', 'the advisory agent must be selectable')
+
+  // Only the advisory step changes. The deterministic and verifier steps are
+  // what make the run safe, so they must be identical in both forms.
+  for (const id of ['deterministic-checks', 'normal-verifier']) {
+    assert.deepEqual(
+      opted.steps.find((s) => s.id === id),
+      ADVISORY_VERIFICATION_WORKFLOW.steps.find((s) => s.id === id),
+      `${id} must not change between the default and opt-in forms`,
+    )
+  }
+  // Every path must still reach the normal verifier after the substitution.
+  assert.equal(opted.steps.length, ADVISORY_VERIFICATION_WORKFLOW.steps.length)
+  assert.equal(opted.metadata.id, ADVISORY_VERIFICATION_WORKFLOW.metadata.id)
+  assert.deepEqual(
+    opted.steps.flatMap((s) => s.transitions.map((t) => t.when)),
+    ADVISORY_VERIFICATION_WORKFLOW.steps.flatMap((s) => s.transitions.map((t) => t.when)),
+    'no transition condition may change',
+  )
+})
+
+test('an empty advisory agent leaves the shipped default untouched', () => {
+  // Guarding the default: an empty value must not blank the field and produce an
+  // invalid document.
+  const step = advisoryWorkflowFor('').steps.find((s) => s.id === 'semantic-advice')
+  assert.equal(step?.agentId, 'builder')
 })
 
 test('the advisory workflow is opt-in: it is never installed automatically', async () => {
