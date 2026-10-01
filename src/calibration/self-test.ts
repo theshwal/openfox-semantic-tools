@@ -220,6 +220,7 @@ export function createProviderSelfTestTool(
             advisory: true,
             syntheticOnly: true,
             protocol: {
+              scope: 'smoke-not-conformance',
               reachable: true,
               noul: true,
               score: true,
