@@ -68,7 +68,7 @@ export class SystemOneHttpProvider implements DecisionProvider {
         body: JSON.stringify({ ...request, ...(model ? { model } : {}) }),
       })
       // Do not echo arbitrary upstream bodies: they can contain submitted source or credentials.
-      if (!response.ok) { await response.body?.cancel(); throw new ProviderError('http', `System One HTTP ${response.status}`) }
+      if (!response.ok) { await response.body?.cancel(); throw new ProviderError('http', `System One HTTP ${response.status}`, response.status) }
       const reader = response.body?.getReader()
       const chunks: Uint8Array[] = []
       let bytes = 0
