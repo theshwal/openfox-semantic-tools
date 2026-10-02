@@ -1,7 +1,7 @@
 # Implementation order and delivery status
 
-Baseline inspected: semantic-tools `857a93f`; OpenFox released tags `v2.0.157`
-and `v2.0.160`. No OpenFox core modifications.
+Baseline inspected for this planning pass: semantic-tools `205ac6bf`; OpenFox
+released tags `v2.0.157` and `v2.0.160`. No OpenFox core modifications.
 
 ## Current shape
 
@@ -23,9 +23,12 @@ advisory workflow file. Nothing registers a hook or a workflow transition.
 | 8 | #5, #14 (discovery) | Implemented: `semantic_search` and `semantic_scan` over a caller-narrowed candidate list, plus the `semantic-code-discovery` skill. Advisory only; the agent confirms candidates with normal code tools. |
 | 9 | #11, #12 | Implemented: optional decision cache (off by default) and an opt-in advisory workflow file. The plugin registers no hook and no transition, so verification cannot be shortened. |
 | 10 | #6 | **Blocked**: `registerMessageTransform` is not in any released 2.0.0.x version. |
-| 11 | #13 (release part) | In progress: CI, offline suite, install recipes and isolated-host validation are in place. The tag and the release are the delivery workflow's step, not this one. |
+| 11 | #13 (release readiness) | Completed: CI, offline suite, package/install recipes and isolated-host validation are in place; package version 0.1.0 is prepared. No Git tag, GitHub release or registry publication is implied. |
+| 12 | #33 | Next: issue-level acceptance-criteria coverage, implemented as a conservative aggregation layer over the existing verification/policy/calibration path. No merge gate. |
+| 13 | #34 | Next: bounded repository-local recall feeding the existing semantic search reranker. Preserve explicit-candidate callers; no persistent index/vector DB. |
+| 14 | #35 | Next: visual decision **spike first**. Benchmark/evidence precedes any production visual API. A negative/defer result is valid. |
 
-Each issue is implemented and checked separately. Experimental tools are not advertised through skills before they exist and are validated. A fixture run is protocol evidence, not decision-quality or OpenFox end-to-end evidence.
+Completed issues above were implemented and checked separately. The same rule applies to the next cycle: #33, then #34, then the #35 spike unless a concrete blocker changes the order. Experimental tools are not advertised through skills before they exist and are validated. #9 collects measured impact after functionality exists; it is not a provider-tuning loop. #6 stays blocked on a released message-transform API. A fixture run is protocol evidence, not decision-quality or OpenFox end-to-end evidence.
 
 ## Current boundaries
 
