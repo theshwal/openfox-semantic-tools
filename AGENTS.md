@@ -48,14 +48,28 @@ Do not add automatic verification gates, codebase-wide scanning or context mutat
 
 ### Next experiments
 
-In order:
+The V0 verification/discovery/skill/calibration work is delivered. The next
+development cycle is:
 
-1. `semantic_verify_task`
-2. `semantic_scan`
-3. `semantic_search`
-4. pre-LLM context relevance/reduction
+1. **#33 — issue-level acceptance-criteria coverage**: aggregate the existing
+   verification primitive conservatively across explicit criteria. Reuse the
+   verification policy and calibration path; do not create a second threshold
+   system or a merge gate.
+2. **#34 — hybrid local recall + semantic reranking**: make
+   `semantic_search` able to build a bounded local candidate set before the
+   existing semantic stage. Preserve explicit-candidate compatibility and keep
+   `semantic_scan` bounded.
+3. **#35 — visual semantic decision spike**: benchmark first. Do not register a
+   production visual tool or widen the generic provider contract until a real
+   backend and fixture set justify it.
+4. **#6 — pre-LLM context relevance/reduction**: remains blocked until the
+   message-transform capability exists in a released OpenFox version.
 
-Model/skill routing is not a project priority unless evidence changes that.
+#9 is the shared measurement umbrella after functional delivery. Do not turn it
+into a permanent provider leaderboard or delay bounded advisory features merely
+to refine model thresholds.
+
+Model/skill routing remains out of scope unless measured evidence changes that.
 
 ## Skills and agent adoption
 

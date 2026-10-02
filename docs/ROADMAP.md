@@ -82,15 +82,43 @@ today is opt-in and advisory.
     checked against `src/plugin/index.ts`). Do not start before it ships in a
     release.
 
-## Phase 5 — distribution
+## Phase 5 — distribution baseline
 
-14. **#13 — CI, packaging and first usable release** — in progress. CI, the
-    offline suite, the isolated-host harnesses and the install recipes are in
-    place; the release tag and registry submission are the remaining steps and
-    belong to the delivery workflow.
+14. **#13 — CI, packaging and first usable release readiness** — completed.
+    CI, offline suites, isolated-host installation on the validated OpenFox
+    versions, package inspection and installation documentation are in place.
+    The package version is prepared as `0.1.0`. This status does **not** claim
+    that a Git tag, GitHub release or registry publication exists.
 
-A curated OpenFox registry submission should happen only after this is
-installable, tested and useful outside the author's machine.
+The repository now has a stable enough advisory baseline for another
+evidence-driven development cycle. Publication remains a delivery decision, not
+permission to make experimental features automatic.
+
+## Phase 6 — next evidence-driven capabilities
+
+15. **#33 — issue-level acceptance-criteria coverage** — first implementation
+    target. Build a bounded advisory aggregation layer on top of the existing
+    verification policy/calibration path. Do not duplicate thresholds or turn it
+    into a merge gate. Functional delivery comes before impact measurement.
+
+16. **#34 — hybrid local recall + semantic reranking** — second implementation
+    target. Extend `semantic_search` compatibly so it can obtain a bounded
+    repository-local candidate set before the existing semantic reranker.
+    `semantic_scan` remains explicit-candidate. No persistent index, vector DB
+    or new retrieval service.
+
+17. **#35 — visual semantic decisions** — third target and a real spike.
+    Phase A is benchmark/evidence only; no production visual tool is registered.
+    A production primitive is allowed only after the recorded go/defer decision
+    shows useful signal, conservative fallback and acceptable false-positive
+    behaviour.
+
+**#9 remains the shared measurement umbrella** for durable claims about
+verification/discovery/impact/cache. It must not become a permanent provider
+leaderboard and does not block bounded functionality in #33 or #34.
+
+**#6 remains blocked** until a released OpenFox version exposes the required
+message-transform API. Do not implement against a develop-only/private surface.
 
 ## Dependency graph
 
@@ -99,29 +127,39 @@ installable, tested and useful outside the author's machine.
    |
    +--> #2 semantic_decide
    |       |
-   |       +--> #4 semantic_verify_task -----> #12 workflow integration
-   |       |          \
-   |       |           +--> #14 semantic-verification skill
+   |       +--> #4 semantic_verify_task -----> #12 advisory workflow
+   |       |          |\
+   |       |          | +--> #14 semantic-verification skill
+   |       |          |
+   |       |          +----> #33 issue-level coverage ----> #9 measured impact
    |       |
    |       +--> #5 semantic scan/search
-   |       |          \
-   |       |           +--> #14 semantic-code-discovery skill
+   |       |          |\
+   |       |          | +--> #14 semantic-code-discovery skill
+   |       |          |
+   |       |          +----> #34 local recall + rerank ----> #9 measured impact
    |       |
-   |       +--> #14 skill-source scaffold
-   |       |
-   |       +--> #11 cache (later)
+   |       +--> #11 cache (off by default) ----------------> #9 benefit evidence
    |
    +--> #7 conformance -----> #8 presets
+   |             |\
+   |             | +-------> #27 calibration/self-test
    |             |
-   |             +---------> #9 provider benchmark
+   |             +---------> #9 provider/impact evidence
    |
    +--> #10 data egress policy
 
-#3 evaluation harness --------> #4 / #5 / #9 / #11 / #12
+#3 evaluation harness --------> #4 / #5 / #9 / #11 / #33 / #34
+
+#1 + provider-neutral decision doctrine
+   + evaluation plumbing ------> #35 visual spike
+                                  |
+                                  +--> production visual primitive only after GO
+                                  +--> downstream consumers stay outside this repo
 
 OpenFox released message transforms -----> #6
 
-#1 + #2 + #3 ---------------------------> #13 release
+#1 + #2 + #3 ---------------------------> #13 release-readiness baseline
 ```
 
 ## Development rule for agents
@@ -130,7 +168,11 @@ When working autonomously:
 
 - take one issue at a time;
 - read dependencies first;
+- for the current cycle, prefer #33 then #34, then #35 unless a concrete blocker changes the order;
 - do not implement downstream issues opportunistically;
+- for #35, finish and record the Phase A go/defer decision before any production API work;
+- keep #9 as measurement/claims work, not as an excuse to tune providers indefinitely;
+- keep #6 blocked until the required API exists in a released OpenFox version;
 - update tests/docs within the same issue;
 - stop after delivery and report evidence;
 - do not reinterpret an experimental issue as permission to enable an automatic gate.
