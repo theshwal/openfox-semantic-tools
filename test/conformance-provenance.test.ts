@@ -150,8 +150,7 @@ test('a uniform 400 response is not read as protocol rejection capability', asyn
   }
 })
 
-test('a local stub reports observations without asserting any identity', async () => {
-  const { spawn: spawnChild } = await import('node:child_process')
+test('a local stub reports observations without asserting any identity', async () => {  const { spawn: spawnChild } = await import('node:child_process')
   const child = spawnChild(process.execPath, ['--import', 'tsx', 'scripts/smoke-server.ts'], {
     env: { PATH: process.env.PATH, HOME: process.env.HOME, SMOKE_PORT: '8913' },
     stdio: ['ignore', 'pipe', 'ignore'],
@@ -185,5 +184,327 @@ test('a local stub reports observations without asserting any identity', async (
     assert.equal(exitCode, 0)
   } finally {
     child.kill('SIGTERM')
+  }
+})
+
+// --- #7: campaign metadata, model omission on the wire, and the auth probe. ---
+
+/** Starts the offline stub, optionally requiring a bearer key. */
+async function startStub(port: number, env: Record<string, string> = {}): Promise<() => void> {
+  const { spawn: spawnChild } = await import('node:child_process')
+  const child = spawnChild(process.execPath, ['--import', 'tsx', 'scripts/smoke-server.ts'], {
+    env: { PATH: process.env.PATH, HOME: process.env.HOME, SMOKE_PORT: String(port), ...env },
+    stdio: ['ignore', 'pipe', 'ignore'],
+  })
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('smoke server timeout')), 10_000)
+    child.stdout!.on('data', (chunk: Buffer) => {
+      if (String(chunk).includes('listening')) { clearTimeout(timer); resolve() }
+    })
+  })
+  return () => child.kill('SIGTERM')
+}
+
+test('campaign metadata records dates, declared values and no secrets', async () => {
+  const stopStub = await startStub(8921)
+  try {
+    const { report } = await runConformance({
+      SEMANTIC_ENDPOINT: 'http://127.0.0.1:8921/v1/systemone',
+      SEMANTIC_PROVIDER_ID: 'offline-smoke-stub',
+      SEMANTIC_MODEL: 'smoke-model',
+      SEMANTIC_RUNTIME_VERSION: 'stub-0.0.1',
+      SEMANTIC_UNSUPPORTED_MODEL: 'unsupported-model-for-smoke',
+      SEMANTIC_API_KEY: 'sk-super-secret-value',
+    })
+    assert.ok(report.campaign, 'campaign metadata must be present')
+    assert.ok(Date.parse(report.campaign.startedAt) > 0, 'startedAt must be a valid date')
+    assert.ok(Date.parse(report.campaign.finishedAt) > 0, 'finishedAt must be a valid date')
+    assert.ok(
+      Date.parse(report.campaign.startedAt) <= Date.parse(report.campaign.finishedAt),
+      'startedAt must not be after finishedAt',
+    )
+    assert.equal(report.campaign.runtimeVersion, 'stub-0.0.1')
+    assert.equal(report.campaign.model, 'smoke-model')
+    assert.equal(report.campaign.command, 'npm run conformance -- <report-directory>')
+    // Declarative vs observed must be explicit, not guessed by the reader.
+    assert.equal(report.campaign.provenance.runtimeVersion, 'operator-declared')
+    assert.equal(report.campaign.provenance.model, 'operator-declared')
+    assert.equal(report.campaign.provenance.startedAt, 'observed')
+    // No secret, endpoint or key anywhere in the serialized report.
+    const serialized = JSON.stringify(report)
+    assert.ok(!serialized.includes('sk-super-secret-value'), 'api key must never be persisted')
+    assert.ok(!serialized.includes('Bearer'), 'authorization header must never be persisted')
+    assert.ok(!serialized.includes('127.0.0.1:8921'), 'endpoint host must not be persisted')
+    assert.equal(report.endpoint, 'redacted')
+  } finally { stopStub() }
+})
+
+test('undeclared runtime version is null rather than invented', async () => {
+  const { report } = await runConformance({
+    SEMANTIC_ENDPOINT: UNREACHABLE,
+    SEMANTIC_PROVIDER_ID: 'unreachable-probe',
+  })
+  assert.equal(report.campaign.runtimeVersion, null)
+  assert.equal(report.campaign.model, null, 'no configured model must be reported as null, not guessed')
+})
+
+test('model-omitted really sends no model on the wire, with SEMANTIC_MODEL configured', async () => {
+  // The regression from #7: the case used to be measured with a configured
+  // default silently filling the model back in, so it re-tested the default
+  // instead of omission. The evidence here is a REAL stub that records the
+  // exact bodies it receives, so the assertion rests on what crossed the wire
+  // rather than on the suite describing itself.
+  const captured: Array<{ model?: string }> = []
+  const server: Server = createServer((incoming, response) => {
+    const chunks: Buffer[] = []
+    incoming.on('data', (chunk: Buffer) => chunks.push(chunk))
+    incoming.on('end', () => {
+      const raw = Buffer.concat(chunks).toString('utf8')
+      const parsed = JSON.parse(raw) as { model?: string }
+      captured.push(parsed)
+      const body = JSON.parse(raw) as { questions: Record<string, unknown> }
+      const answers: Record<string, unknown> = {}
+      for (const id of Object.keys(body.questions)) answers[id] = { type: 'noul', noul: 0.8 }
+      response.writeHead(200, { 'Content-Type': 'application/json' })
+      response.end(JSON.stringify({ model: parsed.model ?? 'stub-default-model', answers }))
+    })
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const port = (server.address() as { port: number }).port
+  try {
+    // A model IS configured: exactly the condition that used to defeat the case.
+    const { report } = await runConformance({
+      SEMANTIC_ENDPOINT: `http://127.0.0.1:${port}/v1/systemone`,
+      SEMANTIC_PROVIDER_ID: 'model-omission-probe',
+      SEMANTIC_MODEL: 'smoke-model',
+    })
+    assert.equal(captured.length > 0, true, 'the stub must have received requests')
+    // Everything except the explicit model case must arrive with no model.
+    assert.equal(
+      captured.some((entry) => entry.model !== undefined),
+      true,
+      'the model-supplied case must reach the wire with its model',
+    )
+    assert.equal(
+      captured.filter((entry) => entry.model === 'smoke-model').length,
+      1,
+      'exactly one request may carry the configured model: the explicit model-supplied case',
+    )
+    // And the report must state the mechanism rather than a self-assessment.
+    assert.equal(report.modelOmittedOnWire.suiteProviderHasDefaultModel, false)
+    assert.ok(report.modelOmittedOnWire.detail.length > 0)
+  } finally {
+    server.closeAllConnections()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
+})
+
+test('a successful auth probe records no invented status', async () => {
+  // The provider only surfaces `httpStatus` on a NON-2xx answer, so a success
+  // has no status to report. Hardcoding 200 would be an invention: 201/202 are
+  // equally valid successes, and the run never observed which one it got.
+  const server = createServer((_incoming, response) => {
+    const headers = { 'Content-Type': 'application/json' }
+    response.writeHead(201, headers)
+    response.end(
+      JSON.stringify({
+        answers: { q: { type: 'noul', noul: 0.9 } },
+      }),
+    )
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const port = (server.address() as { port: number }).port
+  try {
+    const { report } = await runConformance({
+      SEMANTIC_ENDPOINT: `http://127.0.0.1:${port}/v1/systemone`,
+      SEMANTIC_PROVIDER_ID: 'created-stub',
+      SEMANTIC_MODEL: 'smoke-model',
+      SEMANTIC_API_KEY: 'sk-configured-but-unused',
+      SEMANTIC_AUTH_PROBE: 'omit',
+    })
+    assert.equal(report.authProbe.attempted, true)
+    assert.equal(report.authProbe.requiresAuth, false)
+    assert.equal(report.authProbe.normalizedWithoutAuth, true)
+    // The point of the regression: 201 was answered, and the report must not
+    // claim a status it cannot have observed.
+    assert.equal(report.authProbe.httpStatus, null, 'a success must not record a fabricated status')
+  } finally {
+    server.closeAllConnections()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
+})
+
+test('a blanket 401 without a positive authenticated baseline proves nothing', async () => {
+  // Every request — authenticated or not — is refused with the same 401. The
+  // probe then sees a 401 without credentials, but nothing demonstrates the
+  // endpoint serves an authenticated request, so credential handling is NOT
+  // isolated: it could equally be a wrong or expired configured key.
+  for (const status of [401, 403] as const) {
+    const server = createServer((_incoming, response) => {
+      response.writeHead(status, { 'Content-Type': 'application/json' })
+      response.end(JSON.stringify({ error: 'refused' }))
+    })
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    const port = (server.address() as { port: number }).port
+    try {
+      const { report } = await runConformance({
+        SEMANTIC_ENDPOINT: `http://127.0.0.1:${port}/v1/systemone`,
+        SEMANTIC_PROVIDER_ID: 'blanket-auth-refusal',
+        SEMANTIC_API_KEY: 'sk-configured-but-unused',
+        SEMANTIC_AUTH_PROBE: 'omit',
+      })
+      assert.equal(report.authProbe.attempted, true, `status ${status}`)
+      // The refusal is real and the status is kept...
+      assert.equal(report.authProbe.httpStatus, status, `status ${status}`)
+      // ...but it does NOT isolate credentials without a positive baseline.
+      assert.equal(report.authProbe.requiresAuth, 'unverified', `status ${status}`)
+      assert.equal(report.authProbe.normalizedWithoutAuth, 'unverified', `status ${status}`)
+      assert.ok(
+        report.authProbe.note.includes('no authenticated request succeeded'),
+        `status ${status}: the note must state why the observation is inconclusive, got: ${report.authProbe.note}`,
+      )
+      // A blanket refusal is never conformance evidence.
+      assert.equal(report.endpointReachable, false, `status ${status}`)
+      assert.equal(report.compatible, false, `status ${status}`)
+    } finally {
+      server.closeAllConnections()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }
+})
+
+test('the auth probe is opt-in and reports unverified when absent', async () => {
+  const { report } = await runConformance({
+    SEMANTIC_ENDPOINT: UNREACHABLE,
+    SEMANTIC_PROVIDER_ID: 'unreachable-probe',
+  })
+  assert.equal(report.authProbe.attempted, false)
+  assert.equal(report.authProbe.reason, 'not-requested')
+  assert.equal(report.authProbe.requiresAuth, 'unverified')
+  // Auth must not leak into compatibility: it is an observation, not a rule.
+  assert.ok(!('requiresAuth' in report.capabilities), 'auth must never be a capability')
+  assert.ok(!report.failedBaseCapabilities.includes('requiresAuth'))
+})
+
+test('the auth probe observes a credential-enforcing endpoint', async () => {
+  const stopStub = await startStub(8923, { SMOKE_REQUIRED_KEY: 'sk-required-value' })
+  try {
+    const { report } = await runConformance({
+      SEMANTIC_ENDPOINT: 'http://127.0.0.1:8923/v1/systemone',
+      SEMANTIC_PROVIDER_ID: 'auth-enforcing-stub',
+      SEMANTIC_MODEL: 'smoke-model',
+      SEMANTIC_UNSUPPORTED_MODEL: 'unsupported-model-for-smoke',
+      SEMANTIC_API_KEY: 'sk-required-value',
+      SEMANTIC_AUTH_PROBE: 'omit',
+    })
+    assert.equal(report.authProbe.attempted, true)
+    // Without the header the endpoint answers 401, which isolates credentials.
+    assert.equal(report.authProbe.requiresAuth, true)
+    assert.equal(report.authProbe.httpStatus, 401)
+    assert.equal(report.authProbe.normalizedWithoutAuth, false)
+    assert.ok(!JSON.stringify(report).includes('sk-required-value'), 'the key must never be persisted')
+    // This stub is selective: it enforces the key *and* answers a genuine 400
+    // to the unsupported model, so the authenticated negative case remains
+    // legitimate targeted protocol evidence.
+    assert.equal(report.capabilities.rejectsUnsupportedModel, true)
+  } finally { stopStub() }
+})
+
+test('an endpoint answering only 401 is never read as protocol rejection evidence', async () => {
+  // A rejected credential on the authenticated path says nothing about whether
+  // the runtime understands the payload. This must stay unverified, and the
+  // run must not claim conformance.
+  const server: Server = createServer((_incoming, response) => {
+    response.writeHead(401, { 'Content-Type': 'application/json' })
+    response.end(JSON.stringify({ error: 'invalid api key sk-secret-value' }))
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const port = (server.address() as { port: number }).port
+  try {
+    const { report, exitCode } = await runConformance({
+      SEMANTIC_ENDPOINT: `http://127.0.0.1:${port}/v1/systemone`,
+      SEMANTIC_PROVIDER_ID: 'always-401-runtime',
+      SEMANTIC_UNSUPPORTED_MODEL: 'some-unsupported-model',
+      SEMANTIC_API_KEY: 'sk-secret-value',
+    })
+    // The numeric status is preserved for diagnosis...
+    assert.equal(report.results.find((r: any) => r.id === 'unsupported-model')?.httpStatus, 401)
+    // ...but it cannot prove a targeted rejection.
+    assert.equal(report.capabilities.rejectsUnsupportedModel, 'unverified')
+    assert.equal(report.endpointReachable, false)
+    assert.equal(report.compatible, false)
+    assert.notEqual(exitCode, 0)
+    // The body, key and endpoint are never persisted.
+    assert.ok(!JSON.stringify(report).includes('sk-secret-value'))
+    assert.ok(!JSON.stringify(report).includes('invalid api key'))
+  } finally {
+    server.closeAllConnections()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
+})
+
+test('the auth probe observes an endpoint that ignores credentials', async () => {
+  // A local unauthenticated endpoint is allowed to answer normally: this must
+  // be a legitimate observation, never a compatibility failure.
+  const stopStub = await startStub(8924)
+  try {
+    const { report, exitCode } = await runConformance({
+      SEMANTIC_ENDPOINT: 'http://127.0.0.1:8924/v1/systemone',
+      SEMANTIC_PROVIDER_ID: 'unauthenticated-local-stub',
+      SEMANTIC_MODEL: 'smoke-model',
+      SEMANTIC_UNSUPPORTED_MODEL: 'unsupported-model-for-smoke',
+      SEMANTIC_API_KEY: 'sk-configured-but-unused',
+      SEMANTIC_AUTH_PROBE: 'omit',
+    })
+    assert.equal(report.authProbe.attempted, true)
+    assert.equal(report.authProbe.requiresAuth, false)
+    assert.equal(report.authProbe.normalizedWithoutAuth, true)
+    assert.equal(report.compatible, true, 'an unauthenticated local endpoint must stay compatible')
+    assert.equal(exitCode, 0)
+  } finally { stopStub() }
+})
+
+test('the auth probe stays unverified when it cannot isolate credentials', async () => {
+  // No key configured: probing would measure nothing, so it is not attempted.
+  const stopStub = await startStub(8925)
+  try {
+    const { report } = await runConformance({
+      SEMANTIC_ENDPOINT: 'http://127.0.0.1:8925/v1/systemone',
+      SEMANTIC_PROVIDER_ID: 'no-key-stub',
+      SEMANTIC_MODEL: 'smoke-model',
+      SEMANTIC_AUTH_PROBE: 'omit',
+    })
+    assert.equal(report.authProbe.attempted, false)
+    assert.equal(report.authProbe.reason, 'no-api-key-configured')
+    assert.equal(report.authProbe.requiresAuth, 'unverified')
+  } finally { stopStub() }
+})
+
+test('a 429 or 500 never counts as auth evidence', async () => {
+  for (const [port, status] of [[8926, 429], [8927, 500]] as const) {
+    const server = createServer((_incoming, response) => {
+      response.writeHead(status, { 'Content-Type': 'application/json' })
+      response.end(JSON.stringify({ error: 'nope' }))
+    })
+    await new Promise<void>((resolve) => server.listen(port, '127.0.0.1', resolve))
+    try {
+      const { report } = await runConformance({
+        SEMANTIC_ENDPOINT: `http://127.0.0.1:${port}/v1/systemone`,
+        SEMANTIC_PROVIDER_ID: 'inconclusive-auth-stub',
+        SEMANTIC_MODEL: 'smoke-model',
+        SEMANTIC_API_KEY: 'sk-configured-but-unused',
+        SEMANTIC_AUTH_PROBE: 'omit',
+      })
+      assert.equal(report.authProbe.attempted, true, `status ${status}`)
+      // Rate limiting and server failure say nothing about credentials.
+      assert.equal(report.authProbe.requiresAuth, 'unverified', `status ${status}`)
+      // Nor about whether an unauthenticated request would normalize: nothing
+      // was answered, so nothing may be claimed.
+      assert.equal(report.authProbe.normalizedWithoutAuth, 'unverified', `status ${status}`)
+      assert.ok(!JSON.stringify(report).includes('sk-configured-but-unused'))
+    } finally {
+      server.closeAllConnections()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
   }
 })

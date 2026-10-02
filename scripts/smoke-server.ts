@@ -8,6 +8,15 @@ const server = createServer((incoming, response) => {
   incoming.on('end', () => {
     let body: Record<string, any> = {}
     try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')) } catch {}
+    // Offline auth simulation, used by the auth probe in the conformance
+    // suite. Enabled only by an explicit env var so the default offline smoke
+    // run stays credential-free.
+    const requiredKey = process.env.SMOKE_REQUIRED_KEY
+    if (requiredKey && incoming.headers.authorization !== `Bearer ${requiredKey}`) {
+      response.writeHead(401, { 'Content-Type': 'application/json' })
+      response.end(JSON.stringify({ error: 'invalid api key' }))
+      return
+    }
     if (!body.questions || !body.state) {
       response.writeHead(400, { 'Content-Type': 'application/json' })
       response.end(JSON.stringify({ error: 'invalid request' }))

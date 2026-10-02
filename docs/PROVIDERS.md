@@ -143,6 +143,72 @@ things:
 - `runtimeRejectsMalformedWirePayload` — the **runtime** answered a malformed
   payload with a rejection.
 
+A failed result carries `code` and, when the runtime actually answered, a bare
+numeric `httpStatus`. That status is what separates a targeted rejection from an
+infrastructure or credential failure. **Only four statuses count as proof of a
+targeted protocol rejection**, because only they state in the status itself that
+the request was rejected for what it contained:
+
+- `400` Bad Request, `405` Method Not Allowed, `415` Unsupported Media Type,
+  `422` Unprocessable Content.
+
+Everything else is reported `unverified`, never as a pass. This is an
+**allowlist**, not a denylist: an unrecognized status — `407` proxy auth
+required, `408` request timeout, `402`, `451`, or anything a runtime might
+invent — stays `unverified` rather than counting as protocol evidence by
+default. In particular:
+
+- `401`/`403`/`407` — refused over credentials, so the payload was never
+  evaluated. Auth behaviour is reported separately.
+- `402`/`451` — a policy or commercial refusal, not a statement about validity.
+- `408` — the runtime timed out waiting; it never judged the request.
+- `429` — rate limiting, an infrastructure condition.
+- `5xx` — the runtime failed on its own side.
+- `network` / `timeout` / `aborted` — nothing answered.
+
+Refusal and inconclusive are different questions: `401` and `429` are still a
+blanket refusal, they just say nothing about the payload. Only the numeric
+status is used for these decisions, never a substring of a message.
+
+Only a bare number is ever recorded — never the response body, headers, URL or
+credentials, which can echo submitted source or secrets.
+
+### Auth is an observation, not a requirement
+
+Auth is deliberately **not** a base or strict compatibility capability: an
+unauthenticated local endpoint is perfectly conformant and will answer normally.
+Requiring a credential would fail local runtimes for no reason.
+
+Set `SEMANTIC_AUTH_PROBE=omit` to send one valid synthetic request to the same
+already-configured endpoint **without** the `Authorization` header. This
+distinguishes "this endpoint ignores credentials" from "this endpoint refused
+the call over credentials", which a `401` on the authenticated path alone
+cannot do.
+
+`authProbe` reports `attempted`, `requiresAuth`, `normalizedWithoutAuth`,
+`httpStatus` and a `note`. It is `unverified` when it was not requested, when
+no key was configured (probing would measure nothing), or when the failure was
+a `429`/`5xx`/timeout that cannot be attributed to credentials. In that last
+case `normalizedWithoutAuth` is `unverified` too: the runtime failed before
+answering, so the probe has observed nothing and must not record a negative.
+
+### Campaign metadata
+
+The report carries a `campaign` block so an observation can be dated and
+reproduced:
+
+| Field | Source |
+| --- | --- |
+| `startedAt` / `finishedAt` | Observed in this run |
+| `runtimeVersion` | **Operator-declared** (`SEMANTIC_RUNTIME_VERSION`), `null` if unset |
+| `model` | **Operator-declared** configured model (`SEMANTIC_MODEL`), `null` if unset |
+| `command` | Fixed: `npm run conformance -- <report-directory>` |
+
+The `provenance` sub-object states which is which for every field, so a reader
+never has to guess whether a value was measured or merely typed. A
+`runtimeVersion` is a label the operator supplied; nothing in this suite
+verifies it. No key, endpoint URL or private path is ever written.
+
 The endpoint is always written as `redacted` and credentials are never
 persisted.
 
@@ -153,6 +219,19 @@ persisted.
 | `SEMANTIC_MODEL` | Optional model id, exercised by the `model-supplied` case |
 | `SEMANTIC_UNSUPPORTED_MODEL` | Optional deliberately invalid model id for the negative case |
 | `SEMANTIC_PROVIDER_ID` | Label stored in the report instead of the endpoint |
+| `SEMANTIC_RUNTIME_VERSION` | Optional operator-declared runtime version, stored as campaign metadata |
+| `SEMANTIC_AUTH_PROBE` | `omit` to observe how the endpoint answers without credentials |
+
+The suite's provider is constructed **without a configured default model**, so
+`model-omitted` genuinely sends no `model` field even when `SEMANTIC_MODEL` is
+set. Without that, the configured default would be filled in behind the request
+and the case would silently re-test the default instead of omission. The
+`model-supplied` case still exercises `SEMANTIC_MODEL`, by passing it explicitly
+on the request — which is where a model belongs in a protocol probe.
+
+This affects the conformance suite only. The plugin's own provider keeps its
+configured default for normal calls; omission is a property of the probe, not a
+transport feature.
 
 `npm run conformance:smoke` runs the same suite against a local offline stub.
 It needs no credentials and no network, and is the only conformance evidence
@@ -178,6 +257,11 @@ transport wiring and report shape for those runtimes, and nothing about their
 protocol coverage. A conformance deviation list for `kev`, `laya`, system-one,
 sys1, jev-rs, local-jev, Lichen or EdgeJev does not exist. Real per-runtime
 deviations must be recorded here as they are measured, not assumed.
+
+**No report in this repository is a machine-readable conformance matrix**, and
+none is fabricated: the committed verification and replay snapshots above are
+not one. Reaching an endpoint proves transport and report shape, never protocol
+coverage.
 
 `semantic_provider_self_test` does not fill that gap either. It runs an embedded
 synthetic smoke test and reports `protocol.scope: "smoke-not-conformance"`

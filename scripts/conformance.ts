@@ -1,9 +1,17 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import {
+  summarizeCompatibility,
+  isTargetedRejection,
+  isBlanketRejection,
+  INCONCLUSIVE_CODES,
+  INCONCLUSIVE_HTTP_STATUSES,
+} from './conformance-report.ts'
 import { SystemOneHttpProvider, ProviderError } from '../src/providers/system-one.ts'
 import { classifyEndpoint, type EndpointClass } from '../src/egress.ts'
-import { summarizeCompatibility, rejectionObserved, BLANKET_REJECTION, INCONCLUSIVE_CODES } from './conformance-report.ts'
 import type { DecisionQuestion, DecisionRequest, ChoiceQuestion, ScoreQuestion } from '../src/decision/types.ts'
+
+const startedAt = new Date().toISOString()
 
 // Credentials and endpoint are read only from the process environment and never persisted.
 const endpoint = process.env.SEMANTIC_ENDPOINT
@@ -11,10 +19,21 @@ if (!endpoint) throw new Error('Set SEMANTIC_ENDPOINT to the verified full POST 
 const unsupportedModel = process.env.SEMANTIC_UNSUPPORTED_MODEL
 const providerId = process.env.SEMANTIC_PROVIDER_ID ?? 'unknown'
 const endpointClass: EndpointClass = classifyEndpoint(endpoint)
+/**
+ * The suite's own provider deliberately carries NO configured default model.
+ *
+ * `model-omitted` is only meaningful if no model is silently filled in from
+ * settings behind the caller's back: with a default configured on this provider,
+ * every case without an explicit model would put that default on the wire and
+ * the case would silently re-test the default instead of omission.
+ *
+ * The `model-supplied` case still exercises the configured `SEMANTIC_MODEL` by
+ * passing it explicitly on the request, which is where a model belongs in a
+ * protocol probe.
+ */
 const provider = new SystemOneHttpProvider({
   endpoint,
   apiKey: process.env.SEMANTIC_API_KEY,
-  model: process.env.SEMANTIC_MODEL,
   timeoutMs: 10000,
 })
 
@@ -65,7 +84,24 @@ interface CaseResult {
   observed: 'pass' | 'fail'
   matched: boolean
   code?: string
+  /**
+   * Numeric HTTP status when the runtime actually answered with a non-2xx.
+   * A bare status only: never the body, headers, URL or credentials, which can
+   * echo submitted source or secrets.
+   */
+  httpStatus?: number
   response?: { model?: string; answers: Record<string, { type: string }>; latencyMs: number }
+}
+
+/**
+ * `model-omitted` is only meaningful because the suite's provider carries no
+ * configured default model: without that, every case without an explicit model
+ * would put the default on the wire and the case would silently re-test the
+ * default instead of omission.
+ */
+const modelOmittedOnWire = {
+  suiteProviderHasDefaultModel: false,
+  detail: 'the suite provider is constructed without a default model, so model-omitted sends no model field',
 }
 
 const results: CaseResult[] = []
@@ -76,25 +112,46 @@ for (const entry of cases) {
   // endpoint; the transport is bypassed so the runtime's own error is observed.
   if (entry.id === 'malformed-wire-payload-rejected') {
     try {
+      // Bounded exactly like the transport: a timeout so an endpoint that
+      // accepts the body but never answers cannot hang the campaign, and
+      // `redirect: 'error'` so the probe cannot be silently redirected to
+      // another host and recorded as the configured runtime.
       const malformedResponse = await fetch(endpoint, {
         method: 'POST',
+        redirect: 'error',
+        signal: AbortSignal.timeout(10000),
         headers: { 'Content-Type': 'application/json', ...(process.env.SEMANTIC_API_KEY ? { Authorization: `Bearer ${process.env.SEMANTIC_API_KEY}` } : {}) },
-        body: JSON.stringify({ state: 'public synthetic', questions: { q: { type: 'noul' } } }),      })
+        body: JSON.stringify({ state: 'public synthetic', questions: { q: { type: 'noul' } } }),
+      })
+      // The body is cancelled unread: it is never parsed, logged or persisted.
+      await malformedResponse.body?.cancel()
       results.push({
         id: entry.id,
         group: entry.group,
         expectation: entry.expect,
         observed: malformedResponse.ok ? 'pass' : 'fail',
         matched: !malformedResponse.ok,
-        ...(malformedResponse.ok ? {} : { code: `http_${malformedResponse.status}` }),
+        ...(malformedResponse.ok ? {} : { code: `http_${malformedResponse.status}`, httpStatus: malformedResponse.status }),
       })
-    } catch {
-      results.push({ id: entry.id, group: entry.group, expectation: entry.expect, observed: 'fail', matched: true, code: 'network' })
+    } catch (error) {
+      const aborted = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
+      results.push({
+        id: entry.id,
+        group: entry.group,
+        expectation: entry.expect,
+        observed: 'fail',
+        matched: true,
+        code: aborted ? 'timeout' : 'network',
+      })
     }
     continue
   }
 
   try {
+    // The suite's provider has no configured default, so a case without an
+    // explicit `model` really is sent with no model field at all. That the
+    // endpoint agrees is proven by a real capturing stub in the test suite, not
+    // asserted here.
     const request: DecisionRequest = { ...entry.request, ...(entry.model ? { model: entry.model } : {}) }
     const response = await provider.decide(request)
     // Guard against the undefined === undefined case: a run without a configured
@@ -110,21 +167,148 @@ for (const entry of cases) {
     })
   } catch (error) {
     const code = error instanceof ProviderError ? error.code : `failure: ${String((error as Error)?.message ?? error).slice(0, 200)}`
-    results.push({ id: entry.id, group: entry.group, expectation: entry.expect, observed: 'fail', matched: entry.expect === 'fail', code })
+    const httpStatus = error instanceof ProviderError ? error.httpStatus : undefined
+    results.push({
+      id: entry.id,
+      group: entry.group,
+      expectation: entry.expect,
+      observed: 'fail',
+      matched: entry.expect === 'fail',
+      code,
+      ...(httpStatus === undefined ? {} : { httpStatus }),
+    })
   }
 }
 
-const byId = (id: string) => results.find((r) => r.id === id)
-const passed = (id: string) => byId(id)?.observed === 'pass'
+/**
+ * Opt-in auth observation.
+ *
+ * When `SEMANTIC_AUTH_PROBE=omit`, the same already-configured endpoint is
+ * probed once with a valid synthetic request sent WITHOUT the Authorization
+ * header. It records only what the endpoint did — never the body, headers, URL
+ * or credentials.
+ *
+ * This is deliberately an *observation*, not a compatibility requirement: an
+ * unauthenticated local endpoint is perfectly conformant and will answer
+ * normally. Its value is distinguishing "this endpoint ignores credentials"
+ * from "this endpoint refused the call over credentials", which a 401 on the
+ * authenticated path alone cannot tell apart from a protocol rejection.
+ *
+ * When it was not requested, or was attempted but stayed inconclusive, it is
+ * reported as `unverified` rather than as a pass or a failure.
+ */
+interface AuthProbeResult {
+  attempted: boolean
+  reason?: string
+  requiresAuth: boolean | 'unverified'
+  /** `'unverified'` when the probe never got far enough to observe an answer. */
+  normalizedWithoutAuth: boolean | 'unverified'
+  /** `null` when no failure status was observed; a success exposes none. */
+  httpStatus: number | null
+  note: string
+}
 
-// Reachability is observed, never declared. A run whose endpoint never answered
-// a single positive case did not exercise any runtime.
+/**
+ * Reachability is observed, never declared. A run whose endpoint never answered
+ * a single positive case did not exercise any runtime.
+ *
+ * Computed before the auth probe, which reads it: a 401/403 seen without
+ * credentials only isolates credential handling when the same endpoint
+ * demonstrably served an authenticated request.
+ */
 const positiveCases = results.filter((r) => r.expectation === 'pass')
 const answeredPositive = positiveCases.filter((r) => r.observed === 'pass').length
 const transportFailures = results.filter(
   (r) => r.observed === 'fail' && INCONCLUSIVE_CODES.has(r.code ?? ''),
 ).length
 const endpointReachable = answeredPositive > 0
+
+let authProbe: AuthProbeResult = {
+  attempted: false,
+  reason: 'not-requested',
+  requiresAuth: 'unverified',
+  normalizedWithoutAuth: 'unverified',
+  httpStatus: null,
+  note: 'set SEMANTIC_AUTH_PROBE=omit to observe how the endpoint answers without an Authorization header',
+}
+
+if (process.env.SEMANTIC_AUTH_PROBE === 'omit') {
+  if (!process.env.SEMANTIC_API_KEY) {
+    // Nothing to omit: probing an endpoint that was never authenticated would
+    // measure nothing at all.
+    authProbe = {
+      attempted: false,
+      reason: 'no-api-key-configured',
+      requiresAuth: 'unverified',
+      normalizedWithoutAuth: 'unverified',
+      httpStatus: null,
+      note: 'no SEMANTIC_API_KEY configured, so an unauthenticated request would be identical to the normal one',
+    }
+  } else {
+    // The same endpoint and transport, built WITHOUT the key: no Authorization
+    // header is ever set.
+    const unauthenticatedProvider = new SystemOneHttpProvider({
+      endpoint,
+      model: process.env.SEMANTIC_MODEL,
+      timeoutMs: 10000,
+    })
+    try {
+      await unauthenticatedProvider.decide({
+        state: 'A public synthetic test passes.',
+        questions: { q: { type: 'noul', instructions: 'Does the state report a passing test?' } },
+      })
+      authProbe = {
+        attempted: true,
+        requiresAuth: false,
+        normalizedWithoutAuth: true,
+        // A successful call exposes NO status: the provider only surfaces
+        // `httpStatus` on a non-2xx answer. Any value here would be invented —
+        // the runtime may legitimately answer 200, 201 or 202. `null` means "no
+        // failure status was observed", which is exactly what happened.
+        httpStatus: null,
+        note: 'endpoint answered a valid request without credentials',
+      }
+    } catch (error) {
+      const status = error instanceof ProviderError ? error.httpStatus : undefined
+      if (status === 401 || status === 403) {
+        // A 401/403 without credentials only isolates credential handling when
+        // the same endpoint demonstrably serves an AUTHENTICATED request. If
+        // nothing answered positively, this is a blanket refusal and could just
+        // as well be an endpoint that refuses everything, expired or wrong
+        // credentials on the authenticated path too. The distinction is then
+        // UNPROVEN, not observed.
+        const authenticatedBaseline = endpointReachable
+        authProbe = {
+          attempted: true,
+          requiresAuth: authenticatedBaseline ? true : 'unverified',
+          normalizedWithoutAuth: authenticatedBaseline ? false : 'unverified',
+          httpStatus: status,
+          note: authenticatedBaseline
+            ? 'endpoint refused the request without credentials, and served authenticated requests'
+            : 'endpoint refused the request without credentials, but no authenticated request succeeded, so credential handling is not isolated',
+        }
+      } else {
+        // 429, 5xx, timeout, network, redirect or an unnormalizable body: the
+        // run cannot attribute this failure to credentials.
+        const code = error instanceof ProviderError ? error.code : 'failure'
+        authProbe = {
+          attempted: true,
+          requiresAuth: 'unverified',
+          // Nothing was observed: the runtime failed before answering, so
+          // whether an unauthenticated request would normalize is UNKNOWN.
+          // Recording `false` here would persist a definitive negative claim the
+          // run never made.
+          normalizedWithoutAuth: 'unverified',
+          httpStatus: status ?? null,
+          note: `probe did not isolate credential handling (${code}${status === undefined ? '' : `/${status}`})`,
+        }
+      }
+    }
+  }
+}
+
+const byId = (id: string) => results.find((r) => r.id === id)
+const passed = (id: string) => byId(id)?.observed === 'pass'
 
 /**
  * Host classification is a SYNTACTIC property of the configured URL, nothing
@@ -149,7 +333,7 @@ const providerLabelExplicitlyConfigured = providerId !== 'unknown'
  */
 const blanketRejection =
   !endpointReachable &&
-  results.some((r) => r.observed === 'fail' && r.code !== undefined && BLANKET_REJECTION.test(r.code))
+  results.some((r) => r.observed === 'fail' && isBlanketRejection(r.code, r.httpStatus))
 
 /**
  * A negative capability is only reported as satisfied when the runtime actually
@@ -164,7 +348,7 @@ const negativeCapability = (id: string): boolean | 'unverified' => {
   const result = byId(id)
   if (!result) return 'unverified'
   if (blanketRejection) return 'unverified'
-  return rejectionObserved(result.observed, result.code) ? true : 'unverified'
+  return isTargetedRejection(result.observed, result.code, result.httpStatus) ? true : 'unverified'
 }
 
 const capabilities: Record<string, boolean | 'unverified'> = {
@@ -213,6 +397,38 @@ await writeFile(
       // read the fields below by name; removed identity fields are gone on
       // purpose and are not restated under a new name.
       schemaVersion: 2,
+      /**
+       * Campaign metadata.
+       *
+       * Everything here is either OPERATOR-DECLARED or OBSERVED-IN-THIS-RUN.
+       * Nothing is inferred, and nothing is copied from a previous run:
+       *
+       * - `startedAt`/`finishedAt` — observed, this run only.
+       * - `runtimeVersion` — OPERATOR-DECLARED, `null` when not supplied. It
+       *   is a label the operator typed; nothing in this suite verifies it.
+       * - `model` — the configured model id (operator-declared), `null` when
+       *   none was configured. Never a model echoed back by a runtime.
+       * - `command` — the fixed command that produces this report.
+       *
+       * The endpoint stays `redacted` and no API key, URL, header or private
+       * path is written here.
+       */
+      campaign: {
+        startedAt,
+        finishedAt: new Date().toISOString(),
+        runtimeVersion: process.env.SEMANTIC_RUNTIME_VERSION?.trim() || null,
+        model: process.env.SEMANTIC_MODEL?.trim() || null,
+        command: 'npm run conformance -- <report-directory>',
+        // What each value is, so a reader never has to guess whether a field
+        // was measured or merely declared.
+        provenance: {
+          startedAt: 'observed',
+          finishedAt: 'observed',
+          runtimeVersion: 'operator-declared',
+          model: 'operator-declared',
+          command: 'fixed',
+        },
+      },
       // Operator-supplied label. Purely descriptive: it asserts nothing about
       // which system answered.
       providerLabel: providerId,
@@ -233,6 +449,14 @@ await writeFile(
       answeredPositiveCases: answeredPositive,
       transportFailures,
       blanketRejection,
+      // Whether `model-omitted` really omitted the model on the wire. A false
+      // here means the case proved nothing about omission and must not be read
+      // as evidence of default-model behaviour.
+      modelOmittedOnWire,
+      // Auth is reported as its own observation and is deliberately NOT a base
+      // or strict compatibility capability: an unauthenticated local endpoint
+      // is allowed to answer normally.
+      authProbe,
       // `compatible`: the runtime can serve the documented base protocol.
       // `strictCompatible`: it also behaved correctly on every negative path probed.
       // A runtime may legitimately be compatible=true with strictCompatible=false.

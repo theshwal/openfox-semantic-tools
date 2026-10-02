@@ -37,8 +37,10 @@ async function stop(server: Server): Promise<void> {
   await new Promise<void>((resolve) => server.close(() => resolve()))
 }
 
-const wellFormed = (ids: string[]) => ({
-  answers: Object.fromEntries(
+// An address that nothing listens on: the connection attempt fails fast.
+const UNREACHABLE_ENDPOINT = 'http://127.0.0.1:1/v1/systemone'
+
+const wellFormed = (ids: string[]) => ({  answers: Object.fromEntries(
     ids.map((id) => [
       id,
       id === 'noul'
@@ -110,6 +112,60 @@ test('unsupported model ids are surfaced by the runtime rather than guessed', as
     assert.deepEqual(seen, ['definitely-not-a-model', undefined])
     assert.equal(seen[1], undefined, 'model must be omitted rather than invented')
   } finally { await stop(server) }
+})
+
+test('the configured default model is sent unless omission is explicitly requested', async () => {
+  // Regression for #7: a configured default must keep applying in normal use.
+  // Only an explicit omit suppresses it, so ordinary calls are unchanged.
+  const seen: Array<string | undefined> = []
+  const { server, url } = await startServer((body) => {
+    const parsed = JSON.parse(body) as { model?: string; questions: object }
+    seen.push(parsed.model)
+    return { status: 200, payload: wellFormed(Object.keys(parsed.questions)) }
+  })
+  try {
+    const provider = new SystemOneHttpProvider({ endpoint: url, timeoutMs: 2000, model: 'configured-default' })
+    await provider.decide(request)
+    assert.deepEqual(seen, ['configured-default'], 'the configured default must still be sent by default')
+  } finally { await stop(server) }
+})
+
+test('a request with no model puts no model on the wire when the provider has no default', async () => {
+  // Wire-level proof against a real stub, not a re-serialization of the same
+  // function under test: the captured body is what the endpoint received.
+  const seen: Array<Record<string, unknown>> = []
+  const { server, url } = await startServer((body) => {
+    const parsed = JSON.parse(body) as { questions: object }
+    seen.push(parsed)
+    return { status: 200, payload: wellFormed(Object.keys(parsed.questions)) }
+  })
+  try {
+    const provider = new SystemOneHttpProvider({ endpoint: url, timeoutMs: 2000 })
+    await provider.decide(request)
+    assert.equal(seen.length, 1)
+    assert.ok(!('model' in seen[0]), 'no model field may reach the wire')
+  } finally { await stop(server) }
+})
+
+test('a non-2xx answer keeps its numeric status without echoing the body', async () => {
+  const { server, url } = await startServer(() => ({ status: 429, payload: { error: 'slow down', key: 'sk-secret-value' } }))
+  try {
+    const error = await new SystemOneHttpProvider({ endpoint: url, timeoutMs: 2000 })
+      .decide(request)
+      .then(() => null, (e: unknown) => e)
+    assert.equal((error as { code?: string }).code, 'http')
+    assert.equal((error as { httpStatus?: number }).httpStatus, 429)
+    assert.ok(!String((error as Error).message).includes('sk-secret-value'))
+  } finally { await stop(server) }
+})
+
+test('a transport failure carries no HTTP status', async () => {
+  // Nothing answered, so there is no status to invent.
+  const error = await new SystemOneHttpProvider({ endpoint: UNREACHABLE_ENDPOINT, timeoutMs: 500 })
+    .decide(request)
+    .then(() => null, (e: unknown) => e)
+  assert.equal((error as { code?: string }).code, 'network')
+  assert.equal((error as { httpStatus?: number }).httpStatus, undefined)
 })
 
 test('a localhost conformance target is classified as local', () => {

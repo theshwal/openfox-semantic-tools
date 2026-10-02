@@ -27,8 +27,98 @@ export function rejectionObserved(observed: 'pass' | 'fail', code: string | unde
   return observed === 'fail' && !INCONCLUSIVE_CODES.has(code ?? '')
 }
 
-/** Codes that show a generic "reject everything" response rather than a targeted rejection. */
+/**
+ * Statuses that can never prove a *targeted* protocol rejection, however the
+ * failure was observed. Everything outside {@link TARGETED_REJECTION_STATUSES}
+ * lands here:
+ *
+ * - `401`/`403`/`407` — refused over credentials, so the runtime never
+ *   evaluated the payload. Auth behaviour is reported separately.
+ * - `402`/`451` — a policy or commercial refusal, not a statement about the
+ *   payload's validity.
+ * - `408` — the runtime timed out waiting; it never judged the request.
+ * - `429` — rate limiting is an infrastructure condition.
+ * - `400`/`405`/`415`/`422` are the only genuine rejections (see the allowlist).
+ * - `5xx` — the runtime failed on its own side.
+ * - network/timeout/abort — nothing answered at all.
+ *
+ * This is narrower than {@link isRefusalStatus}: a 401/429 is still a refusal,
+ * it just cannot be read as a judgement about the payload.
+ */
+/**
+ * The ONLY statuses that may be recorded as proof of a targeted protocol
+ * rejection: they state, in the status itself, that this request was rejected
+ * because of what it contained.
+ *
+ * This is an allowlist on purpose. A denylist would make every unlisted status
+ * — `407` proxy auth required, `408` request timeout, `402`, `451`, and any
+ * status a runtime might invent — count as protocol evidence by default, which
+ * is exactly the failure mode this suite exists to prevent. An unrecognized
+ * status is `unverified`, never a pass.
+ */
+export const TARGETED_REJECTION_STATUSES: ReadonlySet<number> = new Set([
+  400, // Bad Request: malformed or invalid payload
+  405, // Method Not Allowed
+  415, // Unsupported Media Type
+  422, // Unprocessable Content
+])
+
+/**
+ * True when the observed failure carries a numeric status that still allows it
+ * to be read as a targeted protocol rejection.
+ */
+export function statusProvesRejection(httpStatus: number | undefined): boolean {
+  if (httpStatus === undefined) return false
+  return TARGETED_REJECTION_STATUSES.has(httpStatus)
+}
+
+/**
+ * Inverse of {@link statusProvesRejection}: any status that is not explicitly a
+ * targeted rejection leaves the capability `unverified`.
+ */
+export const INCONCLUSIVE_HTTP_STATUSES = (status: number): boolean =>
+  !TARGETED_REJECTION_STATUSES.has(status)
+
+/**
+ * True when the runtime refused the request with a 4xx status.
+ *
+ * This is the "refused traffic" test, and it is deliberately different from
+ * {@link INCONCLUSIVE_HTTP_STATUSES}, which asks a narrower question: can this
+ * particular failure be read as a *targeted* protocol rejection? A 401 satisfies
+ * both (it is a refusal, and it is not evidence about the payload).
+ */
+export const isRefusalStatus = (status: number): boolean => status >= 400 && status < 500
+
+/**
+ * Codes that show a generic "reject everything" response rather than a targeted
+ * rejection.
+ *
+ * Detection uses the ACTUAL numeric status rather than the code text, so it
+ * cannot be fooled by a substring and cannot fire on a status the runtime never
+ * returned. Responses carrying no status (a transport failure) fall back to the
+ * code, where a 4xx-shaped code is all that remains.
+ */
 export const BLANKET_REJECTION = /^http_4\d\d$/
+
+export function isBlanketRejection(code: string | undefined, httpStatus: number | undefined): boolean {
+  if (httpStatus !== undefined) return isRefusalStatus(httpStatus)
+  return code !== undefined && BLANKET_REJECTION.test(code)
+}
+
+/**
+ * A rejection capability requires an observed rejection that is neither a
+ * transport failure nor an inconclusive status. When a numeric status is
+ * available it is authoritative; otherwise the code is used.
+ */
+export function isTargetedRejection(
+  observed: 'pass' | 'fail',
+  code: string | undefined,
+  httpStatus?: number,
+): boolean {
+  if (observed !== 'fail') return false
+  if (httpStatus !== undefined) return statusProvesRejection(httpStatus)
+  return rejectionObserved(observed, code)
+}
 
 /**
  * Base protocol capabilities every System One-compatible runtime must provide.
