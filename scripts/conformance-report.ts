@@ -38,7 +38,7 @@ export function rejectionObserved(observed: 'pass' | 'fail', code: string | unde
  *   payload's validity.
  * - `408` — the runtime timed out waiting; it never judged the request.
  * - `429` — rate limiting is an infrastructure condition.
- * - `404`/`405`/`415`/`422` are the only genuine rejections (see the allowlist).
+ * - `400`/`405`/`415`/`422` are the only genuine rejections (see the allowlist).
  * - `5xx` — the runtime failed on its own side.
  * - network/timeout/abort — nothing answered at all.
  *

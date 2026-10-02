@@ -299,6 +299,80 @@ test('model-omitted really sends no model on the wire, with SEMANTIC_MODEL confi
   }
 })
 
+test('a successful auth probe records no invented status', async () => {
+  // The provider only surfaces `httpStatus` on a NON-2xx answer, so a success
+  // has no status to report. Hardcoding 200 would be an invention: 201/202 are
+  // equally valid successes, and the run never observed which one it got.
+  const server = createServer((_incoming, response) => {
+    const headers = { 'Content-Type': 'application/json' }
+    response.writeHead(201, headers)
+    response.end(
+      JSON.stringify({
+        answers: { q: { type: 'noul', noul: 0.9 } },
+      }),
+    )
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const port = (server.address() as { port: number }).port
+  try {
+    const { report } = await runConformance({
+      SEMANTIC_ENDPOINT: `http://127.0.0.1:${port}/v1/systemone`,
+      SEMANTIC_PROVIDER_ID: 'created-stub',
+      SEMANTIC_MODEL: 'smoke-model',
+      SEMANTIC_API_KEY: 'sk-configured-but-unused',
+      SEMANTIC_AUTH_PROBE: 'omit',
+    })
+    assert.equal(report.authProbe.attempted, true)
+    assert.equal(report.authProbe.requiresAuth, false)
+    assert.equal(report.authProbe.normalizedWithoutAuth, true)
+    // The point of the regression: 201 was answered, and the report must not
+    // claim a status it cannot have observed.
+    assert.equal(report.authProbe.httpStatus, null, 'a success must not record a fabricated status')
+  } finally {
+    server.closeAllConnections()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
+})
+
+test('a blanket 401 without a positive authenticated baseline proves nothing', async () => {
+  // Every request — authenticated or not — is refused with the same 401. The
+  // probe then sees a 401 without credentials, but nothing demonstrates the
+  // endpoint serves an authenticated request, so credential handling is NOT
+  // isolated: it could equally be a wrong or expired configured key.
+  for (const status of [401, 403] as const) {
+    const server = createServer((_incoming, response) => {
+      response.writeHead(status, { 'Content-Type': 'application/json' })
+      response.end(JSON.stringify({ error: 'refused' }))
+    })
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    const port = (server.address() as { port: number }).port
+    try {
+      const { report } = await runConformance({
+        SEMANTIC_ENDPOINT: `http://127.0.0.1:${port}/v1/systemone`,
+        SEMANTIC_PROVIDER_ID: 'blanket-auth-refusal',
+        SEMANTIC_API_KEY: 'sk-configured-but-unused',
+        SEMANTIC_AUTH_PROBE: 'omit',
+      })
+      assert.equal(report.authProbe.attempted, true, `status ${status}`)
+      // The refusal is real and the status is kept...
+      assert.equal(report.authProbe.httpStatus, status, `status ${status}`)
+      // ...but it does NOT isolate credentials without a positive baseline.
+      assert.equal(report.authProbe.requiresAuth, 'unverified', `status ${status}`)
+      assert.equal(report.authProbe.normalizedWithoutAuth, 'unverified', `status ${status}`)
+      assert.ok(
+        report.authProbe.note.includes('no authenticated request succeeded'),
+        `status ${status}: the note must state why the observation is inconclusive, got: ${report.authProbe.note}`,
+      )
+      // A blanket refusal is never conformance evidence.
+      assert.equal(report.endpointReachable, false, `status ${status}`)
+      assert.equal(report.compatible, false, `status ${status}`)
+    } finally {
+      server.closeAllConnections()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  }
+})
+
 test('the auth probe is opt-in and reports unverified when absent', async () => {
   const { report } = await runConformance({
     SEMANTIC_ENDPOINT: UNREACHABLE,

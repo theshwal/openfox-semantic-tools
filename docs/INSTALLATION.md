@@ -9,8 +9,8 @@ Nothing here needs a **provider credential** or an account with any vendor.
 
 | Recipe | Use when |
 | --- | --- |
-| [A — source checkout, absolute local path](#recipe-a--source-checkout-absolute-local-path) | Always. This is the supported path. |
-| [B — packed tarball](#recipe-b--packed-tarball-not-installable) | Never, for installation. Documented because it fails, and why matters. |
+| Recipe A — source checkout, absolute local path | Always. This is the supported path. |
+| Recipe B — packed tarball | Never, for installation. Documented because it fails, and why matters. |
 
 Both are described because both are attempted in practice; only A ends in a
 working install. The host operation they both meet is the same: OpenFox copies a

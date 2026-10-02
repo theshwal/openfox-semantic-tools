@@ -203,9 +203,25 @@ interface AuthProbeResult {
   requiresAuth: boolean | 'unverified'
   /** `'unverified'` when the probe never got far enough to observe an answer. */
   normalizedWithoutAuth: boolean | 'unverified'
+  /** `null` when no failure status was observed; a success exposes none. */
   httpStatus: number | null
   note: string
 }
+
+/**
+ * Reachability is observed, never declared. A run whose endpoint never answered
+ * a single positive case did not exercise any runtime.
+ *
+ * Computed before the auth probe, which reads it: a 401/403 seen without
+ * credentials only isolates credential handling when the same endpoint
+ * demonstrably served an authenticated request.
+ */
+const positiveCases = results.filter((r) => r.expectation === 'pass')
+const answeredPositive = positiveCases.filter((r) => r.observed === 'pass').length
+const transportFailures = results.filter(
+  (r) => r.observed === 'fail' && INCONCLUSIVE_CODES.has(r.code ?? ''),
+).length
+const endpointReachable = answeredPositive > 0
 
 let authProbe: AuthProbeResult = {
   attempted: false,
@@ -245,18 +261,31 @@ if (process.env.SEMANTIC_AUTH_PROBE === 'omit') {
         attempted: true,
         requiresAuth: false,
         normalizedWithoutAuth: true,
-        httpStatus: 200,
+        // A successful call exposes NO status: the provider only surfaces
+        // `httpStatus` on a non-2xx answer. Any value here would be invented —
+        // the runtime may legitimately answer 200, 201 or 202. `null` means "no
+        // failure status was observed", which is exactly what happened.
+        httpStatus: null,
         note: 'endpoint answered a valid request without credentials',
       }
     } catch (error) {
       const status = error instanceof ProviderError ? error.httpStatus : undefined
       if (status === 401 || status === 403) {
+        // A 401/403 without credentials only isolates credential handling when
+        // the same endpoint demonstrably serves an AUTHENTICATED request. If
+        // nothing answered positively, this is a blanket refusal and could just
+        // as well be an endpoint that refuses everything, expired or wrong
+        // credentials on the authenticated path too. The distinction is then
+        // UNPROVEN, not observed.
+        const authenticatedBaseline = endpointReachable
         authProbe = {
           attempted: true,
-          requiresAuth: true,
-          normalizedWithoutAuth: false,
+          requiresAuth: authenticatedBaseline ? true : 'unverified',
+          normalizedWithoutAuth: authenticatedBaseline ? false : 'unverified',
           httpStatus: status,
-          note: 'endpoint refused the request without credentials',
+          note: authenticatedBaseline
+            ? 'endpoint refused the request without credentials, and served authenticated requests'
+            : 'endpoint refused the request without credentials, but no authenticated request succeeded, so credential handling is not isolated',
         }
       } else {
         // 429, 5xx, timeout, network, redirect or an unnormalizable body: the
@@ -280,15 +309,6 @@ if (process.env.SEMANTIC_AUTH_PROBE === 'omit') {
 
 const byId = (id: string) => results.find((r) => r.id === id)
 const passed = (id: string) => byId(id)?.observed === 'pass'
-
-// Reachability is observed, never declared. A run whose endpoint never answered
-// a single positive case did not exercise any runtime.
-const positiveCases = results.filter((r) => r.expectation === 'pass')
-const answeredPositive = positiveCases.filter((r) => r.observed === 'pass').length
-const transportFailures = results.filter(
-  (r) => r.observed === 'fail' && INCONCLUSIVE_CODES.has(r.code ?? ''),
-).length
-const endpointReachable = answeredPositive > 0
 
 /**
  * Host classification is a SYNTACTIC property of the configured URL, nothing
