@@ -29,9 +29,9 @@ only; it does not register an eighth production tool.
 | 11 | #13 (release readiness) | Completed: CI, offline suite, package/install recipes and isolated-host validation are in place; package version 0.1.0 is prepared. No Git tag, GitHub release or registry publication is implied. |
 | 12 | #33 | **Completed**: `semantic_issue_coverage` aggregates explicit criteria through the existing verification policy/calibration/egress path. Advisory only; no merge gate. |
 | 13 | #34 | **Completed**: bounded local recall feeds true per-file semantic reranking in `semantic_search`; explicit candidates remain supported and `semantic_scan` stays explicit-candidate. No persistent index/vector DB. |
-| 14 | #35 | **Phase A in progress**: labelled smoke manifest + versioned harness + conventional Qwen visual baseline are recorded. Production API remains blocked on typed System One visual evidence and the 31-case action-state gate. |
+| 14 | #35 | **Backend viability GO / production DEFER**: labelled smoke manifest + versioned harness + Qwen VLM baseline + typed OpenJev System One baseline are recorded. OpenJev is 7/7 on the smoke set at 875 ms median with typed probabilities. Production API remains blocked on the 31-case action-state safety gate. |
 
-Completed issues above were implemented and checked separately. #33 and #34 are now delivered. #35 remains evidence-only until its explicit GO/DEFER gate is satisfied; the conventional VLM smoke baseline is evidence, not permission to ship a production visual tool. #9 collects measured impact after functionality exists; it is not a provider-tuning loop. #6 stays blocked on a released message-transform API. A fixture run is protocol evidence, not decision-quality or OpenFox end-to-end evidence.
+Completed issues above were implemented and checked separately. #33 and #34 are now delivered. #35 remains evidence-only for production: backend viability is now demonstrated by the typed OpenJev smoke run, but the production GO/DEFER gate still requires the frozen action-state corpus and safety metrics. #9 collects measured impact after functionality exists; it is not a provider-tuning loop. #6 stays blocked on a released message-transform API. A fixture run is protocol evidence, not decision-quality or OpenFox end-to-end evidence.
 
 ## Current boundaries
 
@@ -64,8 +64,9 @@ Completed issues above were implemented and checked separately. #33 and #34 are 
 - Arbitrary HTTP/network error bodies are deliberately omitted to avoid
   reflecting secrets or submitted state. HTTP status remains available.
 - Core text-provider quality, false-pass rates and end-to-end savings remain
-  **unmeasured**. #35 now has a measured conventional-VLM smoke baseline, but
-  its action-state false-positive-success/fallback metrics remain null. What is
+  **unmeasured**. #35 now has both a measured conventional-VLM smoke baseline
+  and a measured typed System One OpenJev smoke baseline, but its action-state
+  false-positive-success/fallback metrics remain null. What is
   also measured is the host behaviour: the built package loads on both
   declared OpenFox releases, 20/20 harness and 67/67 agent-e2e checks each, with
   no hook and no transition.

@@ -106,14 +106,15 @@ permission to make experimental features automatic.
     `semantic_scan` still requires explicit candidates. No persistent index,
     vector DB or retrieval daemon was added.
 
-17. **#35 — visual semantic decisions** — **Phase A in progress**.
-    The labelled smoke manifest, versioned visual harness and conventional Qwen
-    VLM baseline are recorded. The existing corpus is structurally insufficient
-    for the action-state gate; the required 31-case acquisition contract is in
+17. **#35 — visual semantic decisions** — **backend viability GO, production
+    DEFER**. The labelled smoke manifest and versioned harness now have both a
+    conventional Qwen VLM baseline and an image-capable typed OpenJev System One
+    baseline. OpenJev scored 7/7 with typed probabilities at 875 ms median on
+    the smoke set. The existing corpus is still structurally insufficient for
+    the safety gate; the required 31-case acquisition contract is in
     `benchmark/visual/ACTION-STATE-DATASET.md`. No production visual tool is
-    registered. A production primitive remains gated on an image-capable typed
-    System One run plus false-positive-success/fallback measurements and a
-    recorded GO/DEFER decision.
+    registered. Production remains gated on action-state false-positive-success
+    and fallback measurements plus an explicit production GO/DEFER decision.
 
 **#9 remains the shared measurement umbrella** for durable claims about
 verification/discovery/impact/cache. It must not become a permanent provider

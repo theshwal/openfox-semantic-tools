@@ -52,15 +52,15 @@ The issue-level coverage and hybrid discovery work are delivered.
 
 Current development priority:
 
-1. **#35 — visual semantic decision spike**: Phase A evidence is partly
-   complete. A versioned harness and labelled smoke set exist; the conventional
-   Qwen VLM baseline has been replayed reproducibly. Do **not** register a
-   production visual tool yet. The remaining gate requires:
-   - a real image-capable typed System One backend;
+1. **#35 — visual semantic decision spike**: backend viability is now **GO**.
+   The same versioned smoke harness has measured both the conventional Qwen VLM
+   baseline and an image-capable typed OpenJev System One baseline. Do **not**
+   register a production visual tool yet. Production remains **DEFER** until:
    - the action-state dataset defined in
-     `benchmark/visual/ACTION-STATE-DATASET.md`;
-   - measured false-positive success / fallback / latency;
-   - an explicit GO or DEFER decision.
+     `benchmark/visual/ACTION-STATE-DATASET.md` exists;
+   - false-positive success / fallback / latency are measured on that frozen
+     corpus;
+   - an explicit production GO or DEFER decision is recorded.
 2. **#9 — measurement umbrella**: collect durable evidence for delivered
    capabilities (#33, #34 and #35) without turning the repository into a
    permanent provider leaderboard.

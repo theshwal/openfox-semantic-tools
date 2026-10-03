@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "measured": true,
+  "fixtureSource": {
+    "repository": "theshwal/openfox",
+    "ref": "develop",
+    "directory": "docs/screenshots",
+    "groundTruth": "Manual visual inspection performed 2026-10-03; labels are not inferred from filenames."
+  },
+  "backend": "systemone",
+  "endpointClass": "operator-supplied",
+  "model": "openjev-latest",
+  "results": [
+    {
+      "caseId": "page-homepage",
+      "expected": "homepage",
+      "answer": "homepage",
+      "correct": true,
+      "malformed": false,
+      "latencyMs": 1700,
+      "providerConfidence": 0.29341336646345784,
+      "rawProbability": 0.5883414137962408,
+      "model": "openjev-latest",
+      "backend": "systemone",
+      "error": null
+    },
+    {
+      "caseId": "page-providers",
+      "expected": "providers",
+      "answer": "providers",
+      "correct": true,
+      "malformed": false,
+      "latencyMs": 894,
+      "providerConfidence": 0.9810374312816156,
+      "rawProbability": 0.9959651626353132,
+      "model": "openjev-latest",
+      "backend": "systemone",
+      "error": null
+    },
+    {
+      "caseId": "page-agents",
+      "expected": "agents",
+      "answer": "agents",
+      "correct": true,
+      "malformed": false,
+      "latencyMs": 1015,
+      "providerConfidence": 0.6096800094817733,
+      "rawProbability": 0.8247392440733714,
+      "model": "openjev-latest",
+      "backend": "systemone",
+      "error": null
+    },
+    {
+      "caseId": "page-workflows",
+      "expected": "workflows",
+      "answer": "workflows",
+      "correct": true,
+      "malformed": false,
+      "latencyMs": 875,
+      "providerConfidence": 0.7796798280986572,
+      "rawProbability": 0.8987765088030578,
+      "model": "openjev-latest",
+      "backend": "systemone",
+      "error": null
+    },
+    {
+      "caseId": "page-vision-fallback",
+      "expected": "other",
+      "answer": "other",
+      "correct": true,
+      "malformed": false,
+      "latencyMs": 850,
+      "providerConfidence": 0.9035070931174276,
+      "rawProbability": 0.9665476225782178,
+      "model": "openjev-latest",
+      "backend": "systemone",
+      "error": null
+    },
+    {
+      "caseId": "vision-ui-providers",
+      "expected": false,
+      "answer": false,
+      "correct": true,
+      "malformed": false,
+      "latencyMs": 663,
+      "providerConfidence": null,
+      "rawProbability": 0.0002016157514654183,
+      "model": "openjev-latest",
+      "backend": "systemone",
+      "error": null
+    },
+    {
+      "caseId": "vision-ui-fallback",
+      "expected": true,
+      "answer": true,
+      "correct": true,
+      "malformed": false,
+      "latencyMs": 792,
+      "providerConfidence": null,
+      "rawProbability": 0.9633130346492826,
+      "model": "openjev-latest",
+      "backend": "systemone",
+      "error": null
+    }
+  ],
+  "summary": {
+    "total": 7,
+    "answered": 7,
+    "correct": 7,
+    "accuracy": 1,
+    "malformed": 0,
+    "malformedRate": 0,
+    "medianLatencyMs": 875,
+    "p95LatencyMs": 1700,
+    "falsePositiveSuccessRate": null,
+    "unknownFallbackRate": null
+  },
+  "limitations": [
+    "This smoke set validates visual input and bounded page/form decisions; it is not yet the 25-50 action-state dataset required for the production GO gate.",
+    "falsePositiveSuccessRate remains null until success/non-success action-state cases exist.",
+    "unknownFallbackRate remains null until the evaluated backend exposes or the benchmark defines an explicit abstention/fallback policy.",
+    "System One results are backend-specific evidence and do not imply another provider/model shares the calibration."
+  ]
+}
