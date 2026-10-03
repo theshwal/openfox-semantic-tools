@@ -1,67 +1,22 @@
 import type { PluginTool } from 'openfox/plugin'
 
-import { ProviderError, SystemOneHttpProvider } from '../providers/system-one.js'
-import { parseSettings } from '../settings.js'
-import { buildVerifyState } from './state.js'
-import { buildVerifyRequest } from './questions.js'
-import { DEFAULT_POLICY, evaluateVerifyPolicy, type VerifyPolicy, type VerifyStatus } from './policy.js'
-import { assessProfileFreshness, parseCalibrationOverrides, parseCalibrationProfile, resolveVerifyPolicy } from '../calibration/profile.js'
-import type { DecisionAnswer, DecisionResponse, DecisionRequest } from '../decision/types.js'
+import { ProviderError } from '../errors.js'
+import { runVerifyAssessment, type VerifyRunOptions } from './run.js'
 
-export interface VerifyReport {
-  reportId: string
-  trace: {
-    issueId: string | null
-    criterionId: string
-    criterionText: string
-    evidenceRefs: readonly string[]
-  }
-  status: VerifyStatus
-  /** Always true in this experiment: the result is advice, never a gate. */
-  advisory: true
-  policyVersion: string
-  calibrated: boolean
-  provider: string
-  model?: string
-  latencyMs: number
-  evidenceBytes: number
-  answers: Record<string, DecisionAnswer>
-  gates: ReturnType<typeof evaluateVerifyPolicy>['gates']
-  reasons: string[]
-  /**
-   * Numbers the runtime declared about its own certainty. Reported for later
-   * analysis and never used to decide the status.
-   */
-  telemetry: ReturnType<typeof evaluateVerifyPolicy>['telemetry']
-  calibration: {
-    profileId: string | null
-    freshness: 'matched' | 'stale' | 'unverified'
-    applied: boolean
-    explicitOverrides: boolean
-  }
-}
+export type { VerifyReport } from './run.js'
 
-export interface VerifyToolOptions {
-  policy?: VerifyPolicy
-  transport?: typeof fetch
-}
+export interface VerifyToolOptions extends VerifyRunOptions {}
 
 /**
  * `semantic_verify_task` is an advisory post-build check on ONE acceptance
- * criterion. It reuses the shipped transport, settings and egress policy rather
- * than reimplementing them, and it always declares an `automatic` origin
- * because it assembles repository/session-derived evidence: the egress policy
- * must be able to block it on a remote endpoint before anything is sent.
- *
- * It registers no workflow transition, no hook and no completion signal. A
- * `success: true` result means the advisory report was produced, never that the
- * criterion is satisfied.
+ * criterion. The actual verification policy lives in runVerifyAssessment so
+ * issue-level aggregation can reuse exactly the same settings, calibration,
+ * egress and failure semantics.
  */
 export function createVerifyTool(
   readSettings: (projectId?: string) => Record<string, unknown>,
   options: VerifyToolOptions = {},
 ): PluginTool {
-  const transport = options.transport ?? fetch
   return {
     name: 'semantic_verify_task',
     description:
@@ -89,74 +44,15 @@ export function createVerifyTool(
     },
     async execute(args, context) {
       try {
-        const built = buildVerifyState(args)
-        const request: DecisionRequest = buildVerifyRequest(
-          built.state,
-          args.criterion as string,
-          typeof args.model === 'string' ? args.model : undefined,
-        )
-        const rawSettings = readSettings(context.projectId)
-        const settings = parseSettings(rawSettings)
-        const provider = new SystemOneHttpProvider(settings, transport)
-        const profile = parseCalibrationProfile(rawSettings.calibrationProfileJson)
-        const runtimeVersion =
-          typeof rawSettings.runtimeVersion === 'string' && rawSettings.runtimeVersion.trim()
-            ? rawSettings.runtimeVersion.trim()
-            : undefined
-        const freshness = assessProfileFreshness(profile, {
-          presetId: settings.presetId ?? 'custom',
-          ...(settings.model ? { model: settings.model } : {}),
-          ...(runtimeVersion ? { runtimeVersion } : {}),
-          policyVersion: DEFAULT_POLICY.version,
-        })
-        // A stale/unverified profile is visible but never applied. Explicit
-        // operator overrides remain explicit and therefore still take priority.
-        const applicableProfile =
-          profile && freshness === 'matched' ? profile : profile ? { ...profile, active: false } : null
-        const explicitCalibration = parseCalibrationOverrides(rawSettings.calibrationOverridesJson)
-        const policy = options.policy ?? resolveVerifyPolicy(
-          DEFAULT_POLICY,
-          applicableProfile,
-          explicitCalibration,
-        )
-        // Repository/session-derived content: always automatic, never explicit.
-        const response: DecisionResponse = await provider.decide(request, {
-          signal: context.signal,
-          origin: 'automatic',
-        })
-        const decision = evaluateVerifyPolicy(response.answers, policy)
-        const report: VerifyReport = {
-          reportId: built.reportId,
-          trace: built.trace,
-          status: decision.status,
-          advisory: true,
-          policyVersion: decision.policyVersion,
-          calibrated: decision.calibrated,
-          provider: response.provider,
-          ...(response.model ? { model: response.model } : {}),
-          latencyMs: response.latencyMs ?? 0,
-          evidenceBytes: built.bytes,
-          answers: response.answers,
-          gates: decision.gates,
-          reasons: [...decision.reasons],
-          telemetry: decision.telemetry,
-          calibration: {
-            profileId: profile?.id ?? null,
-            freshness,
-            applied: Boolean(profile?.active && freshness === 'matched'),
-            explicitOverrides: rawSettings.calibrationOverridesJson !== undefined && rawSettings.calibrationOverridesJson !== '',
-          },
-        }
+        const report = await runVerifyAssessment(args, context, readSettings, options)
         return { success: true, output: JSON.stringify(report) }
       } catch (error) {
         if (error instanceof ProviderError) {
-          return { success: false, error: JSON.stringify({ code: error.code, message: error.message }) }
+          return {
+            success: false,
+            error: JSON.stringify({ code: error.code, message: error.message }),
+          }
         }
-        // A non-ProviderError is not the caller's fault: it is either an
-        // internal defect or a settings access failure. Reporting
-        // `invalid_arguments` here would send the agent to fix arguments that
-        // are fine. The message stays generic because settings access can throw
-        // secret-bearing errors.
         return {
           success: false,
           error: JSON.stringify({
