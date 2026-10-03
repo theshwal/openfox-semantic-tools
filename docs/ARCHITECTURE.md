@@ -204,14 +204,32 @@ This is not a replacement for static analysis when a deterministic rule exists.
 
 ### 5.4 semantic_search
 
-Purpose: reduce exploratory repository reads by ranking likely relevant files/functions/chunks.
+Purpose: reduce exploratory repository reads with a two-stage bounded path:
 
-Potential references:
+```text
+query
+  -> local lexical/path recall
+  -> bounded candidate set
+  -> one semantic score question per file, batched in one provider call
+  -> advisory shortlist
+  -> OpenFox reads/verifies the actual files
+```
 
-- jevgrep;
-- function/chunk scoring patterns from Jev ecosystem experiments.
+The local stage is dependency-free and ephemeral: no vector DB, embedding
+service, daemon or persistent index. It skips common generated/vendor
+directories and symbolic links, refuses files that the semantic reader could
+not later consume, and is capped before semantic work starts.
 
-The main design question is whether repository chunking + decision calls actually beats OpenFox's existing search/read behavior end to end.
+Explicit candidate lists remain supported. `semantic_scan` remains
+explicit-candidate only.
+
+When auto-recall succeeded but the semantic provider is unavailable or blocked
+by egress policy, `semantic_search` may return the local shortlist explicitly
+marked as a local-only fallback. This is different from pretending the semantic
+stage succeeded.
+
+The main product question remains whether this reduces files/reads and
+end-to-end work without lowering task success. Those measurements belong to #9.
 
 ### 5.5 context relevance / reduction
 
