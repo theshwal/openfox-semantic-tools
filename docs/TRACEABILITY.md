@@ -139,6 +139,22 @@ Proof kinds used below:
 | 27.13 | "Tests prove precedence: explicit override > calibration profile > conservative defaults." | T: `test/calibration-profile.test.ts` "precedence is explicit override > active profile > conservative defaults" | verified |
 | 27.14 | "Documentation states clearly that provider/model behavior can change over time and that shipped profiles are dated observations, not guarantees." | F: `docs/CALIBRATION.md`; F: README "Provider calibration and self-test" section | verified |
 
+## Issue #45 — arbitrary question calibration
+
+| # | Requirement (issue text) | Proof | Verdict |
+| --- | --- | --- | --- |
+| 45.1 | "An operator can evaluate one arbitrary `noul`, `choice`, or `score` question against their own labelled examples without editing plugin source." | F: `src/calibration/question-tool.ts` exposes the question and the labelled set as tool arguments; T: `test/question-calibration-tool.test.ts` "the tool evaluates labelled noul cases and never leaks state or secrets" | verified |
+| 45.2 | "Results preserve the native semantic primitive and its numeric domain." | F: `src/calibration/question-eval.ts` reports `noul` as a probability, `choice` as a label plus its distribution, `score` in level units with `rubricRange`; T: `test/question-calibration.test.ts` "score cases keep the native rubric range and report the absolute error" | verified |
+| 45.3 | "Relevant agreement/error/calibration metrics are produced; unsupported metrics remain null." | F: `QuestionEvaluationReport.metrics` with one non-null branch per primitive; every rate is `number | null` and an empty answered set yields `null`, never `0` (including `choice.accuracy`); raw counts such as `choice.matched` stay numeric because a count of zero is a real count; T: `test/question-calibration.test.ts` "noul cases report false positives, false negatives and a Brier score", "choice cases report a confusion matrix and per-class agreement" and "an unmeasured rate is null, never zero, for every primitive" | verified |
+| 45.4 | "Provider/model/question provenance is explicit and stale calibration cannot silently carry over." | F: `fingerprintQuestion`, `QuestionIdentity`, `questionIsApplicableTo`; `effectiveProvider` resolves the model as requested override > provider echo > configured model, and the report and its candidate carry the SAME identity; T: `test/question-calibration.test.ts` "the question fingerprint changes with the question and ignores key order", "a candidate from another question is not applicable to this one" and "the report names the model actually evaluated, not the configured one" | verified |
+| 45.5 | "Candidate thresholds/bands, if derived, are advisory and inactive by default." | F: `InactiveCandidate.active` is the literal `false` and carries observations only; T: `test/question-calibration.test.ts` "an unusable answer and a missing case never become a matched observation" | verified |
+| 45.6 | "Raw private states are not persisted by default." | F: the report carries `expected`/`observed`/numbers and never the `state`; T: `test/question-calibration-tool.test.ts` "the tool evaluates labelled noul cases and never leaks state or secrets" | verified |
+| 45.7 | "No universal 0..1 normalization layer is introduced." | F: no normalized field exists; the only division is a reported MAE in level units; T: `test/question-calibration.test.ts` "score cases keep the native rubric range and report the absolute error" asserts the serialized report contains no `normalized` field | verified |
+| 45.8 | "Tests cover all three question types, malformed answers, provider failure and question/profile mismatch." | T: `test/question-calibration.test.ts` and `test/question-calibration-tool.test.ts` cover the three primitives, `score_distribution_mismatch`, `invalid_noul_probability`, a per-case `http` failure and a fingerprint mismatch | verified |
+| 45.9 | "A provider failure must remain visible and must not become a semantic answer." | F: `FATAL_ERROR_CODES` splits cancellation/egress/configuration from data-point failures; T: `test/question-calibration-tool.test.ts` "a total provider failure is reported per case and still yields a report" and "cancellation propagates instead of producing a report" | verified |
+| 45.10 | "A generic question-evaluation primitive is preferred over a second policy engine." | F: `src/calibration/question-eval.ts` holds no threshold and no gate; the verification `CalibrationProfile` is untouched; T: `test/question-calibration.test.ts` exercises the module directly, without the tool boundary | verified |
+| 45.11 | "A rubric is addressed exactly as the shipped adapter addresses it." | F: `questionLabels` mirrors `normalizeResponse`: a `choice` array rubric is addressed by its VALUES and a `score` rubric by its level index, so a valid provider answer is never scored malformed; T: `test/question-calibration.test.ts` "an array-rubric choice uses the criteria values as labels, like the adapter" | verified |
+
 ## Issue #2 — real isolated OpenFox agent
 
 Proof for this section comes from `npm run harness:agent-e2e`
@@ -211,7 +227,7 @@ transitions.
 Counts are recomputed from the tables above by
 `test/traceability.test.ts`, so they cannot silently drift.
 
-- Verified: 77 requirements.
+- Verified: 88 requirements.
 - Verified with a documented deviation: 0.
 - **Unverified: 3** — the real-provider false-pass rate (4.18), the
   OpenFox end-to-end savings metrics (4.19), and the unreached `pass-candidate`

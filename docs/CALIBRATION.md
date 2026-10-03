@@ -104,6 +104,74 @@ The candidate is deliberately:
 This lets an operator export/import the result, review it, and add explicit
 `gateOverrides` only when their own evidence justifies doing so.
 
+## Arbitrary question calibration
+
+The `CalibrationProfile` above describes the five `semantic_verify_task` gates
+and nothing else. An operator who wants to test the configured runtime on
+**their own** question uses `semantic_question_calibration`, which takes:
+
+- `question`: one typed `DecisionQuestion` (`noul`, `choice` or `score`);
+- `cases`: `{ id, state, expected }`, where `expected` is a boolean for `noul`,
+  a criterion key for `choice` and a rubric level index for `score`;
+- optional `questionVersion` and `model`.
+
+Input is validated with the same request validator `semantic_decide` uses, so a
+question that is accepted here is one the adapter could also send. A case set is
+bounded (at most 50 cases, 24 kB per state) and is rejected rather than
+truncated.
+
+### What it reports
+
+Every number stays in its primitive's own domain. There is deliberately no
+universal 0..1 normalization and no fabricated value:
+
+| Primitive | Reported |
+| --- | --- |
+| `noul` | probability, false-positive/false-negative counts and rates, Brier score |
+| `choice` | chosen label, distribution, confusion matrix, per-class agreement |
+| `score` | raw level value, native `rubricRange`, absolute error, MAE |
+
+A metric that was not measured is `null`: an unanswered case makes the
+agreement `null`, a missing labelled class makes its per-class agreement
+`null`, and a case set with no finite probability makes the Brier score `null`.
+They are never reported as `0`.
+
+A `score` answer is checked against its own distribution
+(`score = E[level]`, see `docs/SCORE-CONTRACT.md`). A contradiction is recorded
+as a malformed case, not dropped.
+
+### Comparison boundary
+
+`noul` has no inherent decision boundary, so the report states the one it used:
+`observed` is `probability > 0.5`. It is a reading of the reported number, not a
+tuned threshold, and it is echoed in `comparisonBoundary` so a reader knows
+exactly what `matched` meant.
+
+### Provenance and the candidate
+
+The report is always `advisory: true` and `active: false`, and carries the
+provider identity plus `question.fingerprint`: a hash of the canonical question
+definition (object criteria are key-sorted, so a re-ordered object is the same
+question and any change of text, type or criteria is a different one).
+`questionIsApplicableTo` uses it, so a candidate measured on one question
+cannot be read as calibration for another.
+
+`candidate` is observation-only: observed probability/score/top-label ranges for
+the matched and mismatched cases, the declared confidence range, and the
+observed separation between labelled positives and negatives. No threshold, band
+or score is derived. Activation is the operator's explicit decision, with their
+own evidence, exactly like a `CalibrationProfile`.
+
+### Failure semantics
+
+- Malformed arguments fail before any provider call.
+- A provider failure on one case is recorded on that case with its code, and the
+  remaining cases still run, so a single run stays a reproducible evaluation
+  report.
+- Cancellation, blocked egress and configuration errors fail the whole tool:
+  they are not data points about this question.
+- The report contains no state, no endpoint and no secret.
+
 ## Current Jev / Kev / Laya snapshot
 
 The dated 2026-10-01 provider work in

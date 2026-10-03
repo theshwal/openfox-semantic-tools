@@ -7,6 +7,7 @@ import { SKILL_SOURCE } from './skills/source.js'
 import { ADVISORY_VERIFICATION_WORKFLOW, advisoryWorkflowFor, listAdvisoryWorkflows } from './workflow/templates.js'
 import { createProviderSelfTestTool } from './calibration/self-test.js'
 import { createCalibrationCandidateTool } from './calibration/candidate-tool.js'
+import { createQuestionCalibrationTool } from './calibration/question-tool.js'
 
 /**
  * Advisory workflow templates, exported as reference data.
@@ -200,6 +201,7 @@ export function register(registry: PluginRegistry): void {
   registry.registerTool(createDiscoveryTool('semantic_scan', readSettings))
   registry.registerTool(createProviderSelfTestTool(readSettings))
   registry.registerTool(createCalibrationCandidateTool())
+  registry.registerTool(createQuestionCalibrationTool(readSettings))
   // Skills carry usage guidance only; they never grant tool access.
   registry.registerSkillSource(SKILL_SOURCE)
 }

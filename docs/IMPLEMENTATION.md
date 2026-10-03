@@ -6,13 +6,14 @@ Current delivery state updated through the #35 Phase A evidence cycle on
 
 ## Current shape
 
-Seven tools (`semantic_decide`, `semantic_verify_task`,
+Eight tools (`semantic_decide`, `semantic_verify_task`,
 `semantic_issue_coverage`, `semantic_search`, `semantic_scan`,
-`semantic_provider_self_test`, `semantic_calibration_candidate`), two usage
-skills, global settings, presets, an optional cache, explicit egress policy, a
-calibration layer and an opt-in advisory workflow file. Nothing registers a
+`semantic_provider_self_test`, `semantic_calibration_candidate`,
+`semantic_question_calibration`), two usage skills, global settings, presets,
+an optional cache, explicit egress policy, a calibration layer and an opt-in
+advisory workflow file. Nothing registers a
 hook or a workflow transition. #35 currently adds benchmark/evidence artifacts
-only; it does not register an eighth production tool.
+only.
 
 | Order | Issues | Delivery / gate |
 | --- | --- | --- |

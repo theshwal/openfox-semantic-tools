@@ -4,7 +4,7 @@ Experimental OpenFox plugin for **fast, typed semantic decisions** and, where it
 
 The project is intentionally provider-agnostic. The first transport target is the Jev / System One-style `POST /v1/systemone` API, so the same OpenFox tools can be backed by hosted Jev or by a compatible local/open-source runtime.
 
-> Status: seven tools, two usage skills, presets, optional cache, egress,
+> Status: eight tools, two usage skills, presets, optional cache, egress,
 > calibration and advisory workflow, validated on OpenFox 2.0.157 and 2.0.160.
 > Dated provider observations are scoped in #9; no durable quality
 > certification or end-to-end savings claim is made. See
@@ -46,6 +46,7 @@ OpenFox
   +-- semantic_scan              advisory, explicit candidates only
   +-- semantic_provider_self_test
   +-- semantic_calibration_candidate
+  +-- semantic_question_calibration
           |
           v
    use-case policy
@@ -64,7 +65,7 @@ The provider layer should accept one state plus one or more typed questions in a
 
 ## What this plugin actually registers
 
-Seven tools and two usage skills, all through the public Plugin API v2. Nothing
+Eight tools and two usage skills, all through the public Plugin API v2. Nothing
 below is planned; see [docs/ROADMAP.md](./docs/ROADMAP.md) for what is not.
 
 | Tool | Shape | Advisory? |
@@ -76,6 +77,7 @@ below is planned; see [docs/ROADMAP.md](./docs/ROADMAP.md) for what is not.
 | `semantic_scan` | Scores an explicit caller-supplied file list against a behavioural predicate. | Yes — candidates only. |
 | `semantic_provider_self_test` | Embedded synthetic smoke test against the configured endpoint. | Yes — never changes settings. |
 | `semantic_calibration_candidate` | Turns an operator-labelled case set into an inactive candidate profile. | Yes — never activates anything. |
+| `semantic_question_calibration` | Evaluates one arbitrary typed question against the operator's labelled cases. | Yes — evaluation evidence only, never a threshold. |
 
 | Skill | Covers |
 | --- | --- |
@@ -555,11 +557,42 @@ Semantic-provider numeric scales are not treated as interchangeable. Verificatio
 
 A profile is never applied unless its own `active` field is true, and a profile whose configured provider/model/version no longer matches is reported as stale/unverified and is not applied.
 
-Two advisory tools are available:
+Three advisory tools are available:
 
 - `semantic_provider_self_test` — runs a small embedded synthetic smoke test against the configured endpoint and reports protocol reachability, profile freshness, observed gate ranges, warnings and fallback categories. It reads no repository/session content and never changes settings.
 - `semantic_calibration_candidate` — turns an operator-owned labelled numeric case set into an inactive, observation-only candidate profile. It never invents thresholds or activates the result.
+- `semantic_question_calibration` — evaluates ONE arbitrary typed question (`noul`, `choice` or `score`) against the operator's own labelled cases and reports how that exact question behaves for the configured provider/model.
 
 Configure `calibrationProfileJson`, `calibrationOverridesJson`, and optionally `runtimeVersion` in plugin settings. See `docs/CALIBRATION.md` for the schema, freshness rules and safety model.
 
 The dated Jev/Kev/Laya snapshot is evidence for why this layer exists, not a leaderboard and not a built-in permissive profile.
+
+### Arbitrary question calibration
+
+`semantic_question_calibration` is the operator-facing surface for a question
+that is not one of the five verification gates:
+
+```jsonc
+{
+  "question": { "type": "noul", "instructions": "Does this note contain a precise diagnosis?" },
+  "cases": [
+    { "id": "clear", "state": "...", "expected": true },
+    { "id": "vague", "state": "...", "expected": false }
+  ],
+  "questionVersion": "notes-v1"
+}
+```
+
+`expected` is a boolean for `noul`, a criterion key for `choice` and a rubric
+level index for `score`. The report keeps each primitive in its own domain — a
+`noul` probability with false-positive/false-negative counts and a Brier score,
+a `choice` confusion matrix and per-class agreement, a `score` absolute error in
+level units — and never normalizes them into a common 0..1 number. Metrics that
+were not measured are `null`, never `0`.
+
+The report is always `advisory: true, active: false` and carries the provider
+identity plus a fingerprint of the exact question, so a candidate measured on
+one question can never be read as calibration for another. Its candidate block
+holds observations only: it derives no threshold and never activates anything.
+The labelled states are sent to the provider but are not written into the
+report.
