@@ -130,7 +130,7 @@ Call \`semantic_search\` or \`semantic_scan\` when:
 
 - you know the behaviour or concept but not where it lives, and text search
   returned nothing useful or too many candidates;
-- you have no reliable candidate list: `semantic_search` can run bounded local
+- you have no reliable candidate list: \`semantic_search\` can run bounded local
   lexical/path recall first, then semantically rerank only that shortlist;
 - you already have a short list of files and want to know which few deserve a
   read, instead of opening all of them;
@@ -147,43 +147,48 @@ Do not call them when:
 - you already know the exact file: read it directly rather than asking for a
   ranking.
 
-`semantic_scan` never scans the repository: it still requires explicit
-candidates. `semantic_search` may perform its own bounded local recall, which is
-local-only and does not transmit the repository sweep to the provider.
+\`semantic_scan\` never scans the repository: it still requires explicit
+candidates. \`semantic_search\` may perform its own bounded local recall, which
+is local-only and does not transmit the repository sweep to the provider.
 
 ## Supplying candidates
 
-- \`candidates\`: relative paths, narrowed by deterministic search first. Keep
-  the list short; the tool refuses an oversized list or oversized files rather
-  than truncating them, because a cut file could hide the relevant code.
-- \`query\` for \`semantic_search\`, \`predicate\` for \`semantic_scan\`: one clear
-  question or behaviour, stated concretely.
+- \`candidates\`: optional for \`semantic_search\`, required for
+  \`semantic_scan\`. When supplied, keep the list short. When omitted for
+  search, the plugin uses bounded path/content recall and sends only its
+  shortlist to the semantic provider. Oversized files are never silently
+  truncated.
+- \`query\` for \`semantic_search\`, \`predicate\` for
+  \`semantic_scan\`: one clear question or behaviour, stated concretely.
 - \`root\`: defaults to the session working directory. Paths outside it, and
   symbolic links, are refused.
 
 ## Reading the result
 
-- \`candidates\` is a ranked list of **candidates**, each with the score, its
-  distribution and its confidence. A high score means "read this first", not
-  "this is correct".
-- Entries with \`usable: false\` carry no score. The answer was missing,
-  inconsistent or undecided. Do not treat them as relevant; read the file
-  yourself instead.
-- \`reasons\` explains why nothing was ranked, when that happens.
+- \`candidates\` is a ranked list of **candidates**. When
+  \`semanticApplied\` is true, each file has its own semantic score,
+  distribution and confidence. A high score means "read this first", not "this
+  is correct".
+- When \`semanticApplied\` is false, the semantic stage failed or was blocked
+  and the shortlist is explicitly marked \`rankingSource: local-recall\` with
+  a deterministic local recall score.
+- Entries with \`usable: false\` carry no usable semantic score. Confirm the
+  candidate yourself instead of treating an unusable semantic answer as
+  relevance evidence.
 - With explicit candidates, a failed semantic call remains a failed call. With
   auto-recall search, provider failure may return the local shortlist with
-  `semanticApplied: false`; confirm those candidates with normal code tools.
+  \`semanticApplied: false\`; confirm those candidates with normal code tools.
 
 ## Limits
 
-- This skill does not grant tool access. \`semantic_search\` and \`semantic_scan\`
-  must both be in the agent's allowed tools; if they are not callable, use
-  deterministic tools.
+- This skill does not grant tool access. \`semantic_search\` and
+  \`semantic_scan\` must both be in the agent's allowed tools; if they are
+  not callable, use deterministic tools.
 - The result is advisory. It never accepts a task or closes a criterion.
 - Ranking is not verification: always confirm a candidate by reading it and
   running the relevant tests.
-- Keep the state small and relevant. Unrelated files in the list cost accuracy
-  as well as tokens.
+- Local recall is bounded and lexical/path-based. It is not exhaustive proof
+  that a missing file is irrelevant.
 `,
 }
 
