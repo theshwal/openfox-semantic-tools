@@ -1,5 +1,6 @@
 import { createDecisionTool } from './tool.js'
 import { createVerifyTool } from './verify/tool.js'
+import { createIssueCoverageTool } from './verify/coverage.js'
 import { createDiscoveryTool } from './discovery/tool.js'
 import { DEFAULT_BACKEND_ID, PRESETS } from './presets/index.js'
 import { SKILL_SOURCE } from './skills/source.js'
@@ -194,6 +195,7 @@ export function register(registry: PluginRegistry): void {
   const readSettings = (projectId?: string) => context.settings('global', projectId)
   registry.registerTool(createDecisionTool(readSettings))
   registry.registerTool(createVerifyTool(readSettings))
+  registry.registerTool(createIssueCoverageTool(readSettings))
   registry.registerTool(createDiscoveryTool('semantic_search', readSettings))
   registry.registerTool(createDiscoveryTool('semantic_scan', readSettings))
   registry.registerTool(createProviderSelfTestTool(readSettings))
