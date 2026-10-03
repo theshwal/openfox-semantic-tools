@@ -61,7 +61,8 @@ test('the skill teaches when NOT to use the tool and how to fall back', () => {
   assert.match(prompt, /tests, typechecks or linters/)
   assert.match(prompt, /human review/)
   assert.match(prompt, /normal\s+verification path|normal verifier/i)
-  assert.match(prompt, /allowedTools|never grants?|does not grant/i)
+  assert.match(prompt, /allowedTools|allowed tools|never grants?|does not grant/i)
+  assert.ok(prompt.includes('semantic_issue_coverage'))
 })
 
 test('the skill documents every status the tool can return', () => {
