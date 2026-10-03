@@ -270,7 +270,9 @@ What is still required before the issue can reach its decision gate:
 
 1. a reachable image-capable System One backend;
 2. 25–50 sanitized action-state screenshots including success, processing,
-   blocked, error, authentication and ambiguous cases;
+   blocked, error, authentication and ambiguous cases; the capture/ground-truth
+   contract is defined in
+   [`benchmark/visual/ACTION-STATE-DATASET.md`](../benchmark/visual/ACTION-STATE-DATASET.md);
 3. measured false-positive `success`, fallback/unknown and latency;
 4. a recorded GO/DEFER decision based on those measurements.
 
