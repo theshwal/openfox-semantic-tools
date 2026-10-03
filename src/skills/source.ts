@@ -123,13 +123,15 @@ export const SEMANTIC_CODE_DISCOVERY_SKILL: PluginSkill = {
   id: 'semantic-code-discovery',
   name: 'Semantic code discovery',
   description:
-    'Use semantic search and scoring only after narrowing candidates, to rank a short list of files. Prefer grep, symbols and tests when they already answer the question.',
+    'Use bounded code discovery when deterministic search is insufficient: semantic_search can recall locally then rerank, while semantic_scan scores explicit candidates.',
   prompt: `## When to use these tools
 
 Call \`semantic_search\` or \`semantic_scan\` when:
 
 - you know the behaviour or concept but not where it lives, and text search
   returned nothing useful or too many candidates;
+- you have no reliable candidate list: `semantic_search` can run bounded local
+  lexical/path recall first, then semantically rerank only that shortlist;
 - you already have a short list of files and want to know which few deserve a
   read, instead of opening all of them;
 - you want to check the same behavioural predicate over several candidates at
@@ -142,8 +144,13 @@ Do not call them when:
 - grep, a symbol lookup, or reading a known file already answers the question;
 - the answer is one or two deterministic tool calls away;
 - a test, a linter or a typechecker already gives an exact answer;
-- you have no candidate list yet. These tools rank what you give them. They do
-  not search the repository, and they must never be used to sweep it.
+- you already know the exact file: read it directly rather than asking for a
+  ranking.
+
+`semantic_scan` never scans the repository: it still requires explicit
+candidates. `semantic_search` may perform its own bounded local recall, which is
+local-only and does not transmit the repository sweep to the provider.
+
 ## Supplying candidates
 
 - \`candidates\`: relative paths, narrowed by deterministic search first. Keep
@@ -163,7 +170,9 @@ Do not call them when:
   inconsistent or undecided. Do not treat them as relevant; read the file
   yourself instead.
 - \`reasons\` explains why nothing was ranked, when that happens.
-- A failed call is not a result. Fall back to normal code tools.
+- With explicit candidates, a failed semantic call remains a failed call. With
+  auto-recall search, provider failure may return the local shortlist with
+  `semanticApplied: false`; confirm those candidates with normal code tools.
 
 ## Limits
 
