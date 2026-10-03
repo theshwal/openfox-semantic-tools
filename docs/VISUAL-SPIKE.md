@@ -41,19 +41,15 @@ its Ajean launch parameters and restarted it, the endpoint became reachable and
 was measured as the conventional-VLM baseline below. No synthetic result was
 substituted during the unavailable period.
 
-### Current external candidates
+### Visual backend status
 
-Two current open projects demonstrate the contract we want to evaluate:
+OpenJev/Codiv has now been measured directly with the versioned harness. It
+accepts image input on the Jev-compatible `/v1/systemone` contract and returns
+typed `noul` / `choice` answers with probability information. The measured
+result is recorded below.
 
-- OpenJev: <https://github.com/razorback16/openjev> — extends the Jev-compatible
-  request with image inputs while retaining typed `noul`, `choice` and
-  `score` questions.
-- Jev-Vision: <https://github.com/sseanliu/Jev-Vision> — an open-weight
-  screenshot step verifier exposing Jev-shaped typed decisions over one or more
-  screenshots.
-
-These are **candidate backends**, not dependencies and not evidence that #35
-passes.
+Jev-Vision remains an additional open screenshot-specific candidate, not a
+dependency and not required for the current gate.
 
 ## Labelled smoke set
 
@@ -254,27 +250,77 @@ per-case latency shape. That variability is itself evidence against treating
 this conventional VLM as a deterministic low-latency System One substitute.
 Both runs remain smoke evidence only.
 
+## Measured System One baseline — OpenJev
+
+On 2026-10-03 the exact repository harness was run once against the hosted
+OpenJev/Codiv System One endpoint using model `openjev-latest`.
+
+Authentication succeeded and `GET /v1/models` exposed `openjev-latest`.
+The benchmark used the same seven smoke decisions as the Qwen baseline, with no
+per-case retry and no response repair.
+
+| case | expected | observed | latency | probability | confidence |
+| --- | --- | --- | ---: | ---: | ---: |
+| homepage page class | homepage | homepage | 1,700 ms | 0.5883 | 0.2934 |
+| providers page class | providers | providers | 894 ms | 0.9960 | 0.9810 |
+| agents page class | agents | agents | 1,015 ms | 0.8247 | 0.6097 |
+| workflows page class | workflows | workflows | 875 ms | 0.8988 | 0.7797 |
+| vision-fallback page class | other | other | 850 ms | 0.9665 | 0.9035 |
+| providers vision form visible | false | false | 663 ms | P(true)=0.0002 | n/a |
+| vision-fallback form visible | true | true | 792 ms | P(true)=0.9633 | n/a |
+
+Aggregate:
+
+- accuracy: **7/7**;
+- malformed: **0/7**;
+- median latency: **875 ms**;
+- p95 latency: **1,700 ms**;
+- typed probability information: **available**;
+- provider confidence: available on `choice`, not separately exposed for these
+  `noul` answers;
+- provider/request errors: **0**.
+
+The exact machine-readable harness stdout is stored in
+[`benchmark/results/visual-openjev-2026-10-03.json`](../benchmark/results/visual-openjev-2026-10-03.json).
+
+The `homepage` result deserves explicit caution: it was correct but weak
+(`P=0.5883`, confidence `0.2934`). That is useful evidence for the intended
+architecture: a production caller needs thresholds and a real
+`unknown/fallback` policy rather than treating every argmax as safe.
+
+### Smoke comparison
+
+| backend | accuracy | malformed | median | p95 | typed probabilities |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Qwen3.8 conventional VLM, exact harness replay | 7/7 | 0/7 | 40,971 ms | 41,483 ms | no |
+| OpenJev System One | 7/7 | 0/7 | **875 ms** | **1,700 ms** | **yes** |
+
+This establishes **backend viability**, not production safety. The smoke set
+does not contain success/error/blocked/auth/ambiguous action states, so the
+critical false-positive-success and fallback metrics are still null.
+
 ## Current decision
 
-**PARTIALLY UNBLOCKED: the conventional VLM baseline is measured; the System One visual comparison remains blocked.**
+**BACKEND VIABILITY GO; PRODUCTION DEFER.**
 
 What is complete:
 
 - environment capability inventory;
 - manually grounded smoke labels;
 - provider-neutral benchmark harness;
-- conventional-VLM comparison path;
-- System One visual comparison path.
+- conventional-VLM comparison path and measured Qwen baseline;
+- measured image-capable typed System One baseline with OpenJev;
+- a recorded backend-viability GO decision.
 
 What is still required before the issue can reach its decision gate:
 
-1. a reachable image-capable System One backend;
-2. 25–50 sanitized action-state screenshots including success, processing,
+1. the 25–50 sanitized action-state screenshots including success, processing,
    blocked, error, authentication and ambiguous cases; the capture/ground-truth
    contract is defined in
    [`benchmark/visual/ACTION-STATE-DATASET.md`](../benchmark/visual/ACTION-STATE-DATASET.md);
-3. measured false-positive `success`, fallback/unknown and latency;
-4. a recorded GO/DEFER decision based on those measurements.
+2. measured false-positive `success`, fallback/unknown and latency on that
+   frozen corpus;
+3. a **production** GO/DEFER decision based on those measurements.
 
 Until then, **do not register a production visual tool and do not widen the
 generic decision contract**.
