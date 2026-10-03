@@ -61,8 +61,8 @@ test('tools read settings after registration, when the registry context is gone'
   // Not a hard-coded count: the plugin gained tools in later lots, and a fixed
   // number would fail for an unrelated reason. What matters is that every tool
   // the plugin registered can read settings after registration.
-  // The four tools this regression covers are asserted BY NAME below and each is
-  // really invoked, so this check only states that the registry is populated
+  // The settings-backed tools this regression covers are asserted BY NAME below
+  // and each is really invoked, so this check only states that the registry is populated
   // without pinning a total that a later lot legitimately changes.
   assert.ok(tools.size > 0, `the plugin registered ${tools.size} tool(s)`)
   // The discovery tools assemble candidate file content BEFORE reading settings,
@@ -77,6 +77,10 @@ test('tools read settings after registration, when the registry context is gone'
     semantic_verify_task: {
       criterionId: 'ac-1',
       criterion: 'The export scopes every record to the tenant.',
+      evidence: { summary: 'x', diffExcerpts: ['y'], deterministicTestResults: ['ok'] },
+    },
+    semantic_issue_coverage: {
+      criteria: [{ id: 'ac-1', text: 'The export scopes every record to the tenant.' }],
       evidence: { summary: 'x', diffExcerpts: ['y'], deterministicTestResults: ['ok'] },
     },
     semantic_search: { query: 'tenant scoped export', candidates: ['fixture.txt'] },
@@ -95,7 +99,7 @@ test('tools read settings after registration, when the registry context is gone'
       )
       assert.match(error.message, /endpoint/i, `${name} must fail on the endpoint, got: ${error.message}`)
     }
-    assert.ok(reads() >= 4, `settings were read during execution (${reads()})`)
+    assert.ok(reads() >= 5, `settings were read during execution (${reads()})`)
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
@@ -104,8 +108,8 @@ test('tools read settings after registration, when the registry context is gone'
 test('registration itself does not depend on a later context read', () => {
   const { registry, tools, reads } = stubRegistry()
   register(registry)
-  // Each of the four tools covered by this regression is checked by name and
-  // really invoked below, so registration is proven per tool rather than by a
+  // Each settings-backed tool covered by this regression is checked by name and
+  // really invoked above, so registration is proven per tool rather than by a
   // registry count that a later lot may legitimately change.
   assert.ok(tools.size > 0, `the plugin registered ${tools.size} tool(s)`)
   assert.equal(reads(), 0, 'registration must not read settings')

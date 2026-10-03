@@ -18,6 +18,8 @@ export const MAX_REFERENCE_COUNT = 200
 
 export interface VerifyState {
   readonly acceptanceCriterion: string
+  /** Optional issue/task context used by issue-level coverage. */
+  readonly taskContext?: string
   readonly implementationSummary?: string
   readonly diffExcerpts?: readonly string[]
   readonly deterministicTestResults?: readonly string[]
@@ -41,6 +43,7 @@ export interface VerifyInput {
   criterionId: string
   criterion: string
   issueId?: string
+  taskContext?: string
   model?: string
   evidence?: {
     summary?: string
@@ -50,7 +53,7 @@ export interface VerifyInput {
   evidenceRefs?: unknown
 }
 
-const ALLOWED = new Set(['criterionId', 'criterion', 'issueId', 'model', 'evidence', 'evidenceRefs'])
+const ALLOWED = new Set(['criterionId', 'criterion', 'issueId', 'taskContext', 'model', 'evidence', 'evidenceRefs'])
 const ALLOWED_EVIDENCE = new Set(['summary', 'diffExcerpts', 'deterministicTestResults'])
 
 function readString(value: unknown, field: string, maxLength = MAX_IDENTIFIER_LENGTH): string {
@@ -108,6 +111,10 @@ export function buildVerifyState(input: unknown): BuiltVerifyState {
   const criterion = readString(input.criterion, 'criterion', MAX_EVIDENCE_BYTES)
 
   const issueId = input.issueId === undefined ? null : readString(input.issueId, 'issueId')
+  const taskContext =
+    input.taskContext === undefined
+      ? undefined
+      : readString(input.taskContext, 'taskContext', MAX_EVIDENCE_BYTES)
   if (input.model !== undefined) readString(input.model, 'model')
 
   const evidence = input.evidence
@@ -129,6 +136,7 @@ export function buildVerifyState(input: unknown): BuiltVerifyState {
 
   const state: VerifyState = {
     acceptanceCriterion: criterion,
+    ...(taskContext ? { taskContext } : {}),
     ...(summary ? { implementationSummary: summary } : {}),
     ...(diffExcerpts.length ? { diffExcerpts } : {}),
     ...(testResults.length ? { deterministicTestResults: testResults } : {}),

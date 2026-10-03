@@ -30,6 +30,11 @@ deterministic checks (tests, typecheck, lint) have run, when:
 - a previous attempt on the same criterion regressed and you need a focused
   re-check rather than a full re-verification.
 
+Call \`semantic_issue_coverage\` instead when an issue has several explicit
+acceptance criteria and you need one bounded advisory coverage report over the
+same implementation evidence. It evaluates each criterion through the same
+verification policy; it is not a different or more permissive verifier.
+
 ## When NOT to use it
 
 Do not call it when:
@@ -37,13 +42,13 @@ Do not call it when:
 - the deterministic checks already fail: fix the failure first;
 - the task is done and only a mechanical confirmation is needed;
 - you have no code and no test output to show it;
-- you need to decide on many criteria at once: it takes exactly one criterion
-  per call, so batch of criteria means several calls;
+- you need to assess several explicit criteria against the same evidence: use
+  \`semantic_issue_coverage\` rather than manually stitching several calls;
 - the question is answerable by reading a specific file or by grep.
 
 ## What to supply
 
-The call takes one criterion and the evidence for it:
+For \`semantic_verify_task\`, the call takes one criterion and the evidence for it:
 
 - \`criterionId\`: a stable id, e.g. the acceptance criterion number.
 - \`criterion\`: the criterion text as written, not a paraphrase.
@@ -56,6 +61,13 @@ The call takes one criterion and the evidence for it:
 
 Keep it bounded. Oversized evidence is rejected rather than truncated, so trim
 your excerpts instead of relying on a cut.
+
+For \`semantic_issue_coverage\`, supply explicit \`{ id, text }\` criteria plus the
+shared task/evidence block. Read \`covered\`, \`missing\` and \`uncertain\` as coverage
+labels only: \`covered\` requires the existing calibrated positive candidate;
+\`missing\` requires decisive evidence that a testable criterion is not satisfied;
+every ambiguous or insufficient case stays \`uncertain\`. \`needsFollowup\` is
+advisory and is not a merge decision.
 
 ## How to read the result
 
