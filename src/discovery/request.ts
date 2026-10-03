@@ -38,25 +38,35 @@ export function buildDiscoveryState(
   }
 }
 
-/** One batched call per tool. `choice` is used because a ranking must be total. */
+export function discoveryQuestionId(questionId: string, index: number): string {
+  return `${questionId}_${index}`
+}
+
+/**
+ * One batched provider call, but one score question per candidate. A single
+ * score over the whole list cannot rank files against each other.
+ */
 export function buildDiscoveryQuestions(
   question: string,
   questionId: string,
+  files: readonly { path: string }[],
 ): Record<string, DecisionQuestion> {
-  return {
-    [questionId]: {
+  const out: Record<string, DecisionQuestion> = {}
+  files.forEach((file, index) => {
+    out[discoveryQuestionId(questionId, index)] = {
       type: 'score',
       instructions:
-        `${question} ` +
-        'For each supplied file, place it on the following rubric according to how strongly its content bears on the question. ' +
+        `${question} Consider only the supplied file "${file.path}". ` +
+        'Place this file on the following rubric according to how strongly its content bears on the question. ' +
         'Judge only the supplied content, and answer with the level whose probability best matches your reading.',
       criteria: [
         'The file content has no bearing on the question',
         'The file content is tangentially related to the question',
         'The file content is directly relevant to answering the question',
       ],
-    },
-  }
+    }
+  })
+  return out
 }
 
 export interface ParsedDiscoveryInput {
@@ -85,6 +95,9 @@ export function parseDiscoveryArgs(
   const question = readText(value[field], field, field === 'query' ? MAX_QUERY_LENGTH : MAX_PREDICATE_LENGTH)
   if (value.candidates !== undefined && !Array.isArray(value.candidates)) {
     throw new ProviderError('invalid_arguments', 'candidates must be an array of relative paths')
+  }
+  if (field === 'predicate' && value.candidates === undefined) {
+    throw new ProviderError('invalid_arguments', 'semantic_scan requires explicit candidates')
   }
   const model = value.model === undefined ? undefined : readText(value.model, 'model', 200)
   // The root defaults to the session workdir and is resolved by read.ts, which
