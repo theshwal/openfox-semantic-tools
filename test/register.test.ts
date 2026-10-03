@@ -18,6 +18,7 @@ test('registers the initial settings schema', () => {
     'semantic_decide',
     'semantic_issue_coverage',
     'semantic_provider_self_test',
+    'semantic_question_calibration',
     'semantic_scan',
     'semantic_search',
     'semantic_verify_task',
@@ -118,10 +119,14 @@ test('every semantic tool reads global settings only', async () => {
     semantic_verify_task: { criterionId: 'ac-1', criterion: 'A criterion' },
     semantic_issue_coverage: { criteria: [{ id: 'ac-1', text: 'A criterion' }] },
     semantic_provider_self_test: {},
+    semantic_question_calibration: {
+      question: { type: 'noul', instructions: 'Check' },
+      cases: [{ id: 'a', state: 'public', expected: true }],
+    },
     semantic_search: { query: 'x', candidates: ['a.ts'], root },
     semantic_scan: { predicate: 'x', candidates: ['a.ts'], root },
   }
-  for (const name of ['semantic_decide', 'semantic_verify_task', 'semantic_issue_coverage', 'semantic_provider_self_test', 'semantic_search', 'semantic_scan']) {
+  for (const name of ['semantic_decide', 'semantic_verify_task', 'semantic_issue_coverage', 'semantic_provider_self_test', 'semantic_question_calibration', 'semantic_search', 'semantic_scan']) {
     settingsCalls.length = 0
     // Endpoint is unset, so the call fails during settings parsing. That is the
     // point: it proves the tool consulted the global scope, not a project one.

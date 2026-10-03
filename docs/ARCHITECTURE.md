@@ -100,7 +100,7 @@ For example, a yes/no probability and a choice confidence are not automatically 
 
 ## 4. What the plugin contributes today
 
-Seven tools, all registered through the public Plugin API v2:
+Eight tools, all registered through the public Plugin API v2:
 
 | Tool | Module | Kind |
 | --- | --- | --- |
@@ -111,6 +111,14 @@ Seven tools, all registered through the public Plugin API v2:
 | `semantic_scan` | `src/discovery/tool.ts` | advisory |
 | `semantic_provider_self_test` | `src/calibration/self-test.ts` | advisory |
 | `semantic_calibration_candidate` | `src/calibration/candidate-tool.ts` | advisory |
+| `semantic_question_calibration` | `src/calibration/question-tool.ts` | advisory, operator-facing |
+
+`semantic_question_calibration` is a thin `PluginTool` wrapper over
+`src/calibration/question-eval.ts`, which owns the question fingerprint, the
+per-primitive evaluation and the metrics. The evaluation module holds no
+threshold and no gate: it is reusable by another use case (for example a
+reference-agreement measurement) without going through the tool boundary, and it
+does not touch the verification-specific `CalibrationProfile`.
 
 Two skills (`semantic-verification`, `semantic-code-discovery`) are provided by
 one skill source (`src/skills/source.ts`), which teaches when those tools are
