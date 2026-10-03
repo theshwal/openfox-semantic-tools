@@ -36,7 +36,8 @@
     "verify:replay": "node --import tsx scripts/verify-policy-replay.ts",
     "harness": "node --import tsx scripts/openfox-harness.ts",
     "harness:agent-e2e": "node --import tsx scripts/agent-e2e.ts",
-    "workflow:install": "node dist/workflow/emit.js"
+    "workflow:install": "node dist/workflow/emit.js",
+    "visual:spike": "node --import tsx scripts/visual-spike.ts"
   },
   "peerDependencies": {
     "openfox": ">=2.0.157"

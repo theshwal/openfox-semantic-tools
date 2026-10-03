@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "repository": "theshwal/openfox",
+    "ref": "develop",
+    "directory": "docs/screenshots",
+    "groundTruth": "Manual visual inspection performed 2026-10-03; labels are not inferred from filenames."
+  },
+  "cases": [
+    {
+      "id": "page-homepage",
+      "image": "homepage.png",
+      "kind": "choice",
+      "questionId": "page",
+      "instructions": "Which OpenFox UI page is visible? Judge the rendered UI, not the filename.",
+      "choices": ["homepage", "providers", "agents", "workflows", "other"],
+      "expected": "homepage",
+      "groundTruthNote": "Full-screen OpenFox home with grouped project/session lists and an Open Project button."
+    },
+    {
+      "id": "page-providers",
+      "image": "providers.png",
+      "kind": "choice",
+      "questionId": "page",
+      "instructions": "Which OpenFox UI page is visible? Judge the rendered UI, not the filename.",
+      "choices": ["homepage", "providers", "agents", "workflows", "other"],
+      "expected": "providers",
+      "groundTruthNote": "LLM Providers setup step with provider cards. A later Vision step label is visible, but the vision configuration form is not."
+    },
+    {
+      "id": "page-agents",
+      "image": "agents.png",
+      "kind": "choice",
+      "questionId": "page",
+      "instructions": "Which OpenFox UI page is visible? Judge the rendered UI, not the filename.",
+      "choices": ["homepage", "providers", "agents", "workflows", "other"],
+      "expected": "agents",
+      "groundTruthNote": "Agents modal listing built-in/sub-agents and allowed-tool chips."
+    },
+    {
+      "id": "page-workflows",
+      "image": "workflows.png",
+      "kind": "choice",
+      "questionId": "page",
+      "instructions": "Which OpenFox UI page is visible? Judge the rendered UI, not the filename.",
+      "choices": ["homepage", "providers", "agents", "workflows", "other"],
+      "expected": "workflows",
+      "groundTruthNote": "Build & Verify flow editor with Start, builder, verifier and Done nodes; the word workflow is not visible."
+    },
+    {
+      "id": "page-vision-fallback",
+      "image": "vision-fallback.png",
+      "kind": "choice",
+      "questionId": "page",
+      "instructions": "Which OpenFox UI page is visible? Judge the rendered UI, not the filename.",
+      "choices": ["homepage", "providers", "agents", "workflows", "other"],
+      "expected": "other",
+      "groundTruthNote": "Vision (Optional) setup step. It belongs to the same setup wizard as providers, but is not the Providers page."
+    },
+    {
+      "id": "vision-ui-providers",
+      "image": "providers.png",
+      "kind": "noul",
+      "questionId": "visionFallbackVisible",
+      "instructions": "Is a vision fallback configuration form visibly present, with controls for enabling fallback and selecting a vision server/model?",
+      "expected": false,
+      "groundTruthNote": "Only a step label for Vision is present; there is no vision fallback configuration form."
+    },
+    {
+      "id": "vision-ui-fallback",
+      "image": "vision-fallback.png",
+      "kind": "noul",
+      "questionId": "visionFallbackVisible",
+      "instructions": "Is a vision fallback configuration form visibly present, with controls for enabling fallback and selecting a vision server/model?",
+      "expected": true,
+      "groundTruthNote": "Explicit Vision (Optional) form with enable checkbox, server URL and vision model fields."
+    }
+  ]
+}
