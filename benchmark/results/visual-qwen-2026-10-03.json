@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 1,
+  "measuredAt": "2026-10-03",
+  "backend": "openai",
+  "endpointClass": "private",
+  "endpoint": "http://192.168.0.1:8080/v1/chat/completions",
+  "server": "llama.cpp",
+  "model": "Qwen3.8-27B-UD-IQ4_XS.gguf",
+  "systemFingerprint": "b10361-14e78ddef",
+  "visionValidation": {
+    "method": "empirical color-image control",
+    "imageCases": [
+      { "expected": "Green", "observed": "Green", "latencyMs": 2700 },
+      { "expected": "Blue", "observed": "Blue", "latencyMs": 2600 },
+      { "expected": "Yellow", "observed": "Yellow", "latencyMs": 2500 }
+    ],
+    "textOnlyControl": { "observed": "Black", "latencyMs": 1600 },
+    "conclusion": "vision input confirmed empirically"
+  },
+  "protocol": {
+    "temperature": 0,
+    "maxTokens": 60,
+    "imageTransport": "data:image/png;base64 via image_url",
+    "responsePolicy": "strict JSON, no prose repair, no retry",
+    "providerProbabilityAvailable": false,
+    "providerConfidenceAvailable": false
+  },
+  "cases": [
+    {
+      "id": "page-homepage",
+      "image": "homepage.png",
+      "expected": "homepage",
+      "observed": "homepage",
+      "correct": true,
+      "latencyMs": 2945,
+      "raw": "{\"page\": \"homepage\"}"
+    },
+    {
+      "id": "page-providers",
+      "image": "providers.png",
+      "expected": "providers",
+      "observed": "providers",
+      "correct": true,
+      "latencyMs": 2871,
+      "raw": "{\"page\": \"providers\"}"
+    },
+    {
+      "id": "page-agents",
+      "image": "agents.png",
+      "expected": "agents",
+      "observed": "agents",
+      "correct": true,
+      "latencyMs": 2693,
+      "raw": "{\"page\": \"agents\"}"
+    },
+    {
+      "id": "page-workflows",
+      "image": "workflows.png",
+      "expected": "workflows",
+      "observed": "workflows",
+      "correct": true,
+      "latencyMs": 42327,
+      "raw": "{\"page\": \"workflows\"}"
+    },
+    {
+      "id": "page-vision-fallback",
+      "image": "vision-fallback.png",
+      "expected": "other",
+      "observed": "other",
+      "correct": true,
+      "latencyMs": 42437,
+      "raw": "{\"page\": \"other\"}"
+    },
+    {
+      "id": "vision-ui-providers",
+      "image": "providers.png",
+      "expected": false,
+      "observed": false,
+      "correct": true,
+      "latencyMs": 43896,
+      "raw": "{\"vision_fallback_visible\": false}"
+    },
+    {
+      "id": "vision-ui-fallback",
+      "image": "vision-fallback.png",
+      "expected": true,
+      "observed": true,
+      "correct": true,
+      "latencyMs": 44359,
+      "raw": "{\"vision_fallback_visible\": true}"
+    }
+  ],
+  "summary": {
+    "total": 7,
+    "correct": 7,
+    "accuracy": 1,
+    "malformed": 0,
+    "malformedRate": 0,
+    "minLatencyMs": 2693,
+    "medianLatencyMs": 42327,
+    "p95LatencyMs": 44359,
+    "maxLatencyMs": 44359,
+    "falsePositiveSuccessRate": null,
+    "unknownFallbackRate": null
+  },
+  "limitations": [
+    "This is a conventional VLM baseline, not a System One result.",
+    "Seven smoke cases are too small to establish robustness.",
+    "No calibrated probability or confidence was exposed by the endpoint.",
+    "The smoke set does not include action-state success/non-success cases, so false-positive success remains unmeasured.",
+    "No ambiguity/abstention policy is defined for this baseline, so unknown/fallback remains unmeasured."
+  ]
+}
