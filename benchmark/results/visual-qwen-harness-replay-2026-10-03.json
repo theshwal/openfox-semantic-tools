@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "measuredAt": "2026-10-03",
+  "evidenceKind": "versioned-harness-replay",
+  "harness": {
+    "command": "npm run visual:spike",
+    "sourceCommit": "bddc9541f3a549e4e5d2fd41b7196f2cee677de4",
+    "cleanWorktree": true,
+    "individualRetries": 0,
+    "responseRepair": false
+  },
+  "backend": "openai",
+  "endpointClass": "private",
+  "server": "llama.cpp",
+  "model": "Qwen3.8-27B-UD-IQ4_XS.gguf",
+  "authentication": "none",
+  "fixtureManifest": "benchmark/visual/cases.json",
+  "fixtureSource": "theshwal/openfox@develop:docs/screenshots",
+  "cases": [
+    {
+      "caseId": "page-homepage",
+      "expected": "homepage",
+      "answer": "homepage",
+      "correct": true,
+      "malformed": false,
+      "latencyMs": 41483,
+      "providerConfidence": null,
+      "rawProbability": null,
+      "error": null
+    },
+    {
+      "caseId": "page-providers",
+      "expected": "providers",
+      "answer": "providers",
+      "correct": true,
+      "malformed": false,
+      "latencyMs": 40810,
+      "providerConfidence": null,
+      "rawProbability": null,
+      "error": null
+    },
+    {
+      "caseId": "page-agents",
+      "expected": "agents",
+      "answer": "agents",
+      "correct": true,
+      "malformed": false,
+      "latencyMs": 41161,
+      "providerConfidence": null,
+      "rawProbability": null,
+      "error": null
+    },
+    {
+      "caseId": "page-workflows",
+      "expected": "workflows",
+      "answer": "workflows",
+      "correct": true,
+      "malformed": false,
+      "latencyMs": 41254,
+      "providerConfidence": null,
+      "rawProbability": null,
+      "error": null
+    },
+    {
+      "caseId": "page-vision-fallback",
+      "expected": "other",
+      "answer": "other",
+      "correct": true,
+      "malformed": false,
+      "latencyMs": 40971,
+      "providerConfidence": null,
+      "rawProbability": null,
+      "error": null
+    },
+    {
+      "caseId": "vision-ui-providers",
+      "expected": false,
+      "answer": false,
+      "correct": true,
+      "malformed": false,
+      "latencyMs": 40801,
+      "providerConfidence": null,
+      "rawProbability": null,
+      "error": null
+    },
+    {
+      "caseId": "vision-ui-fallback",
+      "expected": true,
+      "answer": true,
+      "correct": true,
+      "malformed": false,
+      "latencyMs": 38695,
+      "providerConfidence": null,
+      "rawProbability": null,
+      "error": null
+    }
+  ],
+  "summary": {
+    "total": 7,
+    "answered": 7,
+    "correct": 7,
+    "accuracy": 1,
+    "malformed": 0,
+    "malformedRate": 0,
+    "medianLatencyMs": 40971,
+    "p95LatencyMs": 41483,
+    "falsePositiveSuccessRate": null,
+    "unknownFallbackRate": null,
+    "wallTimeApproxMs": 289000
+  },
+  "repositoryValidation": {
+    "command": "npm run check",
+    "result": "pass",
+    "testsPassed": 323,
+    "testsFailed": 0
+  },
+  "limitations": [
+    "This is a conventional OpenAI-compatible VLM baseline, not a System One result.",
+    "The smoke set contains seven decisions over five screenshots and is too small for robustness claims.",
+    "No calibrated probability or provider confidence was exposed.",
+    "No action-state success/non-success taxonomy exists yet, so false-positive success remains unmeasured.",
+    "No explicit abstention/fallback policy exists for this baseline, so unknown/fallback remains unmeasured.",
+    "The exact harness replay showed roughly 39-41.5 second per-case latency; this is not evidence for a fast decision layer."
+  ]
+}
