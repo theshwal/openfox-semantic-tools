@@ -96,22 +96,24 @@ permission to make experimental features automatic.
 
 ## Phase 6 — next evidence-driven capabilities
 
-15. **#33 — issue-level acceptance-criteria coverage** — first implementation
-    target. Build a bounded advisory aggregation layer on top of the existing
-    verification policy/calibration path. Do not duplicate thresholds or turn it
-    into a merge gate. Functional delivery comes before impact measurement.
+15. **#33 — issue-level acceptance-criteria coverage** — **completed**.
+    `semantic_issue_coverage` reuses the existing verification policy,
+    calibration and egress path. It remains advisory and is not a merge gate.
 
-16. **#34 — hybrid local recall + semantic reranking** — second implementation
-    target. Extend `semantic_search` compatibly so it can obtain a bounded
-    repository-local candidate set before the existing semantic reranker.
-    `semantic_scan` remains explicit-candidate. No persistent index, vector DB
-    or new retrieval service.
+16. **#34 — hybrid local recall + semantic reranking** — **completed**.
+    `semantic_search` can build a bounded local shortlist before true
+    per-file semantic reranking; explicit-candidate compatibility remains and
+    `semantic_scan` still requires explicit candidates. No persistent index,
+    vector DB or retrieval daemon was added.
 
-17. **#35 — visual semantic decisions** — third target and a real spike.
-    Phase A is benchmark/evidence only; no production visual tool is registered.
-    A production primitive is allowed only after the recorded go/defer decision
-    shows useful signal, conservative fallback and acceptable false-positive
-    behaviour.
+17. **#35 — visual semantic decisions** — **Phase A in progress**.
+    The labelled smoke manifest, versioned visual harness and conventional Qwen
+    VLM baseline are recorded. The existing corpus is structurally insufficient
+    for the action-state gate; the required 31-case acquisition contract is in
+    `benchmark/visual/ACTION-STATE-DATASET.md`. No production visual tool is
+    registered. A production primitive remains gated on an image-capable typed
+    System One run plus false-positive-success/fallback measurements and a
+    recorded GO/DEFER decision.
 
 **#9 remains the shared measurement umbrella** for durable claims about
 verification/discovery/impact/cache. It must not become a permanent provider
@@ -168,7 +170,8 @@ When working autonomously:
 
 - take one issue at a time;
 - read dependencies first;
-- for the current cycle, prefer #33 then #34, then #35 unless a concrete blocker changes the order;
+- #33 and #34 are delivered; do not reopen or reimplement them unless a regression/new issue is filed;
+- #35 is the active experiment, but keep it in evidence mode until the explicit GO/DEFER gate is satisfied;
 - do not implement downstream issues opportunistically;
 - for #35, finish and record the Phase A go/defer decision before any production API work;
 - keep #9 as measurement/claims work, not as an excuse to tune providers indefinitely;
