@@ -35,9 +35,11 @@ The local OpenFox host is also unsuitable for a heavy visual model: no NVIDIA
 GPU/CUDA device is available, and its local Ollama instance has no models
 installed.
 
-A separately configured Windows/Qwen OpenAI-compatible endpoint was probed as a
-possible conventional-VLM baseline, but it was not reachable from the OpenFox
-server on 2026-10-03. No synthetic result was substituted.
+A separately configured Windows/Qwen OpenAI-compatible endpoint was initially
+unreachable from the OpenFox server on 2026-10-03. After the operator corrected
+its Ajean launch parameters and restarted it, the endpoint became reachable and
+was measured as the conventional-VLM baseline below. No synthetic result was
+substituted during the unavailable period.
 
 ### Current external candidates
 
@@ -203,6 +205,54 @@ distributions, and the observed median latency is orders of magnitude above the
 fast decision layer this project is trying to validate.
 
 No confidence is inferred from response text or generation behavior.
+
+## Reproducibility replay with the versioned harness
+
+After PR #39 was merged, the exact repository harness was replayed from a clean
+detached worktree at commit `bddc9541`, rather than from the older dirty OpenFox
+workspace used during environment discovery.
+
+Command shape:
+
+```bash
+VISUAL_BACKEND=openai \
+VISUAL_FIXTURE_ROOT=/path/to/openfox/docs/screenshots \
+VISUAL_ENDPOINT=http://private-host:8080/v1/chat/completions \
+VISUAL_MODEL=Qwen3.8-27B-UD-IQ4_XS.gguf \
+npm run visual:spike
+```
+
+No API key was used. There were no per-case retries and no response repair.
+
+The versioned harness independently reproduced **7/7 correct, 0/7 malformed**:
+
+| case | latency |
+| --- | ---: |
+| homepage page class | 41,483 ms |
+| providers page class | 40,810 ms |
+| agents page class | 41,161 ms |
+| workflows page class | 41,254 ms |
+| vision-fallback page class | 40,971 ms |
+| providers vision form visible | 40,801 ms |
+| vision-fallback form visible | 38,695 ms |
+
+Aggregate:
+
+- accuracy: **7/7**;
+- malformed JSON: **0/7**;
+- median latency: **40,971 ms**;
+- p95 latency: **41,483 ms**;
+- provider confidence/probability: **not available**;
+- total harness wall time: approximately **4 min 49 s**;
+- repository `npm run check`: **PASS**, 323 tests / 0 failures.
+
+The machine-readable replay is
+[`benchmark/results/visual-qwen-harness-replay-2026-10-03.json`](../benchmark/results/visual-qwen-harness-replay-2026-10-03.json).
+
+The first probe and the versioned replay agree on correctness but differ in
+per-case latency shape. That variability is itself evidence against treating
+this conventional VLM as a deterministic low-latency System One substitute.
+Both runs remain smoke evidence only.
 
 ## Current decision
 
