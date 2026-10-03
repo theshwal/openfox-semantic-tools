@@ -1,15 +1,18 @@
 # Implementation order and delivery status
 
-Baseline inspected for this planning pass: semantic-tools `205ac6bf`; OpenFox
-released tags `v2.0.157` and `v2.0.160`. No OpenFox core modifications.
+Current delivery state updated through the #35 Phase A evidence cycle on
+2026-10-03. OpenFox compatibility evidence still targets released tags
+`v2.0.157` and `v2.0.160`. No OpenFox core modifications.
 
 ## Current shape
 
-Six tools (`semantic_decide`, `semantic_verify_task`, `semantic_search`,
-`semantic_scan`, `semantic_provider_self_test`,
-`semantic_calibration_candidate`), two usage skills, global settings, presets,
-an optional cache, explicit egress policy, a calibration layer and an opt-in
-advisory workflow file. Nothing registers a hook or a workflow transition.
+Seven tools (`semantic_decide`, `semantic_verify_task`,
+`semantic_issue_coverage`, `semantic_search`, `semantic_scan`,
+`semantic_provider_self_test`, `semantic_calibration_candidate`), two usage
+skills, global settings, presets, an optional cache, explicit egress policy, a
+calibration layer and an opt-in advisory workflow file. Nothing registers a
+hook or a workflow transition. #35 currently adds benchmark/evidence artifacts
+only; it does not register an eighth production tool.
 
 | Order | Issues | Delivery / gate |
 | --- | --- | --- |
@@ -24,11 +27,11 @@ advisory workflow file. Nothing registers a hook or a workflow transition.
 | 9 | #11, #12 | Implemented: optional decision cache (off by default) and an opt-in advisory workflow file. The plugin registers no hook and no transition, so verification cannot be shortened. |
 | 10 | #6 | **Blocked**: `registerMessageTransform` is not in any released 2.0.0.x version. |
 | 11 | #13 (release readiness) | Completed: CI, offline suite, package/install recipes and isolated-host validation are in place; package version 0.1.0 is prepared. No Git tag, GitHub release or registry publication is implied. |
-| 12 | #33 | Next: issue-level acceptance-criteria coverage, implemented as a conservative aggregation layer over the existing verification/policy/calibration path. No merge gate. |
-| 13 | #34 | Next: bounded repository-local recall feeding the existing semantic search reranker. Preserve explicit-candidate callers; no persistent index/vector DB. |
-| 14 | #35 | Next: visual decision **spike first**. Benchmark/evidence precedes any production visual API. A negative/defer result is valid. |
+| 12 | #33 | **Completed**: `semantic_issue_coverage` aggregates explicit criteria through the existing verification policy/calibration/egress path. Advisory only; no merge gate. |
+| 13 | #34 | **Completed**: bounded local recall feeds true per-file semantic reranking in `semantic_search`; explicit candidates remain supported and `semantic_scan` stays explicit-candidate. No persistent index/vector DB. |
+| 14 | #35 | **Phase A in progress**: labelled smoke manifest + versioned harness + conventional Qwen visual baseline are recorded. Production API remains blocked on typed System One visual evidence and the 31-case action-state gate. |
 
-Completed issues above were implemented and checked separately. The same rule applies to the next cycle: #33, then #34, then the #35 spike unless a concrete blocker changes the order. Experimental tools are not advertised through skills before they exist and are validated. #9 collects measured impact after functionality exists; it is not a provider-tuning loop. #6 stays blocked on a released message-transform API. A fixture run is protocol evidence, not decision-quality or OpenFox end-to-end evidence.
+Completed issues above were implemented and checked separately. #33 and #34 are now delivered. #35 remains evidence-only until its explicit GO/DEFER gate is satisfied; the conventional VLM smoke baseline is evidence, not permission to ship a production visual tool. #9 collects measured impact after functionality exists; it is not a provider-tuning loop. #6 stays blocked on a released message-transform API. A fixture run is protocol evidence, not decision-quality or OpenFox end-to-end evidence.
 
 ## Current boundaries
 
@@ -60,8 +63,10 @@ Completed issues above were implemented and checked separately. The same rule ap
   evidence and an explicit transport shim.
 - Arbitrary HTTP/network error bodies are deliberately omitted to avoid
   reflecting secrets or submitted state. HTTP status remains available.
-- Real provider quality, false-pass rates and savings remain **unmeasured**.
-  What *is* measured is the host behaviour: the built package loads on both
+- Core text-provider quality, false-pass rates and end-to-end savings remain
+  **unmeasured**. #35 now has a measured conventional-VLM smoke baseline, but
+  its action-state false-positive-success/fallback metrics remain null. What is
+  also measured is the host behaviour: the built package loads on both
   declared OpenFox releases, 20/20 harness and 67/67 agent-e2e checks each, with
   no hook and no transition.
 

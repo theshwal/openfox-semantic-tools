@@ -48,26 +48,31 @@ Do not add automatic verification gates, codebase-wide scanning or context mutat
 
 ### Next experiments
 
-The V0 verification/discovery/skill/calibration work is delivered. The next
-development cycle is:
+The issue-level coverage and hybrid discovery work are delivered.
 
-1. **#33 — issue-level acceptance-criteria coverage**: aggregate the existing
-   verification primitive conservatively across explicit criteria. Reuse the
-   verification policy and calibration path; do not create a second threshold
-   system or a merge gate.
-2. **#34 — hybrid local recall + semantic reranking**: make
-   `semantic_search` able to build a bounded local candidate set before the
-   existing semantic stage. Preserve explicit-candidate compatibility and keep
-   `semantic_scan` bounded.
-3. **#35 — visual semantic decision spike**: benchmark first. Do not register a
-   production visual tool or widen the generic provider contract until a real
-   backend and fixture set justify it.
-4. **#6 — pre-LLM context relevance/reduction**: remains blocked until the
+Current development priority:
+
+1. **#35 — visual semantic decision spike**: Phase A evidence is partly
+   complete. A versioned harness and labelled smoke set exist; the conventional
+   Qwen VLM baseline has been replayed reproducibly. Do **not** register a
+   production visual tool yet. The remaining gate requires:
+   - a real image-capable typed System One backend;
+   - the action-state dataset defined in
+     `benchmark/visual/ACTION-STATE-DATASET.md`;
+   - measured false-positive success / fallback / latency;
+   - an explicit GO or DEFER decision.
+2. **#9 — measurement umbrella**: collect durable evidence for delivered
+   capabilities (#33, #34 and #35) without turning the repository into a
+   permanent provider leaderboard.
+3. **#6 — pre-LLM context relevance/reduction**: remains blocked until the
    message-transform capability exists in a released OpenFox version.
 
-#9 is the shared measurement umbrella after functional delivery. Do not turn it
-into a permanent provider leaderboard or delay bounded advisory features merely
-to refine model thresholds.
+Delivered in the current cycle:
+
+- **#33** — `semantic_issue_coverage`, conservative aggregation over the
+  existing verification policy/calibration path;
+- **#34** — bounded repository-local recall plus true per-file semantic
+  reranking in `semantic_search`.
 
 Model/skill routing remains out of scope unless measured evidence changes that.
 
@@ -84,12 +89,12 @@ Use OpenFox plugin skills to teach **when and how** proven semantic tools should
 - keep provider names/endpoints/models out of skills;
 - never let a skill imply that it grants tool access — plugin tools still require the agent's `allowedTools`.
 
-Planned usage skills are tracked in issue #14:
+Usage skills from #14 are shipped:
 
 - `semantic-code-discovery` for semantic search/scan;
-- `semantic-verification` for post-build evidence checks.
+- `semantic-verification` for post-build evidence checks and issue coverage.
 
-The skill source may be scaffolded after `semantic_decide`, but do not expose guidance for a higher-level tool before that tool exists and has enough evidence to justify normal agent usage.
+Do not expose guidance for a higher-level tool before that tool exists and has enough evidence to justify normal agent usage.
 
 ## OpenFox message transforms
 
