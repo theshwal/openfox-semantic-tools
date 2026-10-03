@@ -4,10 +4,15 @@ import type { PluginTool } from 'openfox/plugin'
 
 import { ProviderError, SystemOneHttpProvider } from '../providers/system-one.js'
 import { parseSettings } from '../settings.js'
-import { readBoundedCandidates } from './read.js'
+import { readBoundedCandidates, MAX_CANDIDATE_FILES } from './read.js'
+import { localRecall, type LocalRecallResult } from './recall.js'
 import { buildDiscoveryQuestions, buildDiscoveryState, parseDiscoveryArgs } from './request.js'
-import { buildReport, rankCandidates, type DiscoveryReport } from './rank.js'
-import { MAX_CANDIDATE_FILES } from './read.js'
+import {
+  buildLocalFallbackReport,
+  buildReport,
+  rankCandidates,
+  type DiscoveryReport,
+} from './rank.js'
 
 export type DiscoveryToolName = 'semantic_search' | 'semantic_scan'
 
@@ -18,22 +23,30 @@ const FIELD = {
 
 const PURPOSE = {
   semantic_search:
-    'Rank a caller-supplied list of code files by how likely each is to answer a query, so fewer exploratory reads are needed.',
+    'Find code from a natural-language query using bounded local recall followed by semantic reranking; explicit candidate lists remain supported.',
   semantic_scan:
-    'Score a caller-supplied list of code files against a behavioural predicate, to surface candidates that deserve a closer look.',
+    'Score an explicit caller-supplied list of code files against a behavioural predicate, to surface candidates that deserve a closer look.',
 } as const
+
+function reportId(
+  name: DiscoveryToolName,
+  question: string,
+  paths: readonly string[],
+): string {
+  return `discovery:${name}:${createHash('sha256')
+    .update(question)
+    .update(paths.join(','))
+    .digest('hex')
+    .slice(0, 16)}`
+}
 
 /**
  * Builds one advisory discovery tool.
  *
- * The caller narrows the candidates first: this tool never scans a repository
- * on its own, because sending a whole repository to a remote provider blindly
- * is exactly what the issue forbids. It reads only the listed files, inside the
- * session root, under hard byte bounds, and refuses rather than truncating.
- *
- * It always declares an `automatic` call origin, because the state is
- * repository-derived and the egress policy must be able to block it on a remote
- * endpoint before anything is sent.
+ * semantic_search may obtain candidates from a bounded local deterministic
+ * recall stage when none are supplied. semantic_scan always requires explicit
+ * candidates. Only the bounded candidate contents are eligible for transmission
+ * to the configured semantic endpoint.
  */
 export function createDiscoveryTool(
   name: DiscoveryToolName,
@@ -41,12 +54,13 @@ export function createDiscoveryTool(
   transport: typeof fetch = fetch,
 ): PluginTool {
   const { field, id: questionId } = FIELD[name]
+  const required = name === 'semantic_search' ? [field] : [field, 'candidates']
   return {
     name,
     description: `${PURPOSE[name]} Advisory only: it returns ranked CANDIDATES to confirm with normal code tools, never a verdict, and it never marks anything complete.`,
     parameters: {
       type: 'object',
-      required: [field, 'candidates'],
+      required,
       additionalProperties: false,
       properties: {
         [field]: { type: 'string', minLength: 1 },
@@ -61,39 +75,72 @@ export function createDiscoveryTool(
       },
     },
     async execute(args, context) {
+      let recall: LocalRecallResult | undefined
       try {
         const parsed = parseDiscoveryArgs(args, context.workdir, field, questionId)
-        const read = await readBoundedCandidates(parsed.root, parsed.candidates)
+        let candidates = parsed.candidates
+
+        if (name === 'semantic_search' && candidates.length === 0) {
+          recall = await localRecall(parsed.root, parsed.question)
+          candidates = recall.candidates.map((candidate) => candidate.path)
+          if (candidates.length === 0) {
+            throw new ProviderError(
+              'insufficient_evidence',
+              'Local recall found no repository files matching the query. Use normal code tools or refine the query.',
+            )
+          }
+        }
+
+        const read = await readBoundedCandidates(parsed.root, candidates)
         const state = buildDiscoveryState(parsed.question, read, questionId)
         const request = {
           state: state as unknown as Record<string, never>,
           ...(parsed.model ? { model: parsed.model } : {}),
-          questions: buildDiscoveryQuestions(parsed.question, questionId),
+          questions: buildDiscoveryQuestions(parsed.question, questionId, read.files),
         }
-        const provider = new SystemOneHttpProvider(parseSettings(readSettings(context.projectId)), transport)
-        // Repository-derived content: always automatic, never explicit.
-        const response = await provider.decide(request, {
-          signal: context.signal,
-          origin: 'automatic',
-        })
-        const ranked = rankCandidates(read.files, response.answers, questionId)
-        const report: DiscoveryReport = buildReport(
-          name,
-          `discovery:${name}:${createHash('sha256')
-            .update(parsed.question)
-            .update(read.files.map((file) => `${file.path}:${file.content.length}`).join(','))
-            .digest('hex')
-            .slice(0, 16)}`,
-          questionId,
-          parsed.question,
-          read,
-          response,
-          ranked,
-        )
-        return { success: true, output: JSON.stringify(report) }
+        const id = reportId(name, parsed.question, read.files.map((file) => file.path))
+
+        try {
+          const provider = new SystemOneHttpProvider(parseSettings(readSettings(context.projectId)), transport)
+          const response = await provider.decide(request, {
+            signal: context.signal,
+            origin: 'automatic',
+          })
+          const ranked = rankCandidates(read.files, response.answers, questionId)
+          const report: DiscoveryReport = buildReport(
+            name,
+            id,
+            questionId,
+            parsed.question,
+            read,
+            response,
+            ranked,
+            recall,
+          )
+          return { success: true, output: JSON.stringify(report) }
+        } catch (error) {
+          // Only an auto-recall semantic_search can safely degrade to the local
+          // shortlist: it has a real deterministic ranking to return. Explicit
+          // candidate calls preserve the historical fail-closed behavior.
+          if (recall && error instanceof ProviderError) {
+            const report = buildLocalFallbackReport(
+              id,
+              questionId,
+              parsed.question,
+              read,
+              recall,
+              `semantic_fallback:${error.code}`,
+            )
+            return { success: true, output: JSON.stringify(report) }
+          }
+          throw error
+        }
       } catch (error) {
         if (error instanceof ProviderError) {
-          return { success: false, error: JSON.stringify({ code: error.code, message: error.message }) }
+          return {
+            success: false,
+            error: JSON.stringify({ code: error.code, message: error.message }),
+          }
         }
         return {
           success: false,

@@ -42,8 +42,8 @@ OpenFox
   +-- semantic_decide            noul / choice / score, batched
   +-- semantic_verify_task       advisory, one criterion per call
   +-- semantic_issue_coverage    advisory, several explicit criteria
-  +-- semantic_search            advisory, caller-narrowed candidates
-  +-- semantic_scan              advisory, caller-narrowed candidates
+  +-- semantic_search            advisory, local recall + semantic rerank or explicit candidates
+  +-- semantic_scan              advisory, explicit candidates only
   +-- semantic_provider_self_test
   +-- semantic_calibration_candidate
           |
@@ -72,8 +72,8 @@ below is planned; see [docs/ROADMAP.md](./docs/ROADMAP.md) for what is not.
 | `semantic_decide` | One state plus batched `noul`/`choice`/`score` questions. | No — it returns typed answers, not verdicts. |
 | `semantic_verify_task` | One acceptance criterion plus bounded evidence. | Yes — never a completion signal. |
 | `semantic_issue_coverage` | Several explicit criteria plus one bounded task/evidence block. | Yes — coverage/follow-up only, never merge-safe. |
-| `semantic_search` | Ranks a caller-supplied file list by relevance to a query. | Yes — candidates only. |
-| `semantic_scan` | Scores a caller-supplied file list against a behavioural predicate. | Yes — candidates only. |
+| `semantic_search` | Bounded local path/content recall, then per-file semantic reranking; explicit candidates remain supported. | Yes — candidates only. |
+| `semantic_scan` | Scores an explicit caller-supplied file list against a behavioural predicate. | Yes — candidates only. |
 | `semantic_provider_self_test` | Embedded synthetic smoke test against the configured endpoint. | Yes — never changes settings. |
 | `semantic_calibration_candidate` | Turns an operator-labelled case set into an inactive candidate profile. | Yes — never activates anything. |
 
@@ -277,6 +277,38 @@ for those runtimes. These seven-case verification snapshots are not a
 conformance matrix or a quality certification; dated comparison observations are
 scoped in #9, with no durable quality/savings claim.
 See [providers and egress](docs/PROVIDERS.md).
+
+## Hybrid code discovery
+
+`semantic_search` accepts a natural-language query with or without an explicit
+candidate list.
+
+With explicit candidates, behaviour stays bounded to those paths. Without
+candidates, the plugin first performs **local-only deterministic recall**:
+
+1. walk the repository under hard file-count bounds;
+2. ignore generated/vendor directories and symbolic links;
+3. score cheap path/content token matches;
+4. keep at most 24 local candidates;
+5. read only that shortlist under the existing per-file/total byte bounds;
+6. ask one semantic score question **per file in one batched provider call**.
+
+This fixes an important limitation of the previous implementation: one semantic
+score for the whole candidate set cannot rank files against one another.
+
+The report exposes `semanticApplied` and, when recall was used, a `recall`
+block with scan counts and local candidates. If the semantic provider fails or
+remote automatic egress is blocked **after auto-recall**, search returns the
+deterministic local shortlist with `semanticApplied: false` and
+`rankingSource: local-recall`. No repository content is sent in that fallback.
+Explicit-candidate calls keep the historical fail-closed semantic behaviour.
+
+`semantic_scan` deliberately does **not** gain repository scanning: it still
+requires explicit candidates.
+
+This is advisory retrieval, not exhaustive proof. Missing from the shortlist
+does not mean irrelevant. End-to-end recall/task-success measurements remain
+under #9.
 
 ## Decision cache (optional, off by default)
 

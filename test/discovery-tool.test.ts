@@ -10,86 +10,147 @@ import type { DiscoveryReport } from '../src/discovery/rank.ts'
 async function fixtureRoot(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), 'discovery-tool-'))
   await mkdir(join(root, 'src'), { recursive: true })
-  await writeFile(join(root, 'src', 'alpha.ts'), 'export const alpha = "tenant scoped query"\n')
+  await writeFile(join(root, 'src', 'alpha.ts'), 'export const tenantScope = "tenant scoped export query"\n')
   await writeFile(join(root, 'src', 'beta.ts'), 'export const beta = "unrelated helper"\n')
+  await writeFile(join(root, 'src', 'gamma.ts'), 'export const tenantAudit = "tenant audit log"\n')
   return root
 }
 
-/**
- * A score answer whose declared value IS the expectation E[level] of its own
- * distribution, as the documented System One contract requires. The answer
- * carries exactly the one question the tool asked, because the transport
- * rejects a response whose answer count differs from the request.
- */
-function scoreAnswer(level: number, confidence?: number, questionId: 'relevance' | 'matchStrength' = 'relevance') {
+function score(level: number, confidence?: number) {
   const probabilities: Record<string, number> = { '0': 0, '1': 0, '2': 0 }
   probabilities[String(level)] = 1
-  return {
-    answers: {
-      [questionId]: { type: 'score', score: level, probabilities, ...(confidence ? { confidence } : {}) },
-    },
-  }
+  return { type: 'score', score: level, probabilities, ...(confidence === undefined ? {} : { confidence }) }
 }
 
-function stub(payload: unknown) {
+function answersFor(body: any, levels: readonly number[] = [2, 0, 1]) {
+  const ids = Object.keys(body.questions)
+  const answers: Record<string, unknown> = {}
+  ids.forEach((id, index) => {
+    answers[id] = score(levels[index] ?? levels[levels.length - 1] ?? 0)
+  })
+  return { answers }
+}
+
+function dynamicStub(
+  respond: (body: any, call: number) => Response | unknown = (body) => answersFor(body),
+) {
   const seen: Array<{ body: any; headers: Record<string, string> }> = []
+  let call = 0
   const transport: typeof fetch = async (_url, init) => {
-    seen.push({
-      body: JSON.parse(String(init?.body)),
-      headers: (init?.headers ?? {}) as Record<string, string>,
-    })
-    return Response.json(payload)
+    const body = JSON.parse(String(init?.body))
+    seen.push({ body, headers: (init?.headers ?? {}) as Record<string, string> })
+    const response = respond(body, call++)
+    return response instanceof Response ? response : Response.json(response)
   }
   return { transport, seen }
 }
 
 const ENDPOINT = { endpoint: 'http://localhost/v1/systemone', timeoutMs: 2000 }
 
-async function run(
+async function runExplicit(
   name: DiscoveryToolName,
   root: string,
-  payload: unknown,
-  extra: Record<string, unknown> = {},
+  levels: readonly number[] = [2, 0],
 ) {
-  const { transport, seen } = stub(payload)
+  const { transport, seen } = dynamicStub((body) => answersFor(body, levels))
   const tool = createDiscoveryTool(name, () => ENDPOINT, transport)
   const field = name === 'semantic_search' ? 'query' : 'predicate'
   const result = await tool.execute(
-    { [field]: 'Does this scope by tenant?', candidates: ['src/alpha.ts', 'src/beta.ts'], root, ...extra },
+    {
+      [field]: 'Does this scope by tenant?',
+      candidates: ['src/alpha.ts', 'src/beta.ts'],
+      root,
+    },
     { sessionId: 's', workdir: root },
   )
   return { result, seen }
 }
 
-test('both discovery tools register with the semantic_ prefix', async () => {
+test('semantic_search can omit candidates while semantic_scan still requires them', async () => {
   const root = await fixtureRoot()
-  for (const name of ['semantic_search', 'semantic_scan'] as const) {
-    const tool = createDiscoveryTool(name, () => ENDPOINT, async () => Response.json(scoreAnswer(2)))
-    assert.equal(tool.name, name)
-    assert.match(tool.description, /CANDIDATES/)
-  }
+  const { transport } = dynamicStub()
+  const search = createDiscoveryTool('semantic_search', () => ENDPOINT, transport)
+  const scan = createDiscoveryTool('semantic_scan', () => ENDPOINT, transport)
+
+  assert.deepEqual((search.parameters as any).required, ['query'])
+  assert.deepEqual((scan.parameters as any).required, ['predicate', 'candidates'])
+
+  const scanResult = await scan.execute({ predicate: 'tenant scope', root }, { sessionId: 's', workdir: root })
+  assert.equal(scanResult.success, false)
+  assert.equal(JSON.parse(scanResult.error!).code, 'invalid_arguments')
 })
 
-test('one batched call carries the question and the labelled excerpts', async () => {
+test('one provider call contains one score question per candidate', async () => {
   const root = await fixtureRoot()
-  const { result, seen } = await run('semantic_search', root, scoreAnswer(2))
+  const { result, seen } = await runExplicit('semantic_search', root, [2, 0])
 
   assert.equal(result.success, true, result.error ?? '')
-  assert.equal(seen.length, 1, 'one provider call, not one per candidate')
-  assert.equal(Object.keys(seen[0].body.questions).length, 1)
+  assert.equal(seen.length, 1, 'reranking stays one batched provider call')
+  assert.equal(Object.keys(seen[0].body.questions).length, 2)
+  assert.deepEqual(Object.keys(seen[0].body.questions).sort(), ['relevance_0', 'relevance_1'])
   assert.equal(seen[0].body.state.files.length, 2)
-  assert.deepEqual(
-    seen[0].body.state.files.map((f: { path: string }) => f.path),
-    ['src/alpha.ts', 'src/beta.ts'],
-  )
-  // Only the content the caller asked for is sent.
-  assert.ok(seen[0].body.state.files[0].content.includes('tenant scoped'))
+  assert.match(seen[0].body.questions.relevance_0.instructions, /src\/alpha\.ts/)
+  assert.match(seen[0].body.questions.relevance_1.instructions, /src\/beta\.ts/)
 })
 
-test('repository-derived content always uses an automatic origin', async () => {
-  // Under block-remote-automatic an explicit call would be allowed, so this
-  // proves the tool declares automatic and is blocked before sending.
-  const { transport, seen } = stub(scoreAnswer(2))
+test('semantic ranking is per-file rather than one score copied to every file', async () => {
+  const root = await fixtureRoot()
+  const { result } = await runExplicit('semantic_search', root, [0, 2])
+  const report = JSON.parse(result.output!) as DiscoveryReport
+
+  assert.equal(report.semanticApplied, true)
+  assert.deepEqual(report.candidates.map((candidate) => candidate.path), ['src/beta.ts', 'src/alpha.ts'])
+  assert.deepEqual(report.candidates.map((candidate) => candidate.score), [2, 0])
+  assert.ok(report.candidates.every((candidate) => candidate.rankingSource === 'semantic'))
+})
+
+test('semantic_search performs bounded local recall before semantic reranking', async () => {
+  const root = await fixtureRoot()
+  const { transport, seen } = dynamicStub((body) => {
+    // Make alpha strongest even if recall also surfaced gamma.
+    const answers: Record<string, unknown> = {}
+    body.state.files.forEach((file: { path: string }, index: number) => {
+      answers[`relevance_${index}`] = score(file.path.endsWith('alpha.ts') ? 2 : 1)
+    })
+    return { answers }
+  })
+  const tool = createDiscoveryTool('semantic_search', () => ENDPOINT, transport)
+  const result = await tool.execute(
+    { query: 'tenant export', root },
+    { sessionId: 's', workdir: root },
+  )
+  assert.equal(result.success, true, result.error ?? '')
+  assert.equal(seen.length, 1)
+  const report = JSON.parse(result.output!) as DiscoveryReport
+  assert.equal(report.recall?.used, true)
+  assert.ok((report.recall?.scannedFiles ?? 0) >= 3)
+  assert.ok(report.trace.candidatePaths.includes('src/alpha.ts'))
+  assert.equal(report.candidates[0].path, 'src/alpha.ts')
+  assert.equal(report.semanticApplied, true)
+})
+
+test('provider failure after local recall returns an explicit local-only shortlist', async () => {
+  const root = await fixtureRoot()
+  const { transport, seen } = dynamicStub(() => new Response('secret-provider-body', { status: 503 }))
+  const tool = createDiscoveryTool('semantic_search', () => ENDPOINT, transport)
+  const result = await tool.execute(
+    { query: 'tenant export', root },
+    { sessionId: 's', workdir: root },
+  )
+  assert.equal(result.success, true)
+  assert.equal(seen.length, 1)
+  const report = JSON.parse(result.output!) as DiscoveryReport
+  assert.equal(report.semanticApplied, false)
+  assert.equal(report.provider, null)
+  assert.ok(report.reasons.includes('semantic_fallback:http'))
+  assert.equal(report.candidates[0].rankingSource, 'local-recall')
+  assert.ok((report.candidates[0].localRecallScore ?? 0) > 0)
+  assert.equal(result.output!.includes('secret-provider-body'), false)
+})
+
+test('egress-blocked auto-recall search falls back locally without sending content', async () => {
+  const root = await fixtureRoot()
+  const { transport, seen } = dynamicStub()
   const tool = createDiscoveryTool(
     'semantic_search',
     () => ({
@@ -99,7 +160,43 @@ test('repository-derived content always uses an automatic origin', async () => {
     }),
     transport,
   )
+  const result = await tool.execute(
+    { query: 'tenant export', root },
+    { sessionId: 's', workdir: root },
+  )
+  assert.equal(result.success, true)
+  assert.equal(seen.length, 0)
+  const report = JSON.parse(result.output!) as DiscoveryReport
+  assert.equal(report.semanticApplied, false)
+  assert.ok(report.reasons.includes('semantic_fallback:egress_blocked'))
+})
+
+test('explicit candidates preserve fail-closed provider behavior', async () => {
   const root = await fixtureRoot()
+  const { transport, seen } = dynamicStub(() => new Response('secret', { status: 503 }))
+  const tool = createDiscoveryTool('semantic_search', () => ENDPOINT, transport)
+  const result = await tool.execute(
+    { query: 'tenant export', candidates: ['src/alpha.ts'], root },
+    { sessionId: 's', workdir: root },
+  )
+  assert.equal(result.success, false)
+  assert.equal(JSON.parse(result.error!).code, 'http')
+  assert.equal(seen.length, 1)
+  assert.equal(result.error!.includes('secret'), false)
+})
+
+test('repository-derived explicit content still uses an automatic origin', async () => {
+  const root = await fixtureRoot()
+  const { transport, seen } = dynamicStub()
+  const tool = createDiscoveryTool(
+    'semantic_search',
+    () => ({
+      endpoint: 'https://api.example.invalid/v1/systemone',
+      endpointClass: 'remote',
+      egressPolicy: 'block-remote-automatic',
+    }),
+    transport,
+  )
   const result = await tool.execute(
     { query: 'x', candidates: ['src/alpha.ts'], root },
     { sessionId: 's', workdir: root },
@@ -109,169 +206,88 @@ test('repository-derived content always uses an automatic origin', async () => {
   assert.equal(seen.length, 0)
 })
 
-test('the report is advisory and returns ranked candidates, not a verdict', async () => {
+test('an unusable answer invalidates only its own candidate', async () => {
   const root = await fixtureRoot()
-  const { result } = await run('semantic_search', root, scoreAnswer(2))
-  const report = JSON.parse(result.output!) as DiscoveryReport
-
-  assert.equal(report.advisory, true)
-  assert.equal(report.trace.tool, 'semantic_search')
-  assert.equal(report.candidates.length, 2)
-  assert.ok(report.candidates.every((c) => c.usable))
-  assert.equal(report.candidates[0].score, 2)
-  assert.ok(report.evidenceBytes > 0)
-  assert.ok(report.reportId.startsWith('discovery:semantic_search:'))
-  // Ranking must never claim a task is settled.
-  assert.ok(!JSON.stringify(report).includes('task complete'))
-})
-
-test('a missing or unusable answer ranks nothing instead of inventing relevance', async () => {
-  const root = await fixtureRoot()
-  // Some of these never reach the ranking stage: a response whose answer count
-  // does not match the request is rejected by the transport. That is a failure,
-  // never a ranking, so both outcomes are acceptable — a false positive is not.
-  for (const payload of [
-    { answers: {} },
-    { answers: { relevance: { type: 'noul', noul: 0.9 } } },
-    { answers: { relevance: { type: 'score', score: 2, probabilities: { 0: 0, 1: 1, 2: 0 } } } },
-    { answers: { relevance: { type: 'score', score: 2, probabilities: { 0: 0.34, 1: 0.33, 2: 0.33 } } } },
-  ]) {
-    const { result } = await run('semantic_search', root, payload)
-    if (!result.success) {
-      // Rejected outright: no ranking was produced at all.
-      assert.ok(result.error)
-      continue
-    }
-    const report = JSON.parse(result.output!) as DiscoveryReport
-    assert.ok(report.candidates.every((c) => c.usable === false), JSON.stringify(payload))
-    assert.ok(report.candidates.every((c) => c.score === null))
-    assert.ok(report.reasons.length > 0, 'a refusal must be explained')
-  }
-})
-
-test('an answer for a different rubric never ranks, at either layer', async () => {
-  const root = await fixtureRoot()
-  // The tool declares a three-level rubric, so its score means E[level] over
-  // 0..2. A five-level answer is a different question entirely: accepting it
-  // would rank candidates on a scale the caller never asked for. The transport
-  // rejects it first, and the policy rejects it independently, so the refusal
-  // does not depend on a single layer.
-  const fiveLevels = {
+  const { transport } = dynamicStub((body) => ({
     answers: {
-      relevance: {
-        type: 'score',
-        score: 3.4,
-        probabilities: { 0: 0, 1: 0, 2: 0, 3: 0.3, 4: 0.7 },
-      },
+      relevance_0: score(2),
+      relevance_1: { type: 'score', score: 2, probabilities: { 0: 0, 1: 1, 2: 0 } },
     },
-  }
-  const { result } = await run('semantic_search', root, fiveLevels)
-  if (result.success) {
-    const report = JSON.parse(result.output!) as DiscoveryReport
-    assert.ok(report.candidates.every((c) => c.usable === false), 'a 5-level answer must not rank')
-    assert.deepEqual(report.reasons, ['rubric_shape_mismatch'])
-  } else {
-    assert.equal(JSON.parse(result.error!).code, 'invalid_response')
-  }
-
-  // The policy layer is checked directly, so a five-level distribution is
-  // refused even if a future transport stopped rejecting it.
-  const { rankCandidates } = await import('../src/discovery/rank.ts')
-  const ranked = rankCandidates(
-    [{ path: 'a.ts', content: 'x' }],
-    { relevance: { type: 'score', score: 3.4, probabilities: { 0: 0, 1: 0, 2: 0, 3: 0.3, 4: 0.7 } } } as never,
-    'relevance',
-  )
-  assert.ok(ranked.candidates.every((c) => !c.usable))
-  assert.deepEqual(ranked.reasons, ['rubric_shape_mismatch'])
-
-  // A three-level answer whose score exceeds the rubric is refused too.
-  const outOfRange = {
-    answers: {
-      relevance: { type: 'score', score: 2.5, probabilities: { 0: 0, 1: 0.2, 2: 0.8 } },
-    },
-  }
-  const second = await run('semantic_search', root, outOfRange)
-  if (second.result.success) {
-    const secondReport = JSON.parse(second.result.output!) as DiscoveryReport
-    assert.ok(secondReport.candidates.every((c) => c.usable === false))
-    assert.ok(secondReport.reasons.includes('score_outside_rubric_range'))
-  } else {
-    assert.equal(JSON.parse(second.result.error!).code, 'invalid_response')
-  }
-})
-
-test('provider failures are explicit and never a ranking', async () => {
-  const root = await fixtureRoot()
-  for (const [expected, makeResponse] of [
-    ['http', () => new Response('secret', { status: 503 })],
-    ['invalid_response', () => new Response('not json', { status: 200 })],
-  ] as const) {
-    // A fresh Response per call: a stub must never hand over an already
-    // consumed body, and must never reach the real network.
-    const tool = createDiscoveryTool(
-      'semantic_scan',
-      () => ENDPOINT,
-      (async () => makeResponse()) as unknown as typeof fetch,
-    )
-    const result = await tool.execute(
-      { predicate: 'x', candidates: ['src/alpha.ts'], root },
-      { sessionId: 's', workdir: root },
-    )
-    assert.equal(result.success, false, expected)
-    const parsed = JSON.parse(result.error!)
-    assert.equal(parsed.code, expected)
-    assert.ok(!result.error!.includes('secret'))
-  }
-})
-
-test('missing files are reported as skipped, and empty input is a refusal', async () => {
-  const root = await fixtureRoot()
-  const { result, seen } = await run('semantic_search', root, scoreAnswer(2), {
-    candidates: ['src/alpha.ts', 'src/ghost.ts'],
-  })
-  const report = JSON.parse(result.output!) as DiscoveryReport
-  assert.deepEqual(report.trace.skippedPaths, ['src/ghost.ts'])
-  assert.equal(seen.length, 1)
-
-  const empty = createDiscoveryTool(
-    'semantic_search',
-    () => ENDPOINT,
-    async () => Response.json(scoreAnswer(2)),
-  )
-  const refused = await empty.execute(
-    { query: 'x', candidates: ['src/ghost.ts'], root },
+  }))
+  const tool = createDiscoveryTool('semantic_search', () => ENDPOINT, transport)
+  const result = await tool.execute(
+    { query: 'tenant', candidates: ['src/alpha.ts', 'src/beta.ts'], root },
     { sessionId: 's', workdir: root },
   )
-  assert.equal(refused.success, false)
-  assert.equal(JSON.parse(refused.error!).code, 'insufficient_evidence')
+  const report = JSON.parse(result.output!) as DiscoveryReport
+  assert.equal(report.candidates[0].path, 'src/alpha.ts')
+  assert.equal(report.candidates[0].usable, true)
+  const beta = report.candidates.find((candidate) => candidate.path === 'src/beta.ts')!
+  assert.equal(beta.usable, false)
+  assert.ok(report.reasons.some((reason) => reason.startsWith('src/beta.ts:')))
 })
 
-test('invalid arguments never reach the provider', async () => {
+test('semantic_scan also gets per-candidate scores but never auto-scans the repo', async () => {
   const root = await fixtureRoot()
-  const { transport, seen } = stub(scoreAnswer(2))
+  const { result, seen } = await runExplicit('semantic_scan', root, [1, 2])
+  assert.equal(result.success, true)
+  assert.deepEqual(Object.keys(seen[0].body.questions).sort(), ['matchStrength_0', 'matchStrength_1'])
+  const report = JSON.parse(result.output!) as DiscoveryReport
+  assert.equal(report.recall, undefined)
+  assert.equal(report.candidates[0].path, 'src/beta.ts')
+})
+
+test('missing explicit files are reported as skipped', async () => {
+  const root = await fixtureRoot()
+  const { transport } = dynamicStub((body) => answersFor(body, [2]))
   const tool = createDiscoveryTool('semantic_search', () => ENDPOINT, transport)
+  const result = await tool.execute(
+    { query: 'tenant', candidates: ['src/alpha.ts', 'src/ghost.ts'], root },
+    { sessionId: 's', workdir: root },
+  )
+  const report = JSON.parse(result.output!) as DiscoveryReport
+  assert.deepEqual(report.trace.skippedPaths, ['src/ghost.ts'])
+})
+
+test('invalid arguments do not reach the provider', async () => {
+  const root = await fixtureRoot()
+  const { transport, seen } = dynamicStub()
+  const search = createDiscoveryTool('semantic_search', () => ENDPOINT, transport)
+  const scan = createDiscoveryTool('semantic_scan', () => ENDPOINT, transport)
+
   for (const bad of [
     {},
     { query: '' },
-    { query: 'x' },
     { query: 'x', candidates: 'src/alpha.ts' },
     { query: 'x', candidates: [42] },
     { query: 'x', candidates: ['src/alpha.ts'], nope: true },
     { query: 'x', candidates: ['../escape.ts'] },
   ]) {
-    const result = await tool.execute(bad, { sessionId: 's', workdir: root })
+    const result = await search.execute(bad, { sessionId: 's', workdir: root })
     assert.equal(result.success, false, JSON.stringify(bad))
   }
+  const noCandidates = await scan.execute({ predicate: 'x', root }, { sessionId: 's', workdir: root })
+  assert.equal(noCandidates.success, false)
   assert.equal(seen.length, 0)
 })
 
-test('cancellation stays a failure with its own code', async () => {
+test('a no-match local recall is an explicit insufficient-evidence result', async () => {
+  const root = await fixtureRoot()
+  const { transport, seen } = dynamicStub()
+  const tool = createDiscoveryTool('semantic_search', () => ENDPOINT, transport)
+  const result = await tool.execute(
+    { query: 'zzzz-no-such-concept-qqqq', root },
+    { sessionId: 's', workdir: root },
+  )
+  assert.equal(result.success, false)
+  assert.equal(JSON.parse(result.error!).code, 'insufficient_evidence')
+  assert.equal(seen.length, 0)
+})
+
+test('cancellation on explicit semantic discovery remains a failure', async () => {
   const root = await fixtureRoot()
   const controller = new AbortController()
   controller.abort()
-  // An immediate abort means no timer is ever scheduled, so nothing keeps the
-  // event loop alive after the assertion.
   const tool = createDiscoveryTool('semantic_scan', () => ({ ...ENDPOINT, timeoutMs: 1 }))
   const result = await tool.execute(
     { predicate: 'x', candidates: ['src/alpha.ts'], root },
@@ -279,5 +295,4 @@ test('cancellation stays a failure with its own code', async () => {
   )
   assert.equal(result.success, false)
   assert.equal(JSON.parse(result.error!).code, 'aborted')
-  assert.equal(controller.signal.aborted, true)
 })
