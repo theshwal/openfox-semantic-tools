@@ -153,6 +153,13 @@ not a certification. No false-pass rate exists. No token, cost or wall-time
 saving exists. Those fields stay `null` and are never written as zero. A
 measurement that was not made is unknown, not good.
 
+## Visual decision spike
+
+Visual screenshot decisions are being evaluated separately under issue #35.
+They are **not** registered as a plugin tool. The current labelled smoke set,
+reproducible harness, environment blockers and GO/DEFER boundary are documented
+in [docs/VISUAL-SPIKE.md](docs/VISUAL-SPIKE.md).
+
 ## Safety and failure behavior
 
 - Provider failure must not silently become a positive decision.
