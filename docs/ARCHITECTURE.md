@@ -100,12 +100,13 @@ For example, a yes/no probability and a choice confidence are not automatically 
 
 ## 4. What the plugin contributes today
 
-Six tools, all registered through the public Plugin API v2:
+Seven tools, all registered through the public Plugin API v2:
 
 | Tool | Module | Kind |
 | --- | --- | --- |
 | `semantic_decide` | `src/tool.ts` | typed primitive, not a verdict |
 | `semantic_verify_task` | `src/verify/tool.ts` | advisory |
+| `semantic_issue_coverage` | `src/verify/coverage.ts` | advisory aggregation over the same verification policy |
 | `semantic_search` | `src/discovery/tool.ts` | advisory |
 | `semantic_scan` | `src/discovery/tool.ts` | advisory |
 | `semantic_provider_self_test` | `src/calibration/self-test.ts` | advisory |
@@ -169,7 +170,23 @@ Policy decides whether to:
 
 **Primary risk:** false pass. This is the metric to optimize against, not just token reduction.
 
-### 5.2 semantic_scan
+### 5.2 semantic_issue_coverage
+
+Purpose: map several explicit acceptance criteria onto the same bounded
+implementation evidence while preserving the one-criterion verification policy
+as the source of truth.
+
+The tool does not define new probability thresholds. Each criterion is run
+through the same verification core, and the issue-level result only projects
+those gate outcomes to `covered`, `missing` or `uncertain`. A positive
+coverage label therefore remains impossible without the existing calibrated
+positive candidate. Provider failure aborts the assessment rather than becoming
+a coverage label.
+
+This is intended for downstream post-build workflow advice. It is not a merge
+gate and does not replace deterministic checks or final review.
+
+### 5.3 semantic_scan
 
 Purpose: rank code units by a semantic predicate.
 
@@ -185,7 +202,7 @@ The semantic result identifies candidates. OpenFox must inspect/verify candidate
 
 This is not a replacement for static analysis when a deterministic rule exists.
 
-### 5.3 semantic_search
+### 5.4 semantic_search
 
 Purpose: reduce exploratory repository reads by ranking likely relevant files/functions/chunks.
 
@@ -196,7 +213,7 @@ Potential references:
 
 The main design question is whether repository chunking + decision calls actually beats OpenFox's existing search/read behavior end to end.
 
-### 5.4 context relevance / reduction
+### 5.5 context relevance / reduction
 
 Purpose: score historical messages/tool outputs against the current goal and remove or compress low-value items before the main LLM call.
 
@@ -272,8 +289,10 @@ OpenFox 2.0.157:
 
 The plugin stays inside this surface and never needs a host patch. Both `2.0.157`
 and `2.0.160` were validated by loading the built package into a real isolated
-host, which confirmed the same six tools, one skill source and thirteen settings
-fields, with zero hooks and zero transitions.
+host, which confirmed the then-current six-tool baseline, one skill source and
+thirteen settings fields, with zero hooks and zero transitions. Issue #33 adds a
+seventh tool using the same public tool registration surface; the historical
+host count is not rewritten as if that run had included the later tool.
 
 ### Future capability
 
