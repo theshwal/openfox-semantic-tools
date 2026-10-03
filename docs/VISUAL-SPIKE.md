@@ -159,9 +159,54 @@ Some safety metrics remain deliberately `null` in this smoke set:
 Those fields become measurable only after the action-state fixture set and
 provider-specific calibration policy exist.
 
+## Measured conventional VLM baseline — Qwen3.8 27B
+
+On 2026-10-03 the previously configured private LAN Qwen endpoint was restarted
+and became reachable. Vision capability was verified empirically with three
+synthetic color images plus a text-only control before using it on the OpenFox
+fixtures.
+
+Observed endpoint/runtime:
+
+- OpenAI-compatible `llama.cpp`;
+- private LAN endpoint at `192.168.0.1:8080`;
+- model `Qwen3.8-27B-UD-IQ4_XS.gguf`;
+- no API key used;
+- image input via `image_url` data URLs;
+- no calibrated probabilities or provider confidence exposed.
+
+The seven smoke decisions were all correct on the first strict-JSON response:
+
+| case | expected | observed | latency |
+| --- | --- | --- | ---: |
+| homepage page class | homepage | homepage | 2,945 ms |
+| providers page class | providers | providers | 2,871 ms |
+| agents page class | agents | agents | 2,693 ms |
+| workflows page class | workflows | workflows | 42,327 ms |
+| vision-fallback page class | other | other | 42,437 ms |
+| providers vision form visible | false | false | 43,896 ms |
+| vision-fallback form visible | true | true | 44,359 ms |
+
+Aggregate:
+
+- accuracy: **7/7**;
+- malformed JSON: **0/7**;
+- median latency: **42,327 ms**;
+- p95 latency: **44,359 ms**.
+
+The machine-readable result is
+[`benchmark/results/visual-qwen-2026-10-03.json`](../benchmark/results/visual-qwen-2026-10-03.json).
+
+This is useful as a **quality baseline**, but not as evidence for the intended
+fast System One path. The endpoint does not expose typed probability
+distributions, and the observed median latency is orders of magnitude above the
+fast decision layer this project is trying to validate.
+
+No confidence is inferred from response text or generation behavior.
+
 ## Current decision
 
-**BLOCKED for the real Phase A comparison, not GO and not production-DEFER.**
+**PARTIALLY UNBLOCKED: the conventional VLM baseline is measured; the System One visual comparison remains blocked.**
 
 What is complete:
 
@@ -174,11 +219,10 @@ What is complete:
 What is still required before the issue can reach its decision gate:
 
 1. a reachable image-capable System One backend;
-2. a reachable conventional VLM baseline;
-3. 25–50 sanitized action-state screenshots including success, processing,
+2. 25–50 sanitized action-state screenshots including success, processing,
    blocked, error, authentication and ambiguous cases;
-4. measured false-positive `success`, fallback/unknown and latency;
-5. a recorded GO/DEFER decision based on those measurements.
+3. measured false-positive `success`, fallback/unknown and latency;
+4. a recorded GO/DEFER decision based on those measurements.
 
 Until then, **do not register a production visual tool and do not widen the
 generic decision contract**.
