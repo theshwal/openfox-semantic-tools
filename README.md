@@ -4,7 +4,7 @@ Experimental OpenFox plugin for **fast, typed semantic decisions** and, where it
 
 The project is intentionally provider-agnostic. The first transport target is the Jev / System One-style `POST /v1/systemone` API, so the same OpenFox tools can be backed by hosted Jev or by a compatible local/open-source runtime.
 
-> Status: six tools, two usage skills, presets, optional cache, egress,
+> Status: seven tools, two usage skills, presets, optional cache, egress,
 > calibration and advisory workflow, validated on OpenFox 2.0.157 and 2.0.160.
 > Dated provider observations are scoped in #9; no durable quality
 > certification or end-to-end savings claim is made. See
@@ -41,6 +41,7 @@ OpenFox
   |
   +-- semantic_decide            noul / choice / score, batched
   +-- semantic_verify_task       advisory, one criterion per call
+  +-- semantic_issue_coverage    advisory, several explicit criteria
   +-- semantic_search            advisory, caller-narrowed candidates
   +-- semantic_scan              advisory, caller-narrowed candidates
   +-- semantic_provider_self_test
@@ -63,13 +64,14 @@ The provider layer should accept one state plus one or more typed questions in a
 
 ## What this plugin actually registers
 
-Six tools and two usage skills, all through the public Plugin API v2. Nothing
+Seven tools and two usage skills, all through the public Plugin API v2. Nothing
 below is planned; see [docs/ROADMAP.md](./docs/ROADMAP.md) for what is not.
 
 | Tool | Shape | Advisory? |
 | --- | --- | --- |
 | `semantic_decide` | One state plus batched `noul`/`choice`/`score` questions. | No — it returns typed answers, not verdicts. |
-| `semantic_verify_task` | One acceptance criterion plus bounded evidence. | Yes — never a pass. |
+| `semantic_verify_task` | One acceptance criterion plus bounded evidence. | Yes — never a completion signal. |
+| `semantic_issue_coverage` | Several explicit criteria plus one bounded task/evidence block. | Yes — coverage/follow-up only, never merge-safe. |
 | `semantic_search` | Ranks a caller-supplied file list by relevance to a query. | Yes — candidates only. |
 | `semantic_scan` | Scores a caller-supplied file list against a behavioural predicate. | Yes — candidates only. |
 | `semantic_provider_self_test` | Embedded synthetic smoke test against the configured endpoint. | Yes — never changes settings. |
@@ -77,7 +79,7 @@ below is planned; see [docs/ROADMAP.md](./docs/ROADMAP.md) for what is not.
 
 | Skill | Covers |
 | --- | --- |
-| `semantic-verification` | When to use `semantic_verify_task`, and when to fall back. |
+| `semantic-verification` | When to use `semantic_verify_task` / `semantic_issue_coverage`, and when to fall back. |
 | `semantic-code-discovery` | When `semantic_search`/`semantic_scan` reduce exploration. |
 
 Supporting features: global settings, provider presets with capability
@@ -214,7 +216,7 @@ Install the built package through OpenFox's plugin installation flow, then enabl
 it. The exact recipes — and why a GitHub URL is not a pinned install — are in
 [docs/INSTALLATION.md](./docs/INSTALLATION.md).
 
-Allow the semantic tools you want in the agent's tool list. Tool registration does not grant access. Each usage skill ships with the tools it describes: `semantic-verification` with `semantic_verify_task`, `semantic-code-discovery` with `semantic_search` and `semantic_scan`.
+Allow the semantic tools you want in the agent's tool list. Tool registration does not grant access. Each usage skill ships with the tools it describes: `semantic-verification` with `semantic_verify_task` and `semantic_issue_coverage`, `semantic-code-discovery` with `semantic_search` and `semantic_scan`.
 
 Example tool arguments:
 
@@ -385,6 +387,32 @@ remain allowed under the same policy.
 completion signal, no automatic "done" behaviour. The tool cannot accept a task
 or close a criterion. Workflow integration is a separate decision (issue #12)
 gated on measured false-pass evidence.
+
+### Issue-level coverage over explicit criteria
+
+`semantic_issue_coverage` reuses the exact same verification questions,
+policy, calibration profile/overrides and automatic egress classification as
+`semantic_verify_task`. It exists so a downstream build workflow can assess a
+bounded list of acceptance criteria without inventing its own aggregation
+logic.
+
+Its coverage labels are deliberately conservative:
+
+| Coverage | Meaning |
+| --- | --- |
+| `covered` | The existing verification policy produced a calibrated `pass-candidate`. |
+| `missing` | The criterion is testable, evidence is sufficient, and the existing `satisfied` gate is decisively unmet. |
+| `uncertain` | Every ambiguous, insufficient, uncalibrated or otherwise non-decisive case. |
+
+`offScopeEvidence` is reported separately per criterion. The aggregate
+`needsFollowup` is true whenever a criterion is not `covered` or off-scope
+evidence is present. It is **not** a merge gate or a statement that a PR is
+safe. Provider failure, timeout, blocked egress or malformed output fails the
+tool as a whole and must fall back to normal verification.
+
+`task` and the bounded evidence block may be transmitted to the configured
+semantic endpoint. `evidenceRefs` remain local trace metadata and are never
+sent.
 
 ### Measuring the check
 
