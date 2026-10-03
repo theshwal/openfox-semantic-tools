@@ -1,5 +1,6 @@
 import type { DecisionAnswer, DecisionResponse } from '../decision/types.js'
-import { ProviderError } from '../errors.js'
+import { discoveryQuestionId } from './request.js'
+import type { LocalRecallCandidate, LocalRecallResult } from './recall.js'
 
 /**
  * A ranked result is a CANDIDATE, never a verdict. The caller must confirm it
@@ -7,13 +8,13 @@ import { ProviderError } from '../errors.js'
  */
 export interface RankedCandidate {
   readonly path: string
-  /** The expectation E[level] the provider reported, or null when unusable. */
+  /** Semantic expectation E[level], null when semantic ranking was unavailable. */
   readonly score: number | null
-  /** The distribution, kept so the caller can judge the spread itself. */
   readonly probabilities: Record<string, number> | null
   readonly confidence: number | null
-  /** False when the answer was missing, unusable or internally inconsistent. */
   readonly usable: boolean
+  readonly rankingSource: 'semantic' | 'local-recall'
+  readonly localRecallScore?: number
 }
 
 export interface DiscoveryReport {
@@ -25,41 +26,25 @@ export interface DiscoveryReport {
     readonly candidatePaths: readonly string[]
     readonly skippedPaths: readonly string[]
   }
-  /** Always true: a ranking is advice, it never accepts or rejects anything. */
   readonly advisory: true
   readonly candidates: readonly RankedCandidate[]
-  readonly provider: string
+  readonly semanticApplied: boolean
+  readonly provider: string | null
   readonly model?: string
   readonly latencyMs: number
   readonly evidenceBytes: number
   readonly reasons: readonly string[]
-}
-
-/**
- * The discovery rubric has three levels, so a conforming distribution carries
- * exactly the keys "0", "1" and "2", and the score is the expectation E[level]
- * over that range: a value in [0, 2].
- */
-const RUBRIC_LENGTH = 3
-const TOP_LEVEL = RUBRIC_LENGTH - 1
-
-/** Returns the uniform "nothing was ranked" outcome. */
-function unusable(
-  files: readonly { path: string }[],
-  confidence: number | null,
-  reasons: string[] = ['answer_unusable'],
-): { candidates: RankedCandidate[]; reasons: string[] } {
-  return {
-    candidates: files.map((file) => ({
-      path: file.path,
-      score: null,
-      probabilities: null,
-      confidence,
-      usable: false,
-    })),
-    reasons,
+  readonly recall?: {
+    readonly used: true
+    readonly scannedFiles: number
+    readonly scoredFiles: number
+    readonly ignoredDirectories: number
+    readonly candidates: readonly LocalRecallCandidate[]
   }
 }
+
+const RUBRIC_LENGTH = 3
+const TOP_LEVEL = RUBRIC_LENGTH - 1
 
 function readNumber(answer: unknown, key: 'score' | 'confidence'): number | null {
   if (answer === null || typeof answer !== 'object') return null
@@ -67,33 +52,28 @@ function readNumber(answer: unknown, key: 'score' | 'confidence'): number | null
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
-/**
- * Turns one batched answer into ranked candidates.
- *
- * A score answer is the expectation E[level] over the caller's rubric. The
- * distribution is validated against it here, and a file whose answer is
- * missing, inconsistent or self-contradictory is reported as `usable: false`
- * rather than being ranked. An unusable entry is never presented as relevant.
- */
-export function rankCandidates(
-  files: readonly { path: string; content: string }[],
-  answers: Record<string, DecisionAnswer | undefined>,
-  questionId: string,
-): { candidates: RankedCandidate[]; reasons: string[] } {
-  const answer = answers[questionId] as
+function rankOne(
+  path: string,
+  answer: DecisionAnswer | undefined,
+): { candidate: RankedCandidate; reasons: string[] } {
+  const typed = answer as
     | { type?: string; score?: unknown; probabilities?: unknown; confidence?: unknown }
     | undefined
-  const reasons: string[] = []
-
-  if (!answer || answer.type !== 'score') {
-    return unusable(files, null)
+  if (!typed || typed.type !== 'score') {
+    return {
+      candidate: { path, score: null, probabilities: null, confidence: null, usable: false, rankingSource: 'semantic' },
+      reasons: ['answer_unusable'],
+    }
   }
 
-  const score = readNumber(answer, 'score')
-  const confidence = readNumber(answer, 'confidence')
-  const raw = answer.probabilities
+  const score = readNumber(typed, 'score')
+  const confidence = readNumber(typed, 'confidence')
+  const raw = typed.probabilities
   if (score === null || raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
-    return unusable(files, confidence)
+    return {
+      candidate: { path, score: null, probabilities: null, confidence, usable: false, rankingSource: 'semantic' },
+      reasons: ['answer_unusable'],
+    }
   }
 
   const probabilities: Record<string, number> = {}
@@ -102,41 +82,71 @@ export function rankCandidates(
   let decisiveMass = 0
   for (const [level, mass] of Object.entries(raw as Record<string, unknown>)) {
     if (typeof mass !== 'number' || !Number.isFinite(mass) || mass < 0 || mass > 1 || !/^\d+$/.test(level)) {
-      return unusable(files, confidence)
+      return {
+        candidate: { path, score: null, probabilities: null, confidence, usable: false, rankingSource: 'semantic' },
+        reasons: ['answer_unusable'],
+      }
     }
     probabilities[level] = mass
     sum += mass
     expectation += Number(level) * mass
-    if (mass > decisiveMass) decisiveMass = mass
+    decisiveMass = Math.max(decisiveMass, mass)
   }
-  // The rubric the tool declared has exactly three levels, so the answer must
-  // carry exactly those three. A provider answering a five-level rubric would
-  // otherwise pass, and its score would mean something different.
+
+  const reasons: string[] = []
   const levels = Object.keys(probabilities).map(Number).sort((a, b) => a - b)
   if (levels.length !== RUBRIC_LENGTH || levels.some((level, i) => level !== i)) {
-    return unusable(files, confidence, ['rubric_shape_mismatch'])
+    reasons.push('rubric_shape_mismatch')
   }
-  if (Math.abs(sum - 1) > 0.02) {
-    reasons.push('distribution_does_not_sum_to_one')
-  }
-  // The declared score must match the expectation its own distribution implies.
-  const consistent = Math.abs(score - expectation) <= 0.01 + 1e-9
-  if (!consistent) reasons.push('score_contradicts_distribution')
+  if (Math.abs(sum - 1) > 0.02) reasons.push('distribution_does_not_sum_to_one')
+  if (Math.abs(score - expectation) > 0.01 + 1e-9) reasons.push('score_contradicts_distribution')
   if (score < 0 || score > TOP_LEVEL) reasons.push('score_outside_rubric_range')
-  // A tie asserts no level, so it is not ranked as if it had.
   if (decisiveMass <= 0.5) reasons.push('no_decisive_level')
 
-  const usable = consistent && score >= 0 && score <= TOP_LEVEL && decisiveMass > 0.5
+  const usable = reasons.length === 0
   return {
-    candidates: files.map((file) => ({
-      path: file.path,
+    candidate: {
+      path,
       score: usable ? score : null,
       probabilities: usable ? probabilities : null,
       confidence,
       usable,
-    })),
-    reasons: usable ? [] : [...new Set(reasons.length ? reasons : ['answer_unusable'])],
+      rankingSource: 'semantic',
+    },
+    reasons,
   }
+}
+
+/** Parse one per-file answer from a single batched request and sort best-first. */
+export function rankCandidates(
+  files: readonly { path: string; content: string }[],
+  answers: Record<string, DecisionAnswer | undefined>,
+  questionId: string,
+): { candidates: RankedCandidate[]; reasons: string[] } {
+  const candidates: RankedCandidate[] = []
+  const reasons: string[] = []
+  files.forEach((file, index) => {
+    const ranked = rankOne(file.path, answers[discoveryQuestionId(questionId, index)])
+    candidates.push(ranked.candidate)
+    for (const reason of ranked.reasons) reasons.push(`${file.path}:${reason}`)
+  })
+  candidates.sort((a, b) => {
+    if (a.usable !== b.usable) return a.usable ? -1 : 1
+    return (b.score ?? -1) - (a.score ?? -1) || a.path.localeCompare(b.path)
+  })
+  return { candidates, reasons: [...new Set(reasons)] }
+}
+
+export function localFallbackCandidates(recall: LocalRecallResult): RankedCandidate[] {
+  return recall.candidates.map((candidate) => ({
+    path: candidate.path,
+    score: null,
+    probabilities: null,
+    confidence: null,
+    usable: true,
+    rankingSource: 'local-recall',
+    localRecallScore: candidate.score,
+  }))
 }
 
 export function buildReport(
@@ -147,6 +157,7 @@ export function buildReport(
   read: { files: readonly { path: string; content: string }[]; bytes: number; skipped: readonly string[] },
   response: DecisionResponse,
   ranked: { candidates: RankedCandidate[]; reasons: string[] },
+  recall?: LocalRecallResult,
 ): DiscoveryReport {
   return {
     reportId,
@@ -158,16 +169,57 @@ export function buildReport(
       skippedPaths: read.skipped,
     },
     advisory: true,
-    // Best first, and the unusable ones last so they cannot be mistaken for
-    // relevant candidates.
-    candidates: [...ranked.candidates].sort((a, b) => {
-      if (a.usable !== b.usable) return a.usable ? -1 : 1
-      return (b.score ?? -1) - (a.score ?? -1)
-    }),
+    candidates: ranked.candidates,
+    semanticApplied: true,
     provider: response.provider,
     ...(response.model ? { model: response.model } : {}),
     latencyMs: response.latencyMs ?? 0,
     evidenceBytes: read.bytes,
     reasons: ranked.reasons,
+    ...(recall
+      ? {
+          recall: {
+            used: true,
+            scannedFiles: recall.scannedFiles,
+            scoredFiles: recall.scoredFiles,
+            ignoredDirectories: recall.ignoredDirectories,
+            candidates: recall.candidates,
+          },
+        }
+      : {}),
+  }
+}
+
+export function buildLocalFallbackReport(
+  reportId: string,
+  questionId: string,
+  question: string,
+  read: { files: readonly { path: string; content: string }[]; bytes: number; skipped: readonly string[] },
+  recall: LocalRecallResult,
+  reason: string,
+): DiscoveryReport {
+  return {
+    reportId,
+    trace: {
+      tool: 'semantic_search',
+      questionId,
+      question,
+      candidatePaths: read.files.map((file) => file.path),
+      skippedPaths: read.skipped,
+    },
+    advisory: true,
+    candidates: localFallbackCandidates(recall),
+    semanticApplied: false,
+    provider: null,
+    latencyMs: 0,
+    evidenceBytes: 0,
+    reasons: [reason],
+    recall: {
+      used: true,
+      scannedFiles: recall.scannedFiles,
+      scoredFiles: recall.scoredFiles,
+      ignoredDirectories: recall.ignoredDirectories,
+      candidates: recall.candidates,
+    },
   }
 }
