@@ -4,7 +4,7 @@ Experimental OpenFox plugin for **fast, typed semantic decisions** and, where it
 
 The project is intentionally provider-agnostic. The first transport target is the Jev / System One-style `POST /v1/systemone` API, so the same OpenFox tools can be backed by hosted Jev or by a compatible local/open-source runtime.
 
-> Status: eight tools, two usage skills, presets, optional cache, egress,
+> Status: nine tools, two usage skills, presets, optional cache, egress,
 > calibration and advisory workflow, validated on OpenFox 2.0.157 and 2.0.160.
 > Dated provider observations are scoped in #9; no durable quality
 > certification or end-to-end savings claim is made. See
@@ -47,6 +47,7 @@ OpenFox
   +-- semantic_provider_self_test
   +-- semantic_calibration_candidate
   +-- semantic_question_calibration
+  +-- semantic_reference_agreement
           |
           v
    use-case policy
@@ -65,7 +66,7 @@ The provider layer should accept one state plus one or more typed questions in a
 
 ## What this plugin actually registers
 
-Eight tools and two usage skills, all through the public Plugin API v2. Nothing
+Nine tools and two usage skills, all through the public Plugin API v2. Nothing
 below is planned; see [docs/ROADMAP.md](./docs/ROADMAP.md) for what is not.
 
 | Tool | Shape | Advisory? |
@@ -78,6 +79,7 @@ below is planned; see [docs/ROADMAP.md](./docs/ROADMAP.md) for what is not.
 | `semantic_provider_self_test` | Embedded synthetic smoke test against the configured endpoint. | Yes — never changes settings. |
 | `semantic_calibration_candidate` | Turns an operator-labelled case set into an inactive candidate profile. | Yes — never activates anything. |
 | `semantic_question_calibration` | Evaluates one arbitrary typed question against the operator's labelled cases. | Yes — evaluation evidence only, never a threshold. |
+| `semantic_reference_agreement` | Compares the provider against a caller-supplied reference judgment on a frozen case set. | Yes — concordance evidence, never a threshold or a ranking. |
 
 | Skill | Covers |
 | --- | --- |
@@ -557,11 +559,12 @@ Semantic-provider numeric scales are not treated as interchangeable. Verificatio
 
 A profile is never applied unless its own `active` field is true, and a profile whose configured provider/model/version no longer matches is reported as stale/unverified and is not applied.
 
-Three advisory tools are available:
+Four advisory tools are available:
 
 - `semantic_provider_self_test` — runs a small embedded synthetic smoke test against the configured endpoint and reports protocol reachability, profile freshness, observed gate ranges, warnings and fallback categories. It reads no repository/session content and never changes settings.
 - `semantic_calibration_candidate` — turns an operator-owned labelled numeric case set into an inactive, observation-only candidate profile. It never invents thresholds or activates the result.
 - `semantic_question_calibration` — evaluates ONE arbitrary typed question (`noul`, `choice` or `score`) against the operator's own labelled cases and reports how that exact question behaves for the configured provider/model.
+- `semantic_reference_agreement` — runs the same frozen question and case set through the provider and compares the result against a caller-supplied reference judgment (an LLM reference is supplied as input, never called from the plugin), reporting agreement/concordance, the disagreements and the agreements the provider was unsure about. Reviewed cases become labelled cases for `semantic_question_calibration`.
 
 Configure `calibrationProfileJson`, `calibrationOverridesJson`, and optionally `runtimeVersion` in plugin settings. See `docs/CALIBRATION.md` for the schema, freshness rules and safety model.
 
@@ -596,3 +599,45 @@ one question can never be read as calibration for another. Its candidate block
 holds observations only: it derives no threshold and never activates anything.
 The labelled states are sent to the provider but are not written into the
 report.
+
+### Reference agreement
+
+`semantic_reference_agreement` answers a different question: on a frozen case
+set, does the semantic provider usually agree with the main/reference LLM, and
+where do they diverge? It is an onboarding and calibration aid, not a
+leaderboard and not a substitute for labelled evaluation.
+
+OpenFox exposes no plugin API for invoking the active main LLM, so the reference
+judgments are **input**, produced before the call by the operator's own model in
+a workflow step or by a human. The plugin adds no second LLM client and no
+second credential:
+
+```jsonc
+{
+  "question": { "type": "noul", "instructions": "Does this note contain a precise diagnosis?" },
+  "cases": [
+    { "id": "clear", "state": "...", "referenceAnswer": true, "disposition": "clear" },
+    { "id": "vague", "state": "...", "referenceAnswer": false }
+  ],
+  "reference": { "source": "llm", "model": "main-model-x", "promptVersion": "notes-prompt-v3" },
+  "reviewed": [{ "id": "vague", "expected": false }]
+}
+```
+
+A case accepts no semantic answer field, so the reference cannot be
+contaminated by the provider result. `reference.model` is required for an LLM
+reference: a reference without a model would read as a repeatable measurement
+when it is not.
+
+The report names the metric honestly. With an LLM reference it is
+**agreement/concordance**, because a second model is not ground truth, and the
+word "accuracy" appears nowhere in it; only `source: "human"` reports accuracy.
+Disagreements are first-class review items, raw probabilities/distributions/
+confidence stay visible, and uncertainty is first-class on both sides:
+`lowConfidenceAgreements` lists the agreements the provider itself was unsure
+about, and `referenceAmbiguous` lists the cases whose reference judgment the
+operator declared `ambiguous` (via the per-case `disposition`). With `reviewed`
+supplied, `promotion.labelledCases` returns the reviewed cases in exactly the
+shape `semantic_question_calibration` accepts, so they feed the labelled
+evaluation without reformatting. The report is `advisory: true, active: false`,
+derives no threshold and ranks no provider.
