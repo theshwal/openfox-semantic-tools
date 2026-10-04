@@ -250,6 +250,7 @@ test('the plugin registers no transition handler and no hook', async () => {
     'semantic_issue_coverage',
     'semantic_provider_self_test',
     'semantic_question_calibration',
+    'semantic_reference_agreement',
     'semantic_scan',
     'semantic_search',
     'semantic_verify_task',

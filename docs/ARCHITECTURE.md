@@ -100,7 +100,7 @@ For example, a yes/no probability and a choice confidence are not automatically 
 
 ## 4. What the plugin contributes today
 
-Eight tools, all registered through the public Plugin API v2:
+Nine tools, all registered through the public Plugin API v2:
 
 | Tool | Module | Kind |
 | --- | --- | --- |
@@ -112,6 +112,7 @@ Eight tools, all registered through the public Plugin API v2:
 | `semantic_provider_self_test` | `src/calibration/self-test.ts` | advisory |
 | `semantic_calibration_candidate` | `src/calibration/candidate-tool.ts` | advisory |
 | `semantic_question_calibration` | `src/calibration/question-tool.ts` | advisory, operator-facing |
+| `semantic_reference_agreement` | `src/calibration/reference-tool.ts` | advisory, operator-facing |
 
 `semantic_question_calibration` is a thin `PluginTool` wrapper over
 `src/calibration/question-eval.ts`, which owns the question fingerprint, the
@@ -119,6 +120,23 @@ per-primitive evaluation and the metrics. The evaluation module holds no
 threshold and no gate: it is reusable by another use case (for example a
 reference-agreement measurement) without going through the tool boundary, and it
 does not touch the verification-specific `CalibrationProfile`.
+
+`semantic_reference_agreement` is the second wrapper over that same module. It
+runs the same frozen question and case set through the provider and compares the
+result against a caller-supplied reference judgment, then adds the reference
+provenance, the first-class disagreement list and the low-confidence agreements
+(`src/calibration/reference-agreement.ts`). The reference crosses a **caller
+boundary**: OpenFox exposes no plugin API for invoking the active main LLM, so
+the plugin adds no second LLM client and no second credential, and the reference
+is already frozen before the tool runs.
+
+Both wrappers are thin **specs** over one shared builder
+(`src/calibration/calibration-tool.ts`), which owns the settings read, the
+provider construction, the per-case decide closure, the `origin: 'explicit'`
+egress call, the question schema and — the reason this is not merely tidiness —
+the rule that only a controlled `ProviderError` message is ever echoed. Two
+copies each encoded that secret-hygiene rule and nothing failed when a fix
+reached one and not the other, so the shared half now exists once.
 
 Two skills (`semantic-verification`, `semantic-code-discovery`) are provided by
 one skill source (`src/skills/source.ts`), which teaches when those tools are

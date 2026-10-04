@@ -19,6 +19,7 @@ test('registers the initial settings schema', () => {
     'semantic_issue_coverage',
     'semantic_provider_self_test',
     'semantic_question_calibration',
+    'semantic_reference_agreement',
     'semantic_scan',
     'semantic_search',
     'semantic_verify_task',
