@@ -302,3 +302,28 @@ test('the closure document links the dataset contract at its real location', () 
   const target = fileURLToPath(new URL(link[1]!, new URL('docs/', root)))
   assert.ok(existsSync(target), `dataset contract link does not resolve: ${link[1]}`)
 })
+
+test('every document-relative path in the closure document resolves', () => {
+  // The result paths were once written as ../results/... , which resolves to a
+  // directory that does not exist. Every doc-relative path the document quotes
+  // must resolve, so a reader can follow each citation.
+  const doc = readFileSync(fileURLToPath(new URL('docs/ACTION-STATE-GATE.md', root)), 'utf8')
+  const quoted = [
+    ...doc.matchAll(/`(\.\.\/[^`]+)`/g),
+    ...doc.matchAll(/\]\((\.\.\/[^)]+)\)/g),
+  ].map((match) => match[1]!)
+  assert.ok(quoted.length > 0, 'the document must cite at least one relative path')
+
+  for (const p of new Set(quoted)) {
+    const target = fileURLToPath(new URL(p, new URL('docs/', root)))
+    assert.ok(existsSync(target), `document cites a path that does not resolve: ${p}`)
+  }
+
+  // And the two measured results must be cited where they actually live.
+  for (const result of [
+    '../benchmark/results/visual-action-state-openjev-2026-10-04.json',
+    '../benchmark/results/visual-action-state-calibration-2026-10-04.json',
+  ]) {
+    assert.ok(doc.includes(result), `the document must cite ${result}`)
+  }
+})

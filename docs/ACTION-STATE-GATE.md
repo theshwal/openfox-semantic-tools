@@ -24,8 +24,8 @@ separately labelled calibration run comparing question formulations.
 | Corpus manifest (harness-loadable) | `benchmark/visual/action-state-cases.json` |
 | Corpus catalogue (coverage + blocker + sha256) | `benchmark/visual/action-state-manifest.json` |
 | Sidecar ground truth | `benchmark/visual/action-state-sidecar.json` |
-| Primary result | `../results/visual-action-state-openjev-2026-10-04.json` |
-| Calibration result | `../results/visual-action-state-calibration-2026-10-04.json` |
+| Primary result | `../benchmark/results/visual-action-state-openjev-2026-10-04.json` |
+| Calibration result | `../benchmark/results/visual-action-state-calibration-2026-10-04.json` |
 | Viewport | 1440x900 |
 | Retries | none, per the contract's primary-run discipline |
 
