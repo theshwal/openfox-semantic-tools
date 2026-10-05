@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "repository": "theshwal/openfox-semantic-tools",
+    "ref": "benchmark/visual/action-state-calibration-cases.json",
+    "directory": "benchmark/visual",
+    "groundTruth": "Frozen sidecar; same corpus as the primary run."
+  },
+  "cases": [
+    {
+      "id": "session-done-2aee81da",
+      "image": "action-state/session-done-2aee81da.png",
+      "kind": "noul",
+      "questionId": "unambiguous_success",
+      "instructions": "Is this screenshot an unambiguous, visibly completed success with no failure, blocker or sign-in requirement? Answer true only if the frame itself settles the question.",
+      "expected": true,
+      "groundTruthNote": "OpenFox session backend reports terminal phase done"
+    },
+    {
+      "id": "project-no-session-026c36f9",
+      "image": "action-state/project-no-session-026c36f9.png",
+      "kind": "noul",
+      "questionId": "unambiguous_success",
+      "instructions": "Is this screenshot an unambiguous, visibly completed success with no failure, blocker or sign-in requirement? Answer true only if the frame itself settles the question.",
+      "expected": false,
+      "groundTruthNote": "project route opened without selecting a session"
+    },
+    {
+      "id": "project-no-session-cd182374",
+      "image": "action-state/project-no-session-cd182374.png",
+      "kind": "noul",
+      "questionId": "unambiguous_success",
+      "instructions": "Is this screenshot an unambiguous, visibly completed success with no failure, blocker or sign-in requirement? Answer true only if the frame itself settles the question.",
+      "expected": false,
+      "groundTruthNote": "project route opened without selecting a session"
+    },
+    {
+      "id": "project-no-session-c1cffc0d",
+      "image": "action-state/project-no-session-c1cffc0d.png",
+      "kind": "noul",
+      "questionId": "unambiguous_success",
+      "instructions": "Is this screenshot an unambiguous, visibly completed success with no failure, blocker or sign-in requirement? Answer true only if the frame itself settles the question.",
+      "expected": false,
+      "groundTruthNote": "project route opened without selecting a session"
+    },
+    {
+      "id": "project-no-session-83527140",
+      "image": "action-state/project-no-session-83527140.png",
+      "kind": "noul",
+      "questionId": "unambiguous_success",
+      "instructions": "Is this screenshot an unambiguous, visibly completed success with no failure, blocker or sign-in requirement? Answer true only if the frame itself settles the question.",
+      "expected": false,
+      "groundTruthNote": "project route opened without selecting a session"
+    },
+    {
+      "id": "session-processing-01-9e93124e",
+      "image": "action-state/session-processing-01-9e93124e.png",
+      "kind": "noul",
+      "questionId": "unambiguous_success",
+      "instructions": "Is this screenshot an unambiguous, visibly completed success with no failure, blocker or sign-in requirement? Answer true only if the frame itself settles the question.",
+      "expected": false,
+      "groundTruthNote": "session backend reports isRunning true while the configured LLM provider is unreachable; the UI renders the retry banner"
+    },
+    {
+      "id": "session-processing-02-9e93124e",
+      "image": "action-state/session-processing-02-9e93124e.png",
+      "kind": "noul",
+      "questionId": "unambiguous_success",
+      "instructions": "Is this screenshot an unambiguous, visibly completed success with no failure, blocker or sign-in requirement? Answer true only if the frame itself settles the question.",
+      "expected": false,
+      "groundTruthNote": "session backend reports isRunning true while the configured LLM provider is unreachable; the UI renders the retry banner"
+    },
+    {
+      "id": "session-processing-03-9e93124e",
+      "image": "action-state/session-processing-03-9e93124e.png",
+      "kind": "noul",
+      "questionId": "unambiguous_success",
+      "instructions": "Is this screenshot an unambiguous, visibly completed success with no failure, blocker or sign-in requirement? Answer true only if the frame itself settles the question.",
+      "expected": false,
+      "groundTruthNote": "session backend reports isRunning true while the configured LLM provider is unreachable; the UI renders the retry banner"
+    },
+    {
+      "id": "session-processing-04-9e93124e",
+      "image": "action-state/session-processing-04-9e93124e.png",
+      "kind": "noul",
+      "questionId": "unambiguous_success",
+      "instructions": "Is this screenshot an unambiguous, visibly completed success with no failure, blocker or sign-in requirement? Answer true only if the frame itself settles the question.",
+      "expected": false,
+      "groundTruthNote": "session backend reports isRunning true while the configured LLM provider is unreachable; the UI renders the retry banner"
+    },
+    {
+      "id": "provider-error-llm-call-failed-01",
+      "image": "action-state/provider-error-llm-call-failed-01.png",
+      "kind": "noul",
+      "questionId": "unambiguous_success",
+      "instructions": "Is this screenshot an unambiguous, visibly completed success with no failure, blocker or sign-in requirement? Answer true only if the frame itself settles the question.",
+      "expected": false,
+      "groundTruthNote": "active provider endpoint unreachable; UI surfaces the retry state"
+    },
+    {
+      "id": "ambiguous-running-indicator-only",
+      "image": "action-state/ambiguous-running-indicator-only.png",
+      "kind": "noul",
+      "questionId": "unambiguous_success",
+      "instructions": "Is this screenshot an unambiguous, visibly completed success with no failure, blocker or sign-in requirement? Answer true only if the frame itself settles the question.",
+      "expected": false,
+      "groundTruthNote": "deliberate crop of a genuine OpenFox state with the discriminating evidence removed"
+    },
+    {
+      "id": "ambiguous-composer-only",
+      "image": "action-state/ambiguous-composer-only.png",
+      "kind": "noul",
+      "questionId": "unambiguous_success",
+      "instructions": "Is this screenshot an unambiguous, visibly completed success with no failure, blocker or sign-in requirement? Answer true only if the frame itself settles the question.",
+      "expected": false,
+      "groundTruthNote": "deliberate crop of a genuine OpenFox state with the discriminating evidence removed"
+    },
+    {
+      "id": "ambiguous-transcript-header-only",
+      "image": "action-state/ambiguous-transcript-header-only.png",
+      "kind": "noul",
+      "questionId": "unambiguous_success",
+      "instructions": "Is this screenshot an unambiguous, visibly completed success with no failure, blocker or sign-in requirement? Answer true only if the frame itself settles the question.",
+      "expected": false,
+      "groundTruthNote": "deliberate crop of a genuine OpenFox state with the discriminating evidence removed"
+    },
+    {
+      "id": "ambiguous-sidebar-context-stripped",
+      "image": "action-state/ambiguous-sidebar-context-stripped.png",
+      "kind": "noul",
+      "questionId": "unambiguous_success",
+      "instructions": "Is this screenshot an unambiguous, visibly completed success with no failure, blocker or sign-in requirement? Answer true only if the frame itself settles the question.",
+      "expected": false,
+      "groundTruthNote": "deliberate crop of a genuine OpenFox state with the discriminating evidence removed"
+    }
+  ]
+}

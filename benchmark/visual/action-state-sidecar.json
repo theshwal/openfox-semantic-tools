@@ -1,0 +1,340 @@
+{
+  "schemaVersion": 1,
+  "note": "Per-case non-visual ground truth. Every label is sourced from the OpenFox HTTP API at capture time, never from pixels or filenames.",
+  "cases": [
+    {
+      "id": "session-done-2aee81da",
+      "image": "action-state/session-done-2aee81da.png",
+      "sha256": "4f8a33729acc08df4b808b4664022c13249c7ef8e7c3d84768e31e1001c1f982",
+      "state": "success",
+      "route": "/p/83527140-b8a8-45cc-b65d-bcf36ea6c95f/s/2aee81da-aa42-43df-958f-fce41edabe68",
+      "source": {
+        "scenario": "OpenFox session backend reports terminal phase done",
+        "route": "/p/83527140-b8a8-45cc-b65d-bcf36ea6c95f/s/2aee81da-aa42-43df-958f-fce41edabe68",
+        "sessionPhase": "done",
+        "isRunning": false,
+        "messageCount": 0,
+        "deterministicEvidence": [
+          "GET /api/sessions phase == done",
+          "GET /api/sessions isRunning == false"
+        ]
+      },
+      "sanitization": {
+        "reviewed": true,
+        "notes": "local OpenFox dev instance, synthetic /tmp test projects; no credentials, tokens, email addresses or personal identifiers are visible in the frame; no textual annotation was added; no crop or mask applied to this case"
+      }
+    },
+    {
+      "id": "project-no-session-026c36f9",
+      "image": "action-state/project-no-session-026c36f9.png",
+      "sha256": "500d4a5aa3ee39edb42e4f678678dd164f20b7d54de5f3bbc1ba21b4fc2a7974",
+      "state": "wrong_page",
+      "route": "/p/026c36f9-2cb5-4492-bc5f-5277e6b36b22",
+      "source": {
+        "scenario": "project route opened without selecting a session",
+        "route": "/p/026c36f9-2cb5-4492-bc5f-5277e6b36b22",
+        "projectId": "026c36f9-2cb5-4492-bc5f-5277e6b36b22",
+        "selectedSession": null,
+        "deterministicEvidence": [
+          "GET /api/sessions/:projectId has no selection",
+          "route /p/:projectId without /s/:sessionId"
+        ]
+      },
+      "sanitization": {
+        "reviewed": true,
+        "notes": "local OpenFox dev instance, synthetic /tmp test projects; no credentials, tokens, email addresses or personal identifiers are visible in the frame; no textual annotation was added; no crop or mask applied to this case"
+      }
+    },
+    {
+      "id": "project-no-session-cd182374",
+      "image": "action-state/project-no-session-cd182374.png",
+      "sha256": "0cacd55242b8052fd47865f4c501ebbfee377ed395efa44f95fecb4685db3126",
+      "state": "wrong_page",
+      "route": "/p/cd182374-f528-431d-a157-746a17695c7e",
+      "source": {
+        "scenario": "project route opened without selecting a session",
+        "route": "/p/cd182374-f528-431d-a157-746a17695c7e",
+        "projectId": "cd182374-f528-431d-a157-746a17695c7e",
+        "selectedSession": null,
+        "deterministicEvidence": [
+          "GET /api/sessions/:projectId has no selection",
+          "route /p/:projectId without /s/:sessionId"
+        ]
+      },
+      "sanitization": {
+        "reviewed": true,
+        "notes": "local OpenFox dev instance, synthetic /tmp test projects; no credentials, tokens, email addresses or personal identifiers are visible in the frame; no textual annotation was added; no crop or mask applied to this case"
+      }
+    },
+    {
+      "id": "project-no-session-c1cffc0d",
+      "image": "action-state/project-no-session-c1cffc0d.png",
+      "sha256": "3c168a772e6cf9ce48adc31470e8826e759d63818616f7de30e91091c5fb90c0",
+      "state": "wrong_page",
+      "route": "/p/c1cffc0d-7914-432d-8819-035579bfec82",
+      "source": {
+        "scenario": "project route opened without selecting a session",
+        "route": "/p/c1cffc0d-7914-432d-8819-035579bfec82",
+        "projectId": "c1cffc0d-7914-432d-8819-035579bfec82",
+        "selectedSession": null,
+        "deterministicEvidence": [
+          "GET /api/sessions/:projectId has no selection",
+          "route /p/:projectId without /s/:sessionId"
+        ]
+      },
+      "sanitization": {
+        "reviewed": true,
+        "notes": "local OpenFox dev instance, synthetic /tmp test projects; no credentials, tokens, email addresses or personal identifiers are visible in the frame; no textual annotation was added; no crop or mask applied to this case"
+      }
+    },
+    {
+      "id": "project-no-session-83527140",
+      "image": "action-state/project-no-session-83527140.png",
+      "sha256": "0012057aca3c941464f8e47932ccc5cab66a5d75b6f307bb531b8a964f1bff84",
+      "state": "wrong_page",
+      "route": "/p/83527140-b8a8-45cc-b65d-bcf36ea6c95f",
+      "source": {
+        "scenario": "project route opened without selecting a session",
+        "route": "/p/83527140-b8a8-45cc-b65d-bcf36ea6c95f",
+        "projectId": "83527140-b8a8-45cc-b65d-bcf36ea6c95f",
+        "selectedSession": null,
+        "deterministicEvidence": [
+          "GET /api/sessions/:projectId has no selection",
+          "route /p/:projectId without /s/:sessionId"
+        ]
+      },
+      "sanitization": {
+        "reviewed": true,
+        "notes": "local OpenFox dev instance, synthetic /tmp test projects; no credentials, tokens, email addresses or personal identifiers are visible in the frame; no textual annotation was added; no crop or mask applied to this case"
+      }
+    },
+    {
+      "id": "session-processing-01-9e93124e",
+      "image": "action-state/session-processing-01-9e93124e.png",
+      "sha256": "b1179429622c2433bc049a2c2b32487b75f69fb5c3e653ce9ac46e5421c339e4",
+      "state": "error",
+      "route": "/p/026c36f9-2cb5-4492-bc5f-5277e6b36b22/s/9e93124e-6d6f-4b67-a482-76c20fccb39d",
+      "source": {
+        "scenario": "session backend reports isRunning true while the configured LLM provider is unreachable; the UI renders the retry banner",
+        "route": "/p/026c36f9-2cb5-4492-bc5f-5277e6b36b22/s/9e93124e-6d6f-4b67-a482-76c20fccb39d",
+        "sessionPhase": "plan",
+        "isRunning": true,
+        "messageCount": 1,
+        "deterministicEvidence": [
+          "GET /api/sessions isRunning == true",
+          "GET /api/providers activeProvider url refuses /v1/models (connection refused)",
+          "UI renders an LLM-call-failed retry banner with a retry countdown"
+        ]
+      },
+      "relabelledFrom": "processing (API isRunning) -> error (decisive rendered evidence)",
+      "sanitization": {
+        "reviewed": true,
+        "notes": "local OpenFox dev instance, synthetic /tmp test projects; no credentials, tokens, email addresses or personal identifiers are visible in the frame; no textual annotation was added; no crop or mask applied to this case"
+      }
+    },
+    {
+      "id": "session-processing-02-9e93124e",
+      "image": "action-state/session-processing-02-9e93124e.png",
+      "sha256": "8b5fd2bc108449ed34f7462bb8e8647604de8c33935182eae1c5750da5d8b1e5",
+      "state": "error",
+      "route": "/p/026c36f9-2cb5-4492-bc5f-5277e6b36b22/s/9e93124e-6d6f-4b67-a482-76c20fccb39d",
+      "source": {
+        "scenario": "session backend reports isRunning true while the configured LLM provider is unreachable; the UI renders the retry banner",
+        "route": "/p/026c36f9-2cb5-4492-bc5f-5277e6b36b22/s/9e93124e-6d6f-4b67-a482-76c20fccb39d",
+        "sessionPhase": "plan",
+        "isRunning": true,
+        "messageCount": 2,
+        "deterministicEvidence": [
+          "GET /api/sessions isRunning == true",
+          "GET /api/providers activeProvider url refuses /v1/models (connection refused)",
+          "UI renders an LLM-call-failed retry banner with a retry countdown"
+        ]
+      },
+      "relabelledFrom": "processing (API isRunning) -> error (decisive rendered evidence)",
+      "sanitization": {
+        "reviewed": true,
+        "notes": "local OpenFox dev instance, synthetic /tmp test projects; no credentials, tokens, email addresses or personal identifiers are visible in the frame; no textual annotation was added; no crop or mask applied to this case"
+      }
+    },
+    {
+      "id": "session-processing-03-9e93124e",
+      "image": "action-state/session-processing-03-9e93124e.png",
+      "sha256": "04501c9ed2845e855b881c25cb6ed0835779081f49f92152b1a7b5b44180219e",
+      "state": "error",
+      "route": "/p/026c36f9-2cb5-4492-bc5f-5277e6b36b22/s/9e93124e-6d6f-4b67-a482-76c20fccb39d",
+      "source": {
+        "scenario": "session backend reports isRunning true while the configured LLM provider is unreachable; the UI renders the retry banner",
+        "route": "/p/026c36f9-2cb5-4492-bc5f-5277e6b36b22/s/9e93124e-6d6f-4b67-a482-76c20fccb39d",
+        "sessionPhase": "plan",
+        "isRunning": true,
+        "messageCount": 3,
+        "deterministicEvidence": [
+          "GET /api/sessions isRunning == true",
+          "GET /api/providers activeProvider url refuses /v1/models (connection refused)",
+          "UI renders an LLM-call-failed retry banner with a retry countdown"
+        ]
+      },
+      "relabelledFrom": "processing (API isRunning) -> error (decisive rendered evidence)",
+      "sanitization": {
+        "reviewed": true,
+        "notes": "local OpenFox dev instance, synthetic /tmp test projects; no credentials, tokens, email addresses or personal identifiers are visible in the frame; no textual annotation was added; no crop or mask applied to this case"
+      }
+    },
+    {
+      "id": "session-processing-04-9e93124e",
+      "image": "action-state/session-processing-04-9e93124e.png",
+      "sha256": "47edd5f9f02a81caf6e5ea8c42f8b7820b70a611e6c26fccc5eead63143b6886",
+      "state": "error",
+      "route": "/p/026c36f9-2cb5-4492-bc5f-5277e6b36b22/s/9e93124e-6d6f-4b67-a482-76c20fccb39d",
+      "source": {
+        "scenario": "session backend reports isRunning true while the configured LLM provider is unreachable; the UI renders the retry banner",
+        "route": "/p/026c36f9-2cb5-4492-bc5f-5277e6b36b22/s/9e93124e-6d6f-4b67-a482-76c20fccb39d",
+        "sessionPhase": "plan",
+        "isRunning": true,
+        "messageCount": 4,
+        "deterministicEvidence": [
+          "GET /api/sessions isRunning == true",
+          "GET /api/providers activeProvider url refuses /v1/models (connection refused)",
+          "UI renders an LLM-call-failed retry banner with a retry countdown"
+        ]
+      },
+      "relabelledFrom": "processing (API isRunning) -> error (decisive rendered evidence)",
+      "sanitization": {
+        "reviewed": true,
+        "notes": "local OpenFox dev instance, synthetic /tmp test projects; no credentials, tokens, email addresses or personal identifiers are visible in the frame; no textual annotation was added; no crop or mask applied to this case"
+      }
+    },
+    {
+      "id": "provider-error-llm-call-failed-01",
+      "image": "action-state/provider-error-llm-call-failed-01.png",
+      "sha256": "2bce7b41e5bb69c5b539631347eeb764a27e2dae5b398521d06671334b9b32d8",
+      "state": "error",
+      "route": "/p/026c36f9-2cb5-4492-bc5f-5277e6b36b22/s/599d531d-0b15-49d8-be1f-0a24de5d1a66",
+      "source": {
+        "scenario": "active provider endpoint unreachable; UI surfaces the retry state",
+        "route": "/p/026c36f9-2cb5-4492-bc5f-5277e6b36b22/s/599d531d-0b15-49d8-be1f-0a24de5d1a66",
+        "activeProviderUrl": "http://localhost:1234/v1",
+        "activeProviderReachable": false,
+        "sessionPhase": "plan",
+        "isRunning": true,
+        "deterministicEvidence": [
+          "GET /api/providers activeProvider url does not answer /v1/models (connection refused)",
+          "UI renders \"LLM call failed - retrying\"",
+          "GET /api/sessions isRunning == true with 0 assistant messages"
+        ]
+      },
+      "sanitization": {
+        "reviewed": true,
+        "notes": "local OpenFox dev instance, synthetic /tmp test projects; no credentials, tokens, email addresses or personal identifiers are visible in the frame; no textual annotation was added; no crop or mask applied to this case"
+      }
+    },
+    {
+      "id": "ambiguous-running-indicator-only",
+      "image": "action-state/ambiguous-running-indicator-only.png",
+      "sha256": "ccaf477f071752c00dda1ad86694886cfd0d36460ea0097254a49bad22d1ec6d",
+      "state": "unknown",
+      "route": null,
+      "source": {
+        "scenario": "deliberate crop of a genuine OpenFox state with the discriminating evidence removed",
+        "derivedFrom": "session-processing-01-9e93124e.png",
+        "derivedFromSha256": "b1179429622c2433bc049a2c2b32487b75f69fb5c3e653ce9ac46e5421c339e4",
+        "cropRegion": {
+          "x": 620,
+          "y": 745,
+          "width": 460,
+          "height": 40
+        },
+        "deterministicEvidence": [
+          "GET /api/sessions recorded for the untrimmed frame session-processing-01-9e93124e.png: b1179429622c",
+          "crop region removes only the running indicator strip is retained; the status banner, transcript and composer are removed, so a running session and a failed-and-retrying session are pixel-identical here"
+        ]
+      },
+      "ambiguityNote": "only the running indicator strip is retained; the status banner, transcript and composer are removed, so a running session and a failed-and-retrying session are pixel-identical here",
+      "sanitization": {
+        "reviewed": true,
+        "notes": "local OpenFox dev instance, synthetic /tmp test projects; no credentials, tokens, email addresses or personal identifiers are visible in the frame; no textual annotation was added; no crop or mask applied to this case"
+      }
+    },
+    {
+      "id": "ambiguous-composer-only",
+      "image": "action-state/ambiguous-composer-only.png",
+      "sha256": "48a9365e1ef60fe33062150497922e975276c715b0639ef3459884d119da0386",
+      "state": "unknown",
+      "route": null,
+      "source": {
+        "scenario": "deliberate crop of a genuine OpenFox state with the discriminating evidence removed",
+        "derivedFrom": "session-processing-01-9e93124e.png",
+        "derivedFromSha256": "b1179429622c2433bc049a2c2b32487b75f69fb5c3e653ce9ac46e5421c339e4",
+        "cropRegion": {
+          "x": 310,
+          "y": 810,
+          "width": 800,
+          "height": 80
+        },
+        "deterministicEvidence": [
+          "GET /api/sessions recorded for the untrimmed frame session-processing-01-9e93124e.png: b1179429622c",
+          "crop region removes only the composer input row is retained, which renders identically in every session state"
+        ]
+      },
+      "ambiguityNote": "only the composer input row is retained, which renders identically in every session state",
+      "sanitization": {
+        "reviewed": true,
+        "notes": "local OpenFox dev instance, synthetic /tmp test projects; no credentials, tokens, email addresses or personal identifiers are visible in the frame; no textual annotation was added; no crop or mask applied to this case"
+      }
+    },
+    {
+      "id": "ambiguous-transcript-header-only",
+      "image": "action-state/ambiguous-transcript-header-only.png",
+      "sha256": "17f56767ec7624844f3cb1262b047138b5827e43fa14bafb2ac652e02c767f16",
+      "state": "unknown",
+      "route": null,
+      "source": {
+        "scenario": "deliberate crop of a genuine OpenFox state with the discriminating evidence removed",
+        "derivedFrom": "session-processing-01-9e93124e.png",
+        "derivedFromSha256": "b1179429622c2433bc049a2c2b32487b75f69fb5c3e653ce9ac46e5421c339e4",
+        "cropRegion": {
+          "x": 310,
+          "y": 112,
+          "width": 800,
+          "height": 30
+        },
+        "deterministicEvidence": [
+          "GET /api/sessions recorded for the untrimmed frame session-processing-01-9e93124e.png: b1179429622c",
+          "crop region removes only the phase header line is retained while the status banner, transcript body and composer are removed, so the frame does not disclose whether the run is working, retrying or finished"
+        ]
+      },
+      "ambiguityNote": "only the phase header line is retained while the status banner, transcript body and composer are removed, so the frame does not disclose whether the run is working, retrying or finished",
+      "sanitization": {
+        "reviewed": true,
+        "notes": "local OpenFox dev instance, synthetic /tmp test projects; no credentials, tokens, email addresses or personal identifiers are visible in the frame; no textual annotation was added; no crop or mask applied to this case"
+      }
+    },
+    {
+      "id": "ambiguous-sidebar-context-stripped",
+      "image": "action-state/ambiguous-sidebar-context-stripped.png",
+      "sha256": "a2d785a61db4d1b23c19e51f0fc88f9522dcf67367163c0dbadfb62d3b1bf906",
+      "state": "unknown",
+      "route": null,
+      "source": {
+        "scenario": "deliberate crop of a genuine OpenFox state with the discriminating evidence removed",
+        "derivedFrom": "session-processing-01-9e93124e.png",
+        "derivedFromSha256": "b1179429622c2433bc049a2c2b32487b75f69fb5c3e653ce9ac46e5421c339e4",
+        "cropRegion": {
+          "x": 0,
+          "y": 150,
+          "width": 290,
+          "height": 260
+        },
+        "deterministicEvidence": [
+          "GET /api/sessions recorded for the untrimmed frame session-processing-01-9e93124e.png: b1179429622c",
+          "crop region removes a context-free strip of the session list is retained with the project identity and any status text cropped away, removing the non-pixel context needed to bind the frame to a specific state"
+        ]
+      },
+      "ambiguityNote": "a context-free strip of the session list is retained with the project identity and any status text cropped away, removing the non-pixel context needed to bind the frame to a specific state",
+      "sanitization": {
+        "reviewed": true,
+        "notes": "local OpenFox dev instance, synthetic /tmp test projects; no credentials, tokens, email addresses or personal identifiers are visible in the frame; no textual annotation was added; no crop or mask applied to this case"
+      }
+    }
+  ]
+}
