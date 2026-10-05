@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "measured": true,
+  "experiment": "question-formulation-comparison",
+  "status": "calibration-only, not part of the primary gate run",
+  "primaryFormulation": {
+    "type": "choice",
+    "choices": [
+      "success",
+      "processing",
+      "blocked",
+      "error",
+      "auth_required",
+      "wrong_page",
+      "unknown"
+    ]
+  },
+  "alternativeFormulation": {
+    "type": "noul",
+    "instructions": "Is this screenshot an unambiguous, visibly completed success with no failure, blocker or sign-in requirement? Answer true only if the frame itself settles the question."
+  },
+  "cases": [
+    {
+      "id": "session-done-2aee81da",
+      "image": "action-state/session-done-2aee81da.png",
+      "sha256": "4f8a33729acc08df4b808b4664022c13249c7ef8e7c3d84768e31e1001c1f982",
+      "expectedIsUnambiguousSuccess": true,
+      "groundTruth": "OpenFox session backend reports terminal phase done"
+    },
+    {
+      "id": "project-no-session-026c36f9",
+      "image": "action-state/project-no-session-026c36f9.png",
+      "sha256": "500d4a5aa3ee39edb42e4f678678dd164f20b7d54de5f3bbc1ba21b4fc2a7974",
+      "expectedIsUnambiguousSuccess": false,
+      "groundTruth": "project route opened without selecting a session"
+    },
+    {
+      "id": "project-no-session-cd182374",
+      "image": "action-state/project-no-session-cd182374.png",
+      "sha256": "0cacd55242b8052fd47865f4c501ebbfee377ed395efa44f95fecb4685db3126",
+      "expectedIsUnambiguousSuccess": false,
+      "groundTruth": "project route opened without selecting a session"
+    },
+    {
+      "id": "project-no-session-c1cffc0d",
+      "image": "action-state/project-no-session-c1cffc0d.png",
+      "sha256": "3c168a772e6cf9ce48adc31470e8826e759d63818616f7de30e91091c5fb90c0",
+      "expectedIsUnambiguousSuccess": false,
+      "groundTruth": "project route opened without selecting a session"
+    },
+    {
+      "id": "project-no-session-83527140",
+      "image": "action-state/project-no-session-83527140.png",
+      "sha256": "0012057aca3c941464f8e47932ccc5cab66a5d75b6f307bb531b8a964f1bff84",
+      "expectedIsUnambiguousSuccess": false,
+      "groundTruth": "project route opened without selecting a session"
+    },
+    {
+      "id": "session-processing-01-9e93124e",
+      "image": "action-state/session-processing-01-9e93124e.png",
+      "sha256": "b1179429622c2433bc049a2c2b32487b75f69fb5c3e653ce9ac46e5421c339e4",
+      "expectedIsUnambiguousSuccess": false,
+      "groundTruth": "session backend reports isRunning true while the configured LLM provider is unreachable; the UI renders the retry banner"
+    },
+    {
+      "id": "session-processing-02-9e93124e",
+      "image": "action-state/session-processing-02-9e93124e.png",
+      "sha256": "8b5fd2bc108449ed34f7462bb8e8647604de8c33935182eae1c5750da5d8b1e5",
+      "expectedIsUnambiguousSuccess": false,
+      "groundTruth": "session backend reports isRunning true while the configured LLM provider is unreachable; the UI renders the retry banner"
+    },
+    {
+      "id": "session-processing-03-9e93124e",
+      "image": "action-state/session-processing-03-9e93124e.png",
+      "sha256": "04501c9ed2845e855b881c25cb6ed0835779081f49f92152b1a7b5b44180219e",
+      "expectedIsUnambiguousSuccess": false,
+      "groundTruth": "session backend reports isRunning true while the configured LLM provider is unreachable; the UI renders the retry banner"
+    },
+    {
+      "id": "session-processing-04-9e93124e",
+      "image": "action-state/session-processing-04-9e93124e.png",
+      "sha256": "47edd5f9f02a81caf6e5ea8c42f8b7820b70a611e6c26fccc5eead63143b6886",
+      "expectedIsUnambiguousSuccess": false,
+      "groundTruth": "session backend reports isRunning true while the configured LLM provider is unreachable; the UI renders the retry banner"
+    },
+    {
+      "id": "provider-error-llm-call-failed-01",
+      "image": "action-state/provider-error-llm-call-failed-01.png",
+      "sha256": "2bce7b41e5bb69c5b539631347eeb764a27e2dae5b398521d06671334b9b32d8",
+      "expectedIsUnambiguousSuccess": false,
+      "groundTruth": "active provider endpoint unreachable; UI surfaces the retry state"
+    },
+    {
+      "id": "ambiguous-running-indicator-only",
+      "image": "action-state/ambiguous-running-indicator-only.png",
+      "sha256": "ccaf477f071752c00dda1ad86694886cfd0d36460ea0097254a49bad22d1ec6d",
+      "expectedIsUnambiguousSuccess": false,
+      "groundTruth": "deliberate crop of a genuine OpenFox state with the discriminating evidence removed"
+    },
+    {
+      "id": "ambiguous-composer-only",
+      "image": "action-state/ambiguous-composer-only.png",
+      "sha256": "48a9365e1ef60fe33062150497922e975276c715b0639ef3459884d119da0386",
+      "expectedIsUnambiguousSuccess": false,
+      "groundTruth": "deliberate crop of a genuine OpenFox state with the discriminating evidence removed"
+    },
+    {
+      "id": "ambiguous-transcript-header-only",
+      "image": "action-state/ambiguous-transcript-header-only.png",
+      "sha256": "17f56767ec7624844f3cb1262b047138b5827e43fa14bafb2ac652e02c767f16",
+      "expectedIsUnambiguousSuccess": false,
+      "groundTruth": "deliberate crop of a genuine OpenFox state with the discriminating evidence removed"
+    },
+    {
+      "id": "ambiguous-sidebar-context-stripped",
+      "image": "action-state/ambiguous-sidebar-context-stripped.png",
+      "sha256": "a2d785a61db4d1b23c19e51f0fc88f9522dcf67367163c0dbadfb62d3b1bf906",
+      "expectedIsUnambiguousSuccess": false,
+      "groundTruth": "deliberate crop of a genuine OpenFox state with the discriminating evidence removed"
+    }
+  ]
+}

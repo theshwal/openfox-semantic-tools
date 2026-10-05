@@ -7,7 +7,12 @@ coverage/
 *.log
 .DS_Store
 
-benchmark/results/
+# Locally reproducible replay output stays untracked.
+benchmark/results/*
+# Measured visual results ARE the evidence a review depends on, so they are
+# versioned. Scope the exception to the visual result files only: everything
+# else under benchmark/results (local replays, ad-hoc runs) stays ignored.
+!benchmark/results/visual-*.json
 *.tgz
 
 # Local live-campaign runner: reads an operator-provided key file, never committed.

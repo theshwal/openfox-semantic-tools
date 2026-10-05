@@ -1,0 +1,263 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "repository": "theshwal/openfox-semantic-tools",
+    "ref": "benchmark/visual/action-state-manifest.json",
+    "directory": "benchmark/visual",
+    "groundTruth": "Frozen sidecar. Every label is read from the OpenFox HTTP API at capture time (GET /api/sessions phase/isRunning, GET /api/providers reachability, route path). No label is derived from pixels or from a filename."
+  },
+  "cases": [
+    {
+      "id": "session-done-2aee81da",
+      "image": "action-state/session-done-2aee81da.png",
+      "kind": "choice",
+      "questionId": "action_state",
+      "instructions": "Which OpenFox action state is visible in this screenshot? Judge the rendered UI only: a finished outcome, work still in progress, a blocked action, a visible failure, a sign-in requirement, an unexpected page, or a frame that does not justify a verdict.",
+      "choices": [
+        "success",
+        "processing",
+        "blocked",
+        "error",
+        "auth_required",
+        "wrong_page",
+        "unknown"
+      ],
+      "expected": "success",
+      "groundTruthNote": "OpenFox session backend reports terminal phase done"
+    },
+    {
+      "id": "project-no-session-026c36f9",
+      "image": "action-state/project-no-session-026c36f9.png",
+      "kind": "choice",
+      "questionId": "action_state",
+      "instructions": "Which OpenFox action state is visible in this screenshot? Judge the rendered UI only: a finished outcome, work still in progress, a blocked action, a visible failure, a sign-in requirement, an unexpected page, or a frame that does not justify a verdict.",
+      "choices": [
+        "success",
+        "processing",
+        "blocked",
+        "error",
+        "auth_required",
+        "wrong_page",
+        "unknown"
+      ],
+      "expected": "wrong_page",
+      "groundTruthNote": "project route opened without selecting a session"
+    },
+    {
+      "id": "project-no-session-cd182374",
+      "image": "action-state/project-no-session-cd182374.png",
+      "kind": "choice",
+      "questionId": "action_state",
+      "instructions": "Which OpenFox action state is visible in this screenshot? Judge the rendered UI only: a finished outcome, work still in progress, a blocked action, a visible failure, a sign-in requirement, an unexpected page, or a frame that does not justify a verdict.",
+      "choices": [
+        "success",
+        "processing",
+        "blocked",
+        "error",
+        "auth_required",
+        "wrong_page",
+        "unknown"
+      ],
+      "expected": "wrong_page",
+      "groundTruthNote": "project route opened without selecting a session"
+    },
+    {
+      "id": "project-no-session-c1cffc0d",
+      "image": "action-state/project-no-session-c1cffc0d.png",
+      "kind": "choice",
+      "questionId": "action_state",
+      "instructions": "Which OpenFox action state is visible in this screenshot? Judge the rendered UI only: a finished outcome, work still in progress, a blocked action, a visible failure, a sign-in requirement, an unexpected page, or a frame that does not justify a verdict.",
+      "choices": [
+        "success",
+        "processing",
+        "blocked",
+        "error",
+        "auth_required",
+        "wrong_page",
+        "unknown"
+      ],
+      "expected": "wrong_page",
+      "groundTruthNote": "project route opened without selecting a session"
+    },
+    {
+      "id": "project-no-session-83527140",
+      "image": "action-state/project-no-session-83527140.png",
+      "kind": "choice",
+      "questionId": "action_state",
+      "instructions": "Which OpenFox action state is visible in this screenshot? Judge the rendered UI only: a finished outcome, work still in progress, a blocked action, a visible failure, a sign-in requirement, an unexpected page, or a frame that does not justify a verdict.",
+      "choices": [
+        "success",
+        "processing",
+        "blocked",
+        "error",
+        "auth_required",
+        "wrong_page",
+        "unknown"
+      ],
+      "expected": "wrong_page",
+      "groundTruthNote": "project route opened without selecting a session"
+    },
+    {
+      "id": "session-processing-01-9e93124e",
+      "image": "action-state/session-processing-01-9e93124e.png",
+      "kind": "choice",
+      "questionId": "action_state",
+      "instructions": "Which OpenFox action state is visible in this screenshot? Judge the rendered UI only: a finished outcome, work still in progress, a blocked action, a visible failure, a sign-in requirement, an unexpected page, or a frame that does not justify a verdict.",
+      "choices": [
+        "success",
+        "processing",
+        "blocked",
+        "error",
+        "auth_required",
+        "wrong_page",
+        "unknown"
+      ],
+      "expected": "error",
+      "groundTruthNote": "session backend reports isRunning true while the configured LLM provider is unreachable; the UI renders the retry banner"
+    },
+    {
+      "id": "session-processing-02-9e93124e",
+      "image": "action-state/session-processing-02-9e93124e.png",
+      "kind": "choice",
+      "questionId": "action_state",
+      "instructions": "Which OpenFox action state is visible in this screenshot? Judge the rendered UI only: a finished outcome, work still in progress, a blocked action, a visible failure, a sign-in requirement, an unexpected page, or a frame that does not justify a verdict.",
+      "choices": [
+        "success",
+        "processing",
+        "blocked",
+        "error",
+        "auth_required",
+        "wrong_page",
+        "unknown"
+      ],
+      "expected": "error",
+      "groundTruthNote": "session backend reports isRunning true while the configured LLM provider is unreachable; the UI renders the retry banner"
+    },
+    {
+      "id": "session-processing-03-9e93124e",
+      "image": "action-state/session-processing-03-9e93124e.png",
+      "kind": "choice",
+      "questionId": "action_state",
+      "instructions": "Which OpenFox action state is visible in this screenshot? Judge the rendered UI only: a finished outcome, work still in progress, a blocked action, a visible failure, a sign-in requirement, an unexpected page, or a frame that does not justify a verdict.",
+      "choices": [
+        "success",
+        "processing",
+        "blocked",
+        "error",
+        "auth_required",
+        "wrong_page",
+        "unknown"
+      ],
+      "expected": "error",
+      "groundTruthNote": "session backend reports isRunning true while the configured LLM provider is unreachable; the UI renders the retry banner"
+    },
+    {
+      "id": "session-processing-04-9e93124e",
+      "image": "action-state/session-processing-04-9e93124e.png",
+      "kind": "choice",
+      "questionId": "action_state",
+      "instructions": "Which OpenFox action state is visible in this screenshot? Judge the rendered UI only: a finished outcome, work still in progress, a blocked action, a visible failure, a sign-in requirement, an unexpected page, or a frame that does not justify a verdict.",
+      "choices": [
+        "success",
+        "processing",
+        "blocked",
+        "error",
+        "auth_required",
+        "wrong_page",
+        "unknown"
+      ],
+      "expected": "error",
+      "groundTruthNote": "session backend reports isRunning true while the configured LLM provider is unreachable; the UI renders the retry banner"
+    },
+    {
+      "id": "provider-error-llm-call-failed-01",
+      "image": "action-state/provider-error-llm-call-failed-01.png",
+      "kind": "choice",
+      "questionId": "action_state",
+      "instructions": "Which OpenFox action state is visible in this screenshot? Judge the rendered UI only: a finished outcome, work still in progress, a blocked action, a visible failure, a sign-in requirement, an unexpected page, or a frame that does not justify a verdict.",
+      "choices": [
+        "success",
+        "processing",
+        "blocked",
+        "error",
+        "auth_required",
+        "wrong_page",
+        "unknown"
+      ],
+      "expected": "error",
+      "groundTruthNote": "active provider endpoint unreachable; UI surfaces the retry state"
+    },
+    {
+      "id": "ambiguous-running-indicator-only",
+      "image": "action-state/ambiguous-running-indicator-only.png",
+      "kind": "choice",
+      "questionId": "action_state",
+      "instructions": "Which OpenFox action state is visible in this screenshot? Judge the rendered UI only: a finished outcome, work still in progress, a blocked action, a visible failure, a sign-in requirement, an unexpected page, or a frame that does not justify a verdict.",
+      "choices": [
+        "success",
+        "processing",
+        "blocked",
+        "error",
+        "auth_required",
+        "wrong_page",
+        "unknown"
+      ],
+      "expected": "unknown",
+      "groundTruthNote": "deliberate crop of a genuine OpenFox state with the discriminating evidence removed"
+    },
+    {
+      "id": "ambiguous-composer-only",
+      "image": "action-state/ambiguous-composer-only.png",
+      "kind": "choice",
+      "questionId": "action_state",
+      "instructions": "Which OpenFox action state is visible in this screenshot? Judge the rendered UI only: a finished outcome, work still in progress, a blocked action, a visible failure, a sign-in requirement, an unexpected page, or a frame that does not justify a verdict.",
+      "choices": [
+        "success",
+        "processing",
+        "blocked",
+        "error",
+        "auth_required",
+        "wrong_page",
+        "unknown"
+      ],
+      "expected": "unknown",
+      "groundTruthNote": "deliberate crop of a genuine OpenFox state with the discriminating evidence removed"
+    },
+    {
+      "id": "ambiguous-transcript-header-only",
+      "image": "action-state/ambiguous-transcript-header-only.png",
+      "kind": "choice",
+      "questionId": "action_state",
+      "instructions": "Which OpenFox action state is visible in this screenshot? Judge the rendered UI only: a finished outcome, work still in progress, a blocked action, a visible failure, a sign-in requirement, an unexpected page, or a frame that does not justify a verdict.",
+      "choices": [
+        "success",
+        "processing",
+        "blocked",
+        "error",
+        "auth_required",
+        "wrong_page",
+        "unknown"
+      ],
+      "expected": "unknown",
+      "groundTruthNote": "deliberate crop of a genuine OpenFox state with the discriminating evidence removed"
+    },
+    {
+      "id": "ambiguous-sidebar-context-stripped",
+      "image": "action-state/ambiguous-sidebar-context-stripped.png",
+      "kind": "choice",
+      "questionId": "action_state",
+      "instructions": "Which OpenFox action state is visible in this screenshot? Judge the rendered UI only: a finished outcome, work still in progress, a blocked action, a visible failure, a sign-in requirement, an unexpected page, or a frame that does not justify a verdict.",
+      "choices": [
+        "success",
+        "processing",
+        "blocked",
+        "error",
+        "auth_required",
+        "wrong_page",
+        "unknown"
+      ],
+      "expected": "unknown",
+      "groundTruthNote": "deliberate crop of a genuine OpenFox state with the discriminating evidence removed"
+    }
+  ]
+}
