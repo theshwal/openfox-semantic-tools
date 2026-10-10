@@ -104,3 +104,53 @@ test('the README points readers at the user guide', async () => {
   const readme = await readFile(resolve(import.meta.dirname, '../README.md'), 'utf8')
   assert.ok(readme.includes('docs/USER-GUIDE.md'), 'the README must link the user guide')
 })
+
+test('the README documents every registered tool and every setting', async () => {
+  const { registry, tools } = fakeRegistry()
+  register(registry)
+  const readme = await readFile(resolve(import.meta.dirname, '../README.md'), 'utf8')
+  for (const name of tools.keys()) {
+    assert.ok(readme.includes(name), `the README must name ${name}`)
+  }
+  for (const field of SETTINGS.fields) {
+    assert.ok(readme.includes(field.key), `the README must document the ${field.key} setting`)
+  }
+})
+
+test('the README states the defaults it claims, matching the real schema', async () => {
+  const readme = await readFile(resolve(import.meta.dirname, '../README.md'), 'utf8')
+  // Each row of the settings table starts `| \`key\` |` and ends with the
+  // default in its LAST column. A wrong default in the README sends operators
+  // to the wrong first move, so it is compared against the schema, not trusted.
+  for (const field of SETTINGS.fields) {
+    if (field.default === undefined) continue
+    const row = readme
+      .split('\n')
+      // Escaped backticks: they would otherwise close the template literal.
+      .find((line) => new RegExp(`^\\|\\s*\\\`${field.key}\\\`\\s*\\|`).test(line))
+    assert.ok(row, `no settings-table row found for ${field.key}`)
+    const cells = row.split('|').map((cell) => cell.trim())
+    // `| key | required | default | what |` → the default is the third cell.
+    const stated = cells[3]?.replace(/[`*]/g, '').trim() ?? ''
+    const actual = String(field.default)
+    // An empty schema default may be spelled more informatively in the table:
+    // `(empty)` and `(backend default)` both describe "no value configured",
+    // and a blank cell is unreadable in rendered Markdown. Anything else must
+    // match the schema exactly.
+    const acceptable =
+      actual === '' ? ['', '(empty)', '(backend default)', '(unset)', 'unset'] : [actual]
+    assert.ok(
+      acceptable.includes(stated),
+      `${field.key}: README says "${stated}", the schema says "${actual}"`,
+    )
+  }
+})
+
+test('the README links only files that exist', async () => {
+  const { existsSync } = await import('node:fs')
+  const readme = await readFile(resolve(import.meta.dirname, '../README.md'), 'utf8')
+  for (const match of readme.matchAll(/\]\((\.\/[^)#]+)\)/g)) {
+    const target = resolve(import.meta.dirname, '..', match[1]!)
+    assert.ok(existsSync(target), `README links a missing file: ${match[1]}`)
+  }
+})

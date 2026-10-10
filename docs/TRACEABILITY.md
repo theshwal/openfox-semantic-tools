@@ -271,6 +271,10 @@ capability, which retired the blocker this issue was waiting on.
 | D4 | The guide's guarantees are the ones the code keeps | T: `test/user-guide.test.ts` "the guarantees the guide advertises are the ones the code keeps" — asserts no hook/transition, the live-turn anchor, `redirect: 'error'`, no reflected error body, no logging | verified |
 | D5 | The guide claims no unmeasured saving | T: `test/user-guide.test.ts` "the guide does not promise a saving that was never measured" | verified |
 | D6 | The guide defers depth to the reference docs | T: `test/user-guide.test.ts` "the guide points at the deep reference docs instead of duplicating them" | verified |
+| D7 | The README is usable by a non-technical operator | F: README cut from ~700 to ~250 lines and reorganised as: what it is → **tested with** (named runtimes, real numbers) → install → settings table → tools → skills → guarantees → honest limits → further reading; the development detail moved behind links | verified |
+| D8 | The README's evidence claims are true | T: `test/user-guide.test.ts` "the README links only files that exist"; R: every runtime name, version string, case count and pass count in "Tested with" was checked against `benchmark/evidence/**` before being written | verified |
+| D9 | The README documents every tool and every setting, with the real defaults | T: `test/user-guide.test.ts` "the README documents every registered tool and every setting" and "the README states the defaults it claims, matching the real schema" | verified |
+| D10 | The README states the verification result **as a negative finding** | F: the 25/41, 17/41 and 6/41 figures are presented with `observedPositiveStatuses` empty on all three runtimes, and the section is labelled a negative result rather than a score | verified |
 
 ## Scope discipline
 
