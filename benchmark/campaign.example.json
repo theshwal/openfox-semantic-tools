@@ -1,0 +1,12 @@
+{
+  "targets": [
+    {
+      "id": "kev-local",
+      "endpoint": "http://127.0.0.1:8080/v1/systemone",
+      "model": "kev-latest",
+      "unsupportedModel": "definitely-not-a-model",
+      "runtimeVersion": "operator-observed version string, or omit this line",
+      "apiKey": ""
+    }
+  ]
+}
