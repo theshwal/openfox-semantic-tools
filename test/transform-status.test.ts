@@ -64,9 +64,49 @@ test('unreadable numbers become null, never a fabricated zero', () => {
   assert.equal(parsed.segmentsOffered, null, 'an unknown count is null, not 0')
   assert.equal(parsed.segmentsDropped, null)
   assert.equal(parsed.uncertain, null)
+  // Issue #6's "estimated token effect" is recorded in CHARACTERS. A token
+  // figure would need the host's tokenizer, which this plugin does not have.
+  assert.equal(parsed.charsRemoved, null, 'an unknown size is null, not 0')
+  assert.equal(parsed.droppedRoles, null)
 })
 
-// --- The store ---
+test('an applied reduction records its size in characters, and never its content', async () => {
+  const store = new TransformStatusStore()
+  const transform = createContextTransform(
+    () => ({ contextReduce: true, endpoint: 'http://127.0.0.1:1/v1/systemone', timeoutMs: 1000 }),
+    dropHistory,
+    store,
+  )
+  await transform.transform(withHistory(), context)
+  const last = store.snapshot()[0]
+  assert.ok(last?.applied)
+  assert.ok((last.charsRemoved ?? 0) > 0, 'a real reduction must report a real size')
+  assert.ok((last.charsAfter ?? 0) < (last.charsBefore ?? 0))
+  assert.equal(
+    last.charsRemoved,
+    (last.charsBefore ?? 0) - (last.charsAfter ?? 0),
+    'the reported removal must be exactly the difference',
+  )
+  // Roles are recorded; content never is.
+  assert.deepEqual(last.droppedRoles, ['assistant', 'user'], 'roles are sorted, so the report is stable')
+  const serialized = JSON.stringify(store.snapshot())
+  assert.equal(serialized.includes('stale ask'), false, 'no message text in the status')
+  assert.equal(serialized.includes('stale answer'), false)
+})
+
+test('no token count is invented where no tokenizer exists', async () => {
+  const store = new TransformStatusStore()
+  const transform = createContextTransform(
+    () => ({ contextReduce: true, endpoint: 'http://127.0.0.1:1/v1/systemone', timeoutMs: 1000 }),
+    dropHistory,
+    store,
+  )
+  await transform.transform(withHistory(), context)
+  const serialized = JSON.stringify(store.snapshot()).toLowerCase()
+  // A token figure without the host tokenizer would be a guess presented as a
+  // measurement. Characters only.
+  assert.equal(serialized.includes('token'), false, 'no token estimate may be presented as measured')
+})
 
 test('the store records every outcome the transform produces', async () => {
   const store = new TransformStatusStore()

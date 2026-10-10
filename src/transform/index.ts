@@ -312,6 +312,16 @@ export function createContextTransform(
         return unchanged('total_wipe_refused')
       }
 
+      // The effect of the reduction, as counts and characters. Deliberately
+      // NOT a token count: without the host's tokenizer for whatever model is
+      // in use, a token figure would be a guess wearing a precise label.
+      const charsBefore = messages.reduce((n, m) => n + (typeof m.content === 'string' ? m.content.length : 0), 0)
+      const charsAfter = reduced.reduce((n, m) => n + (typeof m.content === 'string' ? m.content.length : 0), 0)
+      const removedChars = charsBefore - charsAfter
+      const droppedRoles = [...new Set(
+        segments.filter((s) => dropped.has(s.index)).map((s) => s.role),
+      )].sort()
+
       return {
         messages: reduced,
         metadata: record({
@@ -321,6 +331,17 @@ export function createContextTransform(
           'semantic.segmentsOffered': asked.length,
           'semantic.segmentsDropped': dropped.size,
           'semantic.uncertain': uncertain,
+          // What was removed, and its estimated token effect — issue #6's hard
+          // requirement to "record what was removed and estimated token
+          // effect". Counts only: the store keeps no message text, so an
+          // operator can see the size of the effect without the content.
+          'semantic.charsRemoved': removedChars,
+          'semantic.charsBefore': charsBefore,
+          'semantic.charsAfter': charsAfter,
+          // Which ROLE was dropped. Still no content: enough to tell a stale
+          // exchange from a dropped user request, which is the safety signal
+          // worth watching.
+          'semantic.droppedRoles': droppedRoles,
         }),
       }
     },

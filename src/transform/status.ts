@@ -22,6 +22,20 @@ export interface TransformStatus {
   segmentsDropped: number | null
   /** Whether the provider's answer left any segment genuinely undecided. */
   uncertain: boolean | null
+  /**
+   * Size of the reduction in CHARACTERS, not tokens.
+   *
+   * Issue #6 asked for the "estimated token effect". A token figure would need
+   * the host's tokenizer for whatever model is configured, which this plugin
+   * does not have; inventing one would be a guess wearing a precise label.
+   * Characters are exact, and the two scale together for the comparison the
+   * status is read for.
+   */
+  charsRemoved: number | null
+  charsBefore: number | null
+  charsAfter: number | null
+  /** Roles that were dropped. Roles only — never any message text. */
+  droppedRoles: string[] | null
   /** How many turns have been reduced since the plugin loaded. */
   appliedTurns: number
 }
@@ -49,6 +63,10 @@ export class TransformStatusStore {
       segmentsOffered: result.segmentsOffered ?? null,
       segmentsDropped: result.segmentsDropped ?? null,
       uncertain: result.uncertain ?? null,
+      charsRemoved: result.charsRemoved ?? null,
+      charsBefore: result.charsBefore ?? null,
+      charsAfter: result.charsAfter ?? null,
+      droppedRoles: result.droppedRoles ?? null,
       appliedTurns: this.#appliedTurns,
     }
     if (result.applied) this.#appliedTurns += 1
@@ -75,6 +93,10 @@ interface PluginMessageTransformResultLike {
   segmentsOffered?: number | null
   segmentsDropped?: number | null
   uncertain?: boolean | null
+  charsRemoved?: number | null
+  charsBefore?: number | null
+  charsAfter?: number | null
+  droppedRoles?: string[] | null
 }
 
 /**
@@ -97,6 +119,14 @@ export function readTransformMetadata(
     segmentsOffered: numberOrNull(metadata['semantic.segmentsOffered']),
     segmentsDropped: numberOrNull(metadata['semantic.segmentsDropped']),
     uncertain: typeof metadata['semantic.uncertain'] === 'boolean' ? metadata['semantic.uncertain'] : null,
+    charsRemoved: numberOrNull(metadata['semantic.charsRemoved']),
+    charsBefore: numberOrNull(metadata['semantic.charsBefore']),
+    charsAfter: numberOrNull(metadata['semantic.charsAfter']),
+    droppedRoles: Array.isArray(metadata['semantic.droppedRoles'])
+      ? (metadata['semantic.droppedRoles'] as unknown[]).filter(
+          (role): role is string => typeof role === 'string',
+        )
+      : null,
   }
 }
 
@@ -108,4 +138,8 @@ export const TRANSFORM_METADATA_KEYS = {
   segmentsOffered: 'semantic.segmentsOffered',
   segmentsDropped: 'semantic.segmentsDropped',
   uncertain: 'semantic.uncertain',
+  charsRemoved: 'semantic.charsRemoved',
+  charsBefore: 'semantic.charsBefore',
+  charsAfter: 'semantic.charsAfter',
+  droppedRoles: 'semantic.droppedRoles',
 } as const

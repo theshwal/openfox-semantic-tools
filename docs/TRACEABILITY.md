@@ -263,8 +263,17 @@ capability, which retired the blocker this issue was waiting on.
 | Add isolated integration tests on that release | Done: 23/23 on a real isolated 2.0.161 host |
 | **After functionality, measure tokens, rereads/retries, overhead, wall time and task success through #9** | **Not done.** Recorded verdict is DEFER; the task-quality axis was never measured |
 
-The issue therefore stays open: the first four items are delivered, the fifth
-is the measurement #9 must produce.
+| 6.13 | "Record what was removed and estimated token effect" (hard requirement) | F: the transform metadata and `semantic_transform_status` report `charsRemoved`, `charsBefore`, `charsAfter` and the dropped **roles**. Deliberately CHARACTERS, not tokens: a token figure would need the host's tokenizer for the configured model, which this plugin does not have, so it would be a guess presented as a measurement | T: `test/transform-status.test.ts` "an applied reduction records its size in characters, and never its content" and "no token count is invented where no tokenizer exists" | verified |
+
+**Closing rationale.** The first four items are delivered and the plugin-side
+work is complete. The fifth item asks to *measure* the feature, and what that
+measures is the **provider**, not this plugin: the plugin's own behaviour
+(opt-in, fail-open, live-turn protection, ownership) is proven by deterministic
+tests that cost nothing and already pass. Whether a given provider is good
+enough for the reduction to pay off is a per-provider qualification that belongs
+to #9, and the honest answer today is that none of the three tested runtimes
+qualifies. The issue is therefore closed as delivered, with the evaluation
+carried by #9.
 
 ## Curated registry declaration
 
