@@ -41,6 +41,7 @@ function stubRegistry(): StubRegistry {
     },
     registerSettings() {},
     registerSkillSource() {},
+    registerMessageTransform() {},
   } as unknown as PluginRegistry
   return {
     registry,
