@@ -38,11 +38,21 @@ Two consequences, both observed in the source of both releases:
    **default branch HEAD**. Passing
    `https://github.com/theshwal/openfox-semantic-tools/tree/v0.1.0` installs
    whatever `main` points at, not `v0.1.0`.
-2. **The packed tarball cannot be installed at all.** `npm pack` applies the
-   `files` allowlist (`dist`, `README.md`, `docs`), so a `.tgz` carries no
-   `src/` and no `tsconfig.json`. The manifest still declares `scripts.build`,
-   so `buildIfNeeded()` tries to compile, fails, and the install is rejected
-   (see Recipe B). There is no build-config-free install path here.
+2. **A `.tgz` unpacked by hand cannot be installed that way.** `npm pack`
+   applies the `files` allowlist (`dist`, `README.md`, `docs`), so an unpacked
+   tarball carries no `src/` and no `tsconfig.json`. The manifest still declares
+   `scripts.build`, so `buildIfNeeded()` tries to compile, fails, and the
+   install is rejected (see Recipe B).
+
+   **This applies to the local-path and GitHub routes only.** The host's npm
+   route is different: `installPluginFromNpm()` runs
+   `npm install --prefix <pluginsDir> <package>` and **does not call
+   `buildIfNeeded()`**, so it loads the prebuilt `dist/` directly and needs no
+   toolchain. That route exists in the host, but this package is not currently
+   published to npm — see #52. Nothing in this document should be read as a
+   claim that a published package would fail to install; it is not published,
+   and the hand-unpacked-tarball failure above is specific to the route that
+   copies a directory and builds it.
 
 Because of (1), the reliable recipe is a **versioned source checkout plus the
 absolute local path**, so the tree you verified is the tree that gets built.
