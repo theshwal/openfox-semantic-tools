@@ -65,6 +65,12 @@ empty for all three). The plugin was designed for exactly that outcome: with
 degrades to `unknown` or a follow-up rather than to a false "done". Zero
 transport failures across all 123 live calls.
 
+These are **not** new measurements and **not** a ranking. They are the dated
+snapshot already recorded in [#9](https://github.com/theshwal/openfox-semantic-tools/issues/9),
+reproduced here so a reader knows the plugin was exercised against real
+runtimes. No run was added while writing this file, no runtime is preferred,
+and no default provider is implied — `custom` remains the default preset.
+
 Full observations: [docs/LIVE-JEV-FINDINGS.md](docs/LIVE-JEV-FINDINGS.md).
 The underlying measurement is tracked in [#9](https://github.com/theshwal/openfox-semantic-tools/issues/9).
 

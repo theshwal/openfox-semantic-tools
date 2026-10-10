@@ -136,6 +136,66 @@ test('an empty or tool-only conversation yields no reducible segment', () => {
   )
 })
 
+// --- Ownership: the transform never mutates the host's array. ---
+
+test('the host message array is never mutated, on any path', async () => {
+  // Upstream co-l/openfox#402 isolates the array the host hands to a
+  // transform, because an in-place edit — before a throw, after a timeout, or
+  // long after the transform returned — would silently corrupt what the host
+  // sends, contradicting the documented fail-open behaviour.
+  //
+  // This plugin does not depend on that PR being merged: it never mutates the
+  // array at all, and always returns a fresh one. Asserted here so the property
+  // survives a future refactor.
+  const hostMessages = [user('old ask'), assistant('old answer'), user('current'), assistant('reply')]
+  const before = JSON.stringify(hostMessages)
+
+  const cases: Array<{ name: string; settings: () => Record<string, unknown>; transport: typeof fetch }> = [
+    { name: 'disabled', settings: () => ({ contextReduce: false }), transport: okTransport },
+    { name: 'failure', settings: () => ({ contextReduce: true, endpoint: 'http://127.0.0.1:1/v1/systemone', timeoutMs: 500 }), transport: (async () => { throw new Error('boom') }) as typeof fetch },
+    {
+      name: 'reduced',
+      settings: () => ({ contextReduce: true, endpoint: 'http://127.0.0.1:1/v1/systemone', timeoutMs: 1000 }),
+      transport: (async (_url: unknown, init: any) => {
+        const body = JSON.parse(String(init.body)) as { questions: Record<string, unknown> }
+        const answers: Record<string, unknown> = {}
+        Object.keys(body.questions).forEach((id, i) => {
+          answers[id] = { type: 'noul', noul: i === 0 ? 0.99 : 0.01, confidence: 0.9 }
+        })
+        return Response.json({ answers })
+      }) as typeof fetch,
+    },
+  ]
+
+  for (const testCase of cases) {
+    const transform = createContextTransform(testCase.settings, testCase.transport)
+    await transform.transform(hostMessages as unknown as Array<Record<string, unknown>>, context())
+    assert.equal(
+      JSON.stringify(hostMessages),
+      before,
+      `${testCase.name}: the transform must not edit the host's array in place`,
+    )
+  }
+})
+
+test('a reduction returns a new array, never the host reference', async () => {
+  const hostMessages = [user('stale'), assistant('stale reply'), user('current'), assistant('reply')]
+  const transform = createContextTransform(
+    () => ({ contextReduce: true, endpoint: 'http://127.0.0.1:1/v1/systemone', timeoutMs: 1000 }),
+    (async (_url: unknown, init: any) => {
+      const body = JSON.parse(String(init.body)) as { questions: Record<string, unknown> }
+      const answers: Record<string, unknown> = {}
+      Object.keys(body.questions).forEach((id, i) => {
+        answers[id] = { type: 'noul', noul: i === 0 ? 0.99 : 0.01, confidence: 0.9 }
+      })
+      return Response.json({ answers })
+    }) as typeof fetch,
+  )
+  const result = await runTransform(transform, hostMessages as unknown as Array<Record<string, unknown>>)
+  assert.equal(result.applied, true)
+  assert.notEqual(result.messages, hostMessages, 'a reduction must build a new array')
+})
+
 // --- The live turn is never a candidate. ---
 
 test('the newest user message is never a reduction candidate', () => {

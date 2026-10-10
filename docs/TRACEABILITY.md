@@ -251,6 +251,20 @@ capability, which retired the blocker this issue was waiting on.
 | 6.9 | No regression to the existing tools | T: full suite 464 passed / 0 failed (2 skipped: the API-mirror drift guard, which needs an installed OpenFox tree and passes 5/5 when one is present via `HARNESS_PKG_DIR`); the transform adds one setting, one registered method and one read-only status tool | verified |
 | 6.10 | The compatibility baseline lives in **one** place | F: `package.json` `openfox.compatibilityBaseline`, read by `scripts/setup-harness.sh` and by `test/helpers/baseline.ts`; T: `test/skill-api-compat.test.ts` "the baseline is declared in exactly one place" fails on any hard-coded literal in `scripts/`, `src/` or `test/` and on a hard-coded shell fallback | verified |
 | 6.11 | One conformance suite, not two copies | F: `scripts/conformance.ts` is now CLI-only (environment, campaign metadata, report writing) and delegates to `runConformanceSuite` in `scripts/conformance-suite.ts`, which `conformance-campaign.ts` and the tests already import; the two implementations were diffed and produce identical reports apart from timing values | verified |
+| 6.12 | The transform must not depend on an unmerged upstream fix | F: the transform never mutates the array the host hands it and always returns a fresh one, so it is unaffected by upstream PR co-l/openfox#402 (input isolation, still open). This is asserted, not assumed | T: `test/transform.test.ts` "the host message array is never mutated, on any path" (disabled, provider failure, and an applied reduction) and "a reduction returns a new array, never the host reference" | verified |
+
+## Issue #6 checklist — status against the issue's own "Unblock and deliver"
+
+| Required by #6 | Status |
+| --- | --- |
+| Identify a **released** OpenFox package with the public message-transform API | Done: 2.0.161 |
+| Revalidate the actual API and update the minimum supported version | Done: type mirror + `>=2.0.161` + drift guard |
+| Implement opt-in bounded relevance, fail-open, protecting system/instruction/current-user content | Done: `contextReduce` default `false`, fail-open on every path, live window excluded from candidacy |
+| Add isolated integration tests on that release | Done: 23/23 on a real isolated 2.0.161 host |
+| **After functionality, measure tokens, rereads/retries, overhead, wall time and task success through #9** | **Not done.** Recorded verdict is DEFER; the task-quality axis was never measured |
+
+The issue therefore stays open: the first four items are delivered, the fifth
+is the measurement #9 must produce.
 
 ## Curated registry declaration
 
