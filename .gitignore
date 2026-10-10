@@ -20,15 +20,22 @@ live-jev-runner.mjs
 
 # Provider evidence under `benchmark/evidence/` is committed ON PURPOSE: it is
 # the dated record a review depends on, and it cannot be re-derived without
-# spending a provider call. That is why the rule is a policy, not a default:
+# spending a provider call.
+#
+# The policy, in terms:
 #
 # - a committed report keeps its per-case OBSERVATIONS (probabilities,
-#   confidences, gate values), because those are the evidence;
-# - anything else that is regenerable stays ignored, and
-# - no raw endpoint, key, header or private path may ever be committed here.
+#   confidences, gate values), because those ARE the evidence;
+# - a committed report must never carry a raw endpoint, key, header or private
+#   path — `test/conformance-campaign.test.ts` fails the build if one does;
+# - if a report starts carrying source or session content rather than public
+#   fixture text, it must be reduced, not committed as-is. See
+#   docs/IMPLEMENTATION.md for the number-only rule that applies to the
+#   smaller campaign snapshots.
 #
-# If a report starts carrying source or session content rather than public
-# fixture text, it must be reduced or excluded, not committed as-is. See
-# docs/IMPLEMENTATION.md for the number-only rule that applies to the smaller
-# campaign snapshots.
-benchmark/evidence/**
+# Anything regenerable stays ignored: that is `benchmark/results/`, above.
+#
+# NOTE: this directory is deliberately NOT excluded. A rule of `**` here was
+# briefly present and silently untracked every provider run, while the comment
+# above claimed the opposite — the evidence a review depends on was absent from
+# the repository, and a contract test failed only because a file was missing.

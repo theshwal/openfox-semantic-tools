@@ -1,0 +1,2475 @@
+{
+  "schemaVersion": 2,
+  "mode": "live",
+  "measured": false,
+  "scope": "policy wiring, label agreement and report shape only. Not decision quality, not a real-provider false-pass rate, not OpenFox end-to-end benefit.",
+  "falsePassRate": null,
+  "falseNegativeRate": null,
+  "falsePassRateReason": "Live transport reached, but the labelled suite is too small and single-run to state a false-pass rate; the raw per-case outcomes are recorded instead.",
+  "fallbackRate": null,
+  "fallbackRateReason": "runs.json fallbacks counts policy routing per fixture, not an observed fallback rate. A rate needs an OpenFox end-to-end run.",
+  "policyVersion": "verify-0.3.0",
+  "policyCalibrated": false,
+  "transportFailures": 0,
+  "caseCount": 41,
+  "fixtureFamilies": {
+    "direct-positive-evidence": 7,
+    "criterion-not-implemented": 6,
+    "other-test-or-scope": 5,
+    "off-scope-change": 5,
+    "ambiguous-criterion": 3,
+    "partial-evidence": 5,
+    "contradictory-evidence": 5,
+    "needs-deeper-verification": 5
+  },
+  "expectedStatusCounts": {
+    "unknown": 10,
+    "needs-verification": 16,
+    "insufficient-evidence": 10,
+    "off-scope": 5
+  },
+  "matched": 17,
+  "mismatches": [
+    {
+      "id": "positive-direct-evidence",
+      "expected": "unknown",
+      "observed": "insufficient-evidence"
+    },
+    {
+      "id": "positive-under-calibrated-policy",
+      "expected": "unknown",
+      "observed": "insufficient-evidence"
+    },
+    {
+      "id": "negative-criterion-not-implemented",
+      "expected": "needs-verification",
+      "observed": "unknown"
+    },
+    {
+      "id": "adversarial-test-log-for-another-test",
+      "expected": "insufficient-evidence",
+      "observed": "off-scope"
+    },
+    {
+      "id": "partial-evidence-summary-without-excerpts",
+      "expected": "insufficient-evidence",
+      "observed": "needs-verification"
+    },
+    {
+      "id": "partial-evidence-invariant-tested-elsewhere",
+      "expected": "insufficient-evidence",
+      "observed": "needs-verification"
+    },
+    {
+      "id": "contradictory-test-asserts-the-opposite",
+      "expected": "needs-verification",
+      "observed": "off-scope"
+    },
+    {
+      "id": "contradictory-summary-denies-criterion",
+      "expected": "needs-verification",
+      "observed": "off-scope"
+    },
+    {
+      "id": "contradictory-code-without-any-check",
+      "expected": "needs-verification",
+      "observed": "off-scope"
+    },
+    {
+      "id": "other-test-config-shape-not-range",
+      "expected": "insufficient-evidence",
+      "observed": "unknown"
+    },
+    {
+      "id": "other-test-green-in-another-package",
+      "expected": "insufficient-evidence",
+      "observed": "needs-verification"
+    },
+    {
+      "id": "other-test-trace-failure-for-sibling-metric",
+      "expected": "insufficient-evidence",
+      "observed": "unknown"
+    },
+    {
+      "id": "ambiguous-outcome-criterion-without-a-threshold",
+      "expected": "unknown",
+      "observed": "needs-verification"
+    },
+    {
+      "id": "needs-deeper-live-endpoint-not-exercised",
+      "expected": "needs-verification",
+      "observed": "off-scope"
+    },
+    {
+      "id": "needs-deeper-partial-parse-accepted-against-the-spec",
+      "expected": "needs-verification",
+      "observed": "insufficient-evidence"
+    },
+    {
+      "id": "needs-deeper-gate-closes-only-on-happy-path",
+      "expected": "needs-verification",
+      "observed": "unknown"
+    },
+    {
+      "id": "not-implemented-no-symbol-in-the-change",
+      "expected": "needs-verification",
+      "observed": "unknown"
+    },
+    {
+      "id": "not-implemented-test-updated-without-the-source",
+      "expected": "needs-verification",
+      "observed": "off-scope"
+    },
+    {
+      "id": "not-implemented-validation-only-in-the-tool-layer",
+      "expected": "insufficient-evidence",
+      "observed": "needs-verification"
+    },
+    {
+      "id": "not-implemented-stale-comment-replaces-the-check",
+      "expected": "needs-verification",
+      "observed": "unknown"
+    },
+    {
+      "id": "positive-skill-load-without-settings",
+      "expected": "unknown",
+      "observed": "insufficient-evidence"
+    },
+    {
+      "id": "partial-evidence-long-report-without-the-failing-assertion",
+      "expected": "insufficient-evidence",
+      "observed": "needs-verification"
+    },
+    {
+      "id": "contradictory-non-json-accepted",
+      "expected": "needs-verification",
+      "observed": "off-scope"
+    },
+    {
+      "id": "contradictory-secret-echoed-in-error-message",
+      "expected": "needs-verification",
+      "observed": "off-scope"
+    }
+  ],
+  "reasonMismatches": [
+    {
+      "id": "ambiguous-outcome-criterion-without-a-threshold",
+      "expectedReason": "criterion_not_testable",
+      "observedReasons": [
+        "criterion_not_satisfied",
+        "evidence_insufficient"
+      ]
+    }
+  ],
+  "calibratedMismatches": [
+    {
+      "id": "positive-under-calibrated-policy",
+      "expected": "pass-candidate",
+      "observed": "insufficient-evidence"
+    },
+    {
+      "id": "positive-cache-eviction-bound",
+      "expected": "pass-candidate",
+      "observed": "unknown"
+    },
+    {
+      "id": "positive-concurrency-single-flight",
+      "expected": "pass-candidate",
+      "observed": "unknown"
+    },
+    {
+      "id": "positive-endpoint-parsing-rules",
+      "expected": "pass-candidate",
+      "observed": "unknown"
+    },
+    {
+      "id": "positive-usage-token-parse-boundaries",
+      "expected": "pass-candidate",
+      "observed": "unknown"
+    },
+    {
+      "id": "positive-skill-load-without-settings",
+      "expected": "pass-candidate",
+      "observed": "insufficient-evidence"
+    }
+  ],
+  "observedPositiveStatuses": [],
+  "cases": [
+    {
+      "id": "positive-direct-evidence",
+      "group": "positive",
+      "category": "direct-positive-evidence",
+      "issueId": "#4",
+      "criterionId": "ac-1",
+      "observed": "insufficient-evidence",
+      "expected": "unknown",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "insufficient-evidence",
+      "matched": false,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "evidence_insufficient"
+      ],
+      "rationale": "All gates are met, but the shipped policy is uncalibrated, so production must stay consultative.",
+      "reportId": "verify:ac-1:deb7d74bfaae336a",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.7905,
+          "satisfied": 0.8476,
+          "evidenceSufficiency": 1.3833,
+          "offScope": 0.2401,
+          "needsDeeperVerification": 0.3788
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.208,
+            "1": 0.2007,
+            "2": 0.5913
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.075,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 1.3833,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "positive-under-calibrated-policy",
+      "group": "positive",
+      "category": "direct-positive-evidence",
+      "issueId": "#4",
+      "criterionId": "ac-2",
+      "observed": "insufficient-evidence",
+      "expected": "unknown",
+      "expectedUnderCalibratedPolicy": "pass-candidate",
+      "observedUnderCalibratedPolicy": "insufficient-evidence",
+      "matched": false,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": false,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "evidence_insufficient"
+      ],
+      "rationale": "Same answers, but this is the only case that may reach pass-candidate, and only with a measured calibration.",
+      "reportId": "verify:ac-2:1cdf61a456e12c6e",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.832,
+          "satisfied": 0.8263,
+          "evidenceSufficiency": 1.0834,
+          "offScope": 0.2389,
+          "needsDeeperVerification": 0.3713
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.2919,
+            "1": 0.3328,
+            "2": 0.3753
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 1.0834,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "negative-criterion-not-implemented",
+      "group": "negative",
+      "category": "criterion-not-implemented",
+      "issueId": "#4",
+      "criterionId": "ac-3",
+      "observed": "unknown",
+      "expected": "needs-verification",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "unknown",
+      "matched": false,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "criterion_not_testable",
+        "criterion_not_satisfied",
+        "evidence_insufficient"
+      ],
+      "rationale": "A confident implementation summary is paired with evidence that does not contain the required check.",
+      "reportId": "verify:ac-3:3c5628c1a16aaed2",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.3748,
+          "satisfied": 0.068,
+          "evidenceSufficiency": 0.5641,
+          "offScope": 0.3894,
+          "needsDeeperVerification": 0.4454
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.5169,
+            "1": 0.402,
+            "2": 0.081
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.1539,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.5641,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "adversarial-assertive-summary-without-code",
+      "group": "adversarial",
+      "category": "other-test-or-scope",
+      "issueId": "#4",
+      "criterionId": "ac-4",
+      "observed": "insufficient-evidence",
+      "expected": "insufficient-evidence",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "insufficient-evidence",
+      "matched": true,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "evidence_insufficient"
+      ],
+      "rationale": "The evidence is an empty test body and an emphatic summary: it contains no code that demonstrates the criterion, and it does not refute it either. The decisive defect here is the evidence, not the criterion, so the correct action is to obtain the real evidence.",
+      "reportId": "verify:ac-4:f42e971020457748",
+      "labelAudit": "CHANGED in verify-0.3.0: unknown -> insufficient-evidence. Justified by the content, not by the score. The evidence block contains a test declaration with an empty body and no implementation line, so `evidenceSufficiency` = 1 (indirect at best) is a decisive reading of a real deficiency, while `satisfied` = 0.62 sits inside its own band and therefore decides nothing. The correct next action for a human is 'go and get the evidence', which is exactly insufficient-evidence. The old `unknown` was the weaker label: it claimed the policy itself could not decide, when the policy had identified something specific. No threshold and no scripted number was touched. The audit brief suggested needs-verification instead; that is rejected on content, because it would require `satisfied` to be decisively false (below 0.6) and the evidence refutes nothing.",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.7975,
+          "satisfied": 0.7578,
+          "evidenceSufficiency": 0.8,
+          "offScope": 0.2864,
+          "needsDeeperVerification": 0.2609
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.3972,
+            "1": 0.4055,
+            "2": 0.1973
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.1082,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.8,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "adversarial-test-log-for-another-test",
+      "group": "adversarial",
+      "category": "other-test-or-scope",
+      "issueId": "#4",
+      "criterionId": "ac-5",
+      "observed": "off-scope",
+      "expected": "insufficient-evidence",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "off-scope",
+      "matched": false,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "off_scope_detected",
+        "criterion_not_satisfied",
+        "evidence_insufficient"
+      ],
+      "rationale": "A green test log for a different property is plausible but does not directly evidence this criterion, while `satisfied` is not refuted: insufficient-evidence is the correct action, go and get the real evidence.",
+      "reportId": "verify:ac-5:80ccd45544ba82a4",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.7475,
+          "satisfied": 0.3467,
+          "evidenceSufficiency": 0.6329,
+          "offScope": 0.4775,
+          "needsDeeperVerification": 0.4487
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.4843,
+            "1": 0.3985,
+            "2": 0.1172
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.0507,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.6329,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "adversarial-off-scope-change",
+      "group": "adversarial",
+      "category": "off-scope-change",
+      "issueId": "#4",
+      "criterionId": "ac-6",
+      "observed": "off-scope",
+      "expected": "off-scope",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "off-scope",
+      "matched": true,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "off_scope_detected",
+        "evidence_insufficient"
+      ],
+      "rationale": "Unrelated public API churn must be surfaced as off-scope even when the criterion itself looks met.",
+      "reportId": "verify:ac-6:cc9419dcf4939725",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.7831,
+          "satisfied": 0.7134,
+          "evidenceSufficiency": 0.7995,
+          "offScope": 0.5166,
+          "needsDeeperVerification": 0.3615
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.4012,
+            "1": 0.3982,
+            "2": 0.2007
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.7995,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "adversarial-ambiguous-criterion",
+      "group": "adversarial",
+      "category": "ambiguous-criterion",
+      "issueId": "#4",
+      "criterionId": "ac-7",
+      "observed": "unknown",
+      "expected": "unknown",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "unknown",
+      "matched": true,
+      "matchedReason": true,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "criterion_not_testable",
+        "criterion_not_satisfied",
+        "evidence_insufficient"
+      ],
+      "rationale": "The criterion is not decidable at all: no state of the code can make it clearly true or clearly false, and no evidence exists either. A dedicated unknown, never a default pass, and never needs-verification because a deeper pass cannot make an undecidable criterion decidable.",
+      "reportId": "verify:ac-7:0fc26e227b2c5379",
+      "labelAudit": "The status was already unknown; what changed in verify-0.3.0 is WHY. Before this batch the case reached unknown through two coincidences, and the label did not say which rule fired. `criterionTestable` (0.1) is now decisively not testable, so the status comes from a dedicated reason. The status label is unchanged because the content already implied it.",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.2391,
+          "satisfied": 0.1191,
+          "evidenceSufficiency": 0.6191,
+          "offScope": 0.241,
+          "needsDeeperVerification": 0.2911
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.4153,
+            "1": 0.5503,
+            "2": 0.0344
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.3254,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.6191,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "positive-cache-eviction-bound",
+      "group": "positive",
+      "category": "direct-positive-evidence",
+      "issueId": "#4",
+      "criterionId": "ac-8",
+      "observed": "unknown",
+      "expected": "unknown",
+      "expectedUnderCalibratedPolicy": "pass-candidate",
+      "observedUnderCalibratedPolicy": "unknown",
+      "matched": true,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": false,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "answer_undecided"
+      ],
+      "rationale": "Implementation, bound and behaviour are all visible in the excerpt and confirmed by a named test, so nothing is refuted and nothing is missing. The shipped policy still routes to unknown because it is uncalibrated.",
+      "reportId": "verify:ac-8:23f712522333fb60",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.7418,
+          "satisfied": 0.9021,
+          "evidenceSufficiency": 1.5805,
+          "offScope": 0.3168,
+          "needsDeeperVerification": 0.3779
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.1342,
+            "1": 0.1511,
+            "2": 0.7147
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.3708,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 1.5805,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "positive-concurrency-single-flight",
+      "group": "positive",
+      "category": "direct-positive-evidence",
+      "issueId": "#4",
+      "criterionId": "ac-9",
+      "observed": "unknown",
+      "expected": "unknown",
+      "expectedUnderCalibratedPolicy": "pass-candidate",
+      "observedUnderCalibratedPolicy": "unknown",
+      "matched": true,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": false,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "answer_undecided"
+      ],
+      "rationale": "The merge is visible in the code path and the round-trip count is asserted, so the criterion is directly evidenced. Kept distinct from ac-2: this one exercises concurrency behaviour rather than report shape.",
+      "reportId": "verify:ac-9:93d63d25fa1f62a7",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.7425,
+          "satisfied": 0.9264,
+          "evidenceSufficiency": 1.6196,
+          "offScope": 0.2658,
+          "needsDeeperVerification": 0.4002
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.1204,
+            "1": 0.1396,
+            "2": 0.74
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.4295,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 1.6196,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "positive-endpoint-parsing-rules",
+      "group": "positive",
+      "category": "direct-positive-evidence",
+      "issueId": "#4",
+      "criterionId": "ac-10",
+      "observed": "unknown",
+      "expected": "unknown",
+      "expectedUnderCalibratedPolicy": "pass-candidate",
+      "observedUnderCalibratedPolicy": "unknown",
+      "matched": true,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": false,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "answer_undecided"
+      ],
+      "rationale": "The refusal is implemented where the criterion requires it and asserted by a test. The only reason this is not a positive today is the uncalibrated policy.",
+      "reportId": "verify:ac-10:eb14a878b6959caa",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.8387,
+          "satisfied": 0.9556,
+          "evidenceSufficiency": 1.8109,
+          "offScope": 0.3374,
+          "needsDeeperVerification": 0.3506
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.0672,
+            "1": 0.0547,
+            "2": 0.8781
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.7163,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 1.8109,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "partial-evidence-summary-without-excerpts",
+      "group": "negative",
+      "category": "partial-evidence",
+      "issueId": "#4",
+      "criterionId": "ac-11",
+      "observed": "needs-verification",
+      "expected": "insufficient-evidence",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "needs-verification",
+      "matched": false,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "criterion_not_satisfied",
+        "evidence_insufficient"
+      ],
+      "rationale": "Only a summary is supplied, with no code and no test output. The change is plausible and nothing refutes the criterion, so the correct action is to supply the excerpt rather than to declare the work missing.",
+      "reportId": "verify:ac-11:753cbba91c92111d",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.6652,
+          "satisfied": 0.1549,
+          "evidenceSufficiency": 0.5631,
+          "offScope": 0.3668,
+          "needsDeeperVerification": 0.5097
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.4921,
+            "1": 0.4526,
+            "2": 0.0552
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.1554,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.5631,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "partial-evidence-invariant-tested-elsewhere",
+      "group": "negative",
+      "category": "partial-evidence",
+      "issueId": "#4",
+      "criterionId": "ac-12",
+      "observed": "needs-verification",
+      "expected": "insufficient-evidence",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "needs-verification",
+      "matched": false,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "criterion_not_satisfied",
+        "evidence_insufficient"
+      ],
+      "rationale": "The one-line call site is visible and nothing contradicts the criterion, but the helper's behaviour is not in the evidence. Insufficient evidence, not a failure: the right next action is to show the helper or its test.",
+      "reportId": "verify:ac-12:13bcca9f2141d7a8",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.54,
+          "satisfied": 0.227,
+          "evidenceSufficiency": 0.5648,
+          "offScope": 0.3778,
+          "needsDeeperVerification": 0.3774
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.4852,
+            "1": 0.4647,
+            "2": 0.0501
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.1528,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.5648,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "partial-evidence-two-of-three-assertions",
+      "group": "negative",
+      "category": "partial-evidence",
+      "issueId": "#4",
+      "criterionId": "ac-13",
+      "observed": "insufficient-evidence",
+      "expected": "insufficient-evidence",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "insufficient-evidence",
+      "matched": true,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "evidence_insufficient"
+      ],
+      "rationale": "The code and the test show one of the two required behaviours: the code is clearly there, but nothing shows a dedicated code, so the criterion is only partly evidenced. Go and read the error mapping.",
+      "reportId": "verify:ac-13:b6336d55bca8f370",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.6314,
+          "satisfied": 0.7774,
+          "evidenceSufficiency": 1.3636,
+          "offScope": 0.347,
+          "needsDeeperVerification": 0.4099
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.2194,
+            "1": 0.1977,
+            "2": 0.5829
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.0454,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 1.3636,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "contradictory-test-asserts-the-opposite",
+      "group": "adversarial",
+      "category": "contradictory-evidence",
+      "issueId": "#4",
+      "criterionId": "ac-14",
+      "observed": "off-scope",
+      "expected": "needs-verification",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "off-scope",
+      "matched": false,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "off_scope_detected",
+        "criterion_not_satisfied",
+        "evidence_insufficient"
+      ],
+      "rationale": "The deterministic output is red and explicitly states the opposite behaviour, so this is a decided failure rather than a gap in the evidence: the work is incomplete and must be redone.",
+      "reportId": "verify:ac-14:a46b08d1d24ae2ad",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.7028,
+          "satisfied": 0.2656,
+          "evidenceSufficiency": 0.7002,
+          "offScope": 0.4045,
+          "needsDeeperVerification": 0.4514
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.4509,
+            "1": 0.3979,
+            "2": 0.1511
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.7002,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "contradictory-summary-denies-criterion",
+      "group": "adversarial",
+      "category": "contradictory-evidence",
+      "issueId": "#4",
+      "criterionId": "ac-15",
+      "observed": "off-scope",
+      "expected": "needs-verification",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "off-scope",
+      "matched": false,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "off_scope_detected",
+        "criterion_not_satisfied",
+        "evidence_insufficient"
+      ],
+      "rationale": "The evidence both implements and demonstrates the violation, and the deterministic test is red. The criterion is refuted, so the work must be redone rather than merely evidenced.",
+      "reportId": "verify:ac-15:3f21341f736b369a",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.8257,
+          "satisfied": 0.0259,
+          "evidenceSufficiency": 1.2362,
+          "offScope": 0.4143,
+          "needsDeeperVerification": 0.6673
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.274,
+            "1": 0.2158,
+            "2": 0.5102
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 1.2362,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "contradictory-code-without-any-check",
+      "group": "adversarial",
+      "category": "contradictory-evidence",
+      "issueId": "#4",
+      "criterionId": "ac-16",
+      "observed": "off-scope",
+      "expected": "needs-verification",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "off-scope",
+      "matched": false,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "off_scope_detected",
+        "criterion_not_satisfied",
+        "evidence_insufficient"
+      ],
+      "rationale": "A green test for the removal is worse than silence: the code shown cannot perform the required comparison. The criterion is decidable and refuted, so a deeper pass and a real implementation are both required.",
+      "reportId": "verify:ac-16:8994708134a3ae20",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.4253,
+          "satisfied": 0.1451,
+          "evidenceSufficiency": 0.6348,
+          "offScope": 0.4535,
+          "needsDeeperVerification": 0.379
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.5004,
+            "1": 0.3643,
+            "2": 0.1353
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.0477,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.6348,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "other-test-config-shape-not-range",
+      "group": "adversarial",
+      "category": "other-test-or-scope",
+      "issueId": "#4",
+      "criterionId": "ac-17",
+      "observed": "unknown",
+      "expected": "insufficient-evidence",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "unknown",
+      "matched": false,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "criterion_not_testable",
+        "criterion_not_satisfied",
+        "evidence_insufficient"
+      ],
+      "rationale": "The test name is the very one a previous change introduced and it does not mention a range or a rejection. The criterion is not refuted, only unevidenced, so the action is to supply the real assertion.",
+      "reportId": "verify:ac-17:0ea6ffd983c6bfeb",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.3824,
+          "satisfied": 0.3019,
+          "evidenceSufficiency": 0.7216,
+          "offScope": 0.3574,
+          "needsDeeperVerification": 0.4479
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.438,
+            "1": 0.4024,
+            "2": 0.1596
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.7216,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "other-test-green-in-another-package",
+      "group": "adversarial",
+      "category": "other-test-or-scope",
+      "issueId": "#4",
+      "criterionId": "ac-18",
+      "observed": "needs-verification",
+      "expected": "insufficient-evidence",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "needs-verification",
+      "matched": false,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "criterion_not_satisfied",
+        "evidence_insufficient"
+      ],
+      "rationale": "The excerpt supports the criterion and the test log comes from a different subject. Nothing contradicts it; the honest reading is that the decisive test was not supplied.",
+      "reportId": "verify:ac-18:dc898651ee6f0a3a",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.889,
+          "satisfied": 0.5811,
+          "evidenceSufficiency": 0.6369,
+          "offScope": 0.3769,
+          "needsDeeperVerification": 0.3658
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.4696,
+            "1": 0.4239,
+            "2": 0.1065
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.0447,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.6369,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "other-test-trace-failure-for-sibling-metric",
+      "group": "adversarial",
+      "category": "other-test-or-scope",
+      "issueId": "#4",
+      "criterionId": "ac-19",
+      "observed": "unknown",
+      "expected": "insufficient-evidence",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "unknown",
+      "matched": false,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "answer_undecided"
+      ],
+      "rationale": "The first green line is relevant but the change also touched an unrelated grouping helper, so the evidence for this criterion alone is indirect. Insufficient evidence is the honest call: no refutation, no direct proof.",
+      "reportId": "verify:ac-19:53dcd09dd72d1780",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.8787,
+          "satisfied": 0.929,
+          "evidenceSufficiency": 1.6416,
+          "offScope": 0.3515,
+          "needsDeeperVerification": 0.3305
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.1184,
+            "1": 0.1216,
+            "2": 0.76
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.4624,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 1.6416,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "off-scope-wholesale-rename-in-a-documentation-only-task",
+      "group": "adversarial",
+      "category": "off-scope-change",
+      "issueId": "#4",
+      "criterionId": "ac-20",
+      "observed": "off-scope",
+      "expected": "off-scope",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "off-scope",
+      "matched": true,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "off_scope_detected",
+        "evidence_insufficient"
+      ],
+      "rationale": "The criterion is met, but a documentation-only task that relocates the contributor guide is unrelated behaviour. Off-scope outranks a positive reading of the criterion itself.",
+      "reportId": "verify:ac-20:c69bf893dab8da9b",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.8411,
+          "satisfied": 0.8713,
+          "evidenceSufficiency": 0.7896,
+          "offScope": 0.4594,
+          "needsDeeperVerification": 0.3334
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.395,
+            "1": 0.4204,
+            "2": 0.1846
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.1306,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.7896,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "off-scope-refactor-plus-backwards-compatible-field",
+      "group": "adversarial",
+      "category": "off-scope-change",
+      "issueId": "#4",
+      "criterionId": "ac-21",
+      "observed": "off-scope",
+      "expected": "off-scope",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "off-scope",
+      "matched": true,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "off_scope_detected",
+        "evidence_insufficient"
+      ],
+      "rationale": "Replacing a shared formatter is unrelated to recording a number, even though the number is present. The correct next action is to split the change, not to accept it.",
+      "reportId": "verify:ac-21:424fef5f459bc2f5",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.8176,
+          "satisfied": 0.8992,
+          "evidenceSufficiency": 0.9678,
+          "offScope": 0.6059,
+          "needsDeeperVerification": 0.3797
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.3084,
+            "1": 0.4153,
+            "2": 0.2762
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.123,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.9678,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "off-scope-dependency-bump-in-a-bugfix-commit",
+      "group": "adversarial",
+      "category": "off-scope-change",
+      "issueId": "#4",
+      "criterionId": "ac-22",
+      "observed": "off-scope",
+      "expected": "off-scope",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "off-scope",
+      "matched": true,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "off_scope_detected",
+        "evidence_insufficient"
+      ],
+      "rationale": "A dependency bump and a default log level are unrelated behaviour in a bugfix commit. The criterion being met does not make the change in scope.",
+      "reportId": "verify:ac-22:883f85f58934ee1e",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.7494,
+          "satisfied": 0.9098,
+          "evidenceSufficiency": 1.0472,
+          "offScope": 0.7312,
+          "needsDeeperVerification": 0.334
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.3004,
+            "1": 0.3519,
+            "2": 0.3477
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.0278,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 1.0472,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "ambiguous-criterion-quality-word-without-a-measure",
+      "group": "adversarial",
+      "category": "ambiguous-criterion",
+      "issueId": "#4",
+      "criterionId": "ac-23",
+      "observed": "unknown",
+      "expected": "unknown",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "unknown",
+      "matched": true,
+      "matchedReason": true,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "criterion_not_testable",
+        "evidence_insufficient"
+      ],
+      "rationale": "No state of the code can make the word robust clearly true or clearly false, so the correct action is to rewrite the criterion with an observable property. A deeper verification pass cannot help here.",
+      "reportId": "verify:ac-23:ad170f7f6d3e372d",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.3749,
+          "satisfied": 0.8717,
+          "evidenceSufficiency": 1.0536,
+          "offScope": 0.3023,
+          "needsDeeperVerification": 0.3376
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.2827,
+            "1": 0.381,
+            "2": 0.3363
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.0715,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 1.0536,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "ambiguous-outcome-criterion-without-a-threshold",
+      "group": "adversarial",
+      "category": "ambiguous-criterion",
+      "issueId": "#4",
+      "criterionId": "ac-24",
+      "observed": "needs-verification",
+      "expected": "unknown",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "needs-verification",
+      "matched": false,
+      "matchedReason": false,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "criterion_not_satisfied",
+        "evidence_insufficient"
+      ],
+      "rationale": "The criterion names an outcome but no threshold, so three percent and thirty percent would both be called significant. The evidence is real; the criterion is what cannot be decided.",
+      "reportId": "verify:ac-24:e8576e84ee9ca7a7",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.6432,
+          "satisfied": 0.0241,
+          "evidenceSufficiency": 0.9789,
+          "offScope": 0.2553,
+          "needsDeeperVerification": 0.4752
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.3446,
+            "1": 0.3319,
+            "2": 0.3235
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.9789,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "needs-deeper-live-endpoint-not-exercised",
+      "group": "negative",
+      "category": "needs-deeper-verification",
+      "issueId": "#4",
+      "criterionId": "ac-25",
+      "observed": "off-scope",
+      "expected": "needs-verification",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "off-scope",
+      "matched": false,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "off_scope_detected",
+        "evidence_insufficient"
+      ],
+      "rationale": "The code looks right and nothing refutes the criterion, but every observation comes from a stub: a real runtime may stream the body differently. A deeper pass against a live endpoint is the right next action.",
+      "reportId": "verify:ac-25:35b149fe554af067",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.6056,
+          "satisfied": 0.7574,
+          "evidenceSufficiency": 1.1583,
+          "offScope": 0.5123,
+          "needsDeeperVerification": 0.4087
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.2706,
+            "1": 0.3005,
+            "2": 0.4289
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 1.1583,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "needs-deeper-hardcoded-guard-against-configurable-setting",
+      "group": "negative",
+      "category": "needs-deeper-verification",
+      "issueId": "#4",
+      "criterionId": "ac-26",
+      "observed": "needs-verification",
+      "expected": "needs-verification",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "needs-verification",
+      "matched": true,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "criterion_not_satisfied",
+        "evidence_insufficient"
+      ],
+      "rationale": "The criterion is only met in appearance: the lifetime comes from a hard-coded default, so a deeper reading of the settings layer would find the gap. Nothing is refuted, so the answer is a deeper pass rather than insufficient evidence.",
+      "reportId": "verify:ac-26:fb6c50c531ea718e",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.442,
+          "satisfied": 0.0342,
+          "evidenceSufficiency": 0.5523,
+          "offScope": 0.344,
+          "needsDeeperVerification": 0.5705
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.5189,
+            "1": 0.4098,
+            "2": 0.0713
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.1715,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.5523,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "needs-deeper-partial-parse-accepted-against-the-spec",
+      "group": "negative",
+      "category": "needs-deeper-verification",
+      "issueId": "#4",
+      "criterionId": "ac-27",
+      "observed": "insufficient-evidence",
+      "expected": "needs-verification",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "insufficient-evidence",
+      "matched": false,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "evidence_insufficient"
+      ],
+      "rationale": "One runtime shape is genuinely covered and the other only passes against a double, so a superficial fix is plausible and a deeper pass across both shapes is warranted.",
+      "reportId": "verify:ac-27:0d37c42887026054",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.7606,
+          "satisfied": 0.8897,
+          "evidenceSufficiency": 1.1837,
+          "offScope": 0.3737,
+          "needsDeeperVerification": 0.4313
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.274,
+            "1": 0.2683,
+            "2": 0.4577
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 1.1837,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "needs-deeper-gate-closes-only-on-happy-path",
+      "group": "negative",
+      "category": "needs-deeper-verification",
+      "issueId": "#4",
+      "criterionId": "ac-28",
+      "observed": "unknown",
+      "expected": "needs-verification",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "unknown",
+      "matched": false,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "criterion_not_testable",
+        "criterion_not_satisfied",
+        "evidence_insufficient"
+      ],
+      "rationale": "Nothing is refuted and the test is green, but a single-model run cannot show the key separates models. A deeper verification with a second model is the next action.",
+      "reportId": "verify:ac-28:9c1098d2680a0237",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.3006,
+          "satisfied": 0.0314,
+          "evidenceSufficiency": 0.5868,
+          "offScope": 0.3966,
+          "needsDeeperVerification": 0.3996
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.4893,
+            "1": 0.4345,
+            "2": 0.0761
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.1198,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.5868,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "needs-deeper-timeout-army-versus-real-clock",
+      "group": "negative",
+      "category": "needs-deeper-verification",
+      "issueId": "#4",
+      "criterionId": "ac-29",
+      "observed": "needs-verification",
+      "expected": "needs-verification",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "needs-verification",
+      "matched": true,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "criterion_not_satisfied",
+        "evidence_insufficient"
+      ],
+      "rationale": "The wiring is visible and nothing contradicts it, but the only test never lets a clock run out, so a deeper run against a slow endpoint is needed before claiming the guarantee.",
+      "reportId": "verify:ac-29:cb32d53ff6e7aadb",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.5923,
+          "satisfied": 0.3053,
+          "evidenceSufficiency": 0.7863,
+          "offScope": 0.3792,
+          "needsDeeperVerification": 0.4521
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.3496,
+            "1": 0.5144,
+            "2": 0.136
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.2717,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.7863,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "not-implemented-no-symbol-in-the-change",
+      "group": "negative",
+      "category": "criterion-not-implemented",
+      "issueId": "#4",
+      "criterionId": "ac-30",
+      "observed": "unknown",
+      "expected": "needs-verification",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "unknown",
+      "matched": false,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "criterion_not_testable",
+        "criterion_not_satisfied",
+        "evidence_insufficient"
+      ],
+      "rationale": "Classification is only half the criterion: the block itself never appears in the change. The work is incomplete, which is a redoing of the task, not a request for more evidence.",
+      "reportId": "verify:ac-30:b5ba06531c9935a6",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.3476,
+          "satisfied": 0.1231,
+          "evidenceSufficiency": 0.6212,
+          "offScope": 0.3773,
+          "needsDeeperVerification": 0.3652
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.5063,
+            "1": 0.3662,
+            "2": 0.1275
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.0682,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.6212,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "not-implemented-guard-missing-from-the-parser",
+      "group": "negative",
+      "category": "criterion-not-implemented",
+      "issueId": "#4",
+      "criterionId": "ac-31",
+      "observed": "needs-verification",
+      "expected": "needs-verification",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "needs-verification",
+      "matched": true,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "criterion_not_satisfied",
+        "evidence_insufficient"
+      ],
+      "rationale": "The criterion is decidable and the shown code cannot satisfy it: the required guard is simply absent. Redo the work.",
+      "reportId": "verify:ac-31:2e4052409090c6a4",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.6959,
+          "satisfied": 0.192,
+          "evidenceSufficiency": 0.52,
+          "offScope": 0.368,
+          "needsDeeperVerification": 0.3534
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.5457,
+            "1": 0.3886,
+            "2": 0.0657
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.22,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.52,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "not-implemented-test-updated-without-the-source",
+      "group": "negative",
+      "category": "criterion-not-implemented",
+      "issueId": "#4",
+      "criterionId": "ac-32",
+      "observed": "off-scope",
+      "expected": "needs-verification",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "off-scope",
+      "matched": false,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "off_scope_detected",
+        "evidence_insufficient"
+      ],
+      "rationale": "The change adjusts the test to accept the very behaviour the criterion forbids. The criterion is refuted by its own evidence, so the implementation must change.",
+      "reportId": "verify:ac-32:18c1e6c62f9707b7",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.731,
+          "satisfied": 0.6511,
+          "evidenceSufficiency": 0.9864,
+          "offScope": 0.4121,
+          "needsDeeperVerification": 0.4255
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.3292,
+            "1": 0.3552,
+            "2": 0.3156
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.0328,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.9864,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "not-implemented-validation-only-in-the-tool-layer",
+      "group": "negative",
+      "category": "criterion-not-implemented",
+      "issueId": "#4",
+      "criterionId": "ac-33",
+      "observed": "needs-verification",
+      "expected": "insufficient-evidence",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "needs-verification",
+      "matched": false,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "criterion_not_satisfied",
+        "evidence_insufficient"
+      ],
+      "rationale": "The excerpt is the whole of the decision-bearing material: it shows a delegated validation call and a transport call, neither of which implements the object check the criterion names, and the only test that exists exercises a different layer. The criterion is not refuted, so the correct action is to supply the evidence that would decide it.",
+      "reportId": "verify:ac-33:4345359a0c360e16",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.5441,
+          "satisfied": 0.4374,
+          "evidenceSufficiency": 0.685,
+          "offScope": 0.3566,
+          "needsDeeperVerification": 0.4492
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.4202,
+            "1": 0.4746,
+            "2": 0.1052
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.2119,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.685,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "not-implemented-stale-comment-replaces-the-check",
+      "group": "negative",
+      "category": "criterion-not-implemented",
+      "issueId": "#4",
+      "criterionId": "ac-34",
+      "observed": "unknown",
+      "expected": "needs-verification",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "unknown",
+      "matched": false,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "criterion_not_testable",
+        "criterion_not_satisfied",
+        "evidence_insufficient"
+      ],
+      "rationale": "A comment that promises a check is not a check, and the loop shown is decidably missing it. The task is incomplete.",
+      "reportId": "verify:ac-34:e461111f6c1301f6",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.3859,
+          "satisfied": 0.0651,
+          "evidenceSufficiency": 0.526,
+          "offScope": 0.2958,
+          "needsDeeperVerification": 0.4513
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.5223,
+            "1": 0.4293,
+            "2": 0.0483
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.211,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.526,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "positive-usage-token-parse-boundaries",
+      "group": "positive",
+      "category": "direct-positive-evidence",
+      "issueId": "#4",
+      "criterionId": "ac-35",
+      "observed": "unknown",
+      "expected": "unknown",
+      "expectedUnderCalibratedPolicy": "pass-candidate",
+      "observedUnderCalibratedPolicy": "unknown",
+      "matched": true,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": false,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "answer_undecided"
+      ],
+      "rationale": "The rejection path and the accepted path are both visible, and both are named in the test log. Only the uncalibrated policy keeps this out of a positive status.",
+      "reportId": "verify:ac-35:4c26a70e2b91ce5a",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.6763,
+          "satisfied": 0.7451,
+          "evidenceSufficiency": 1.529,
+          "offScope": 0.3282,
+          "needsDeeperVerification": 0.4118
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.1604,
+            "1": 0.1501,
+            "2": 0.6895
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.2936,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 1.529,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "positive-skill-load-without-settings",
+      "group": "positive",
+      "category": "direct-positive-evidence",
+      "issueId": "#4",
+      "criterionId": "ac-36",
+      "observed": "insufficient-evidence",
+      "expected": "unknown",
+      "expectedUnderCalibratedPolicy": "pass-candidate",
+      "observedUnderCalibratedPolicy": "insufficient-evidence",
+      "matched": false,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": false,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "evidence_insufficient"
+      ],
+      "rationale": "The behaviour is visible in the code and asserted directly by the named test, with no unrelated behaviour in the excerpt.",
+      "reportId": "verify:ac-36:667429d1af5ab9a9",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.8494,
+          "satisfied": 0.8596,
+          "evidenceSufficiency": 1.4183,
+          "offScope": 0.3686,
+          "needsDeeperVerification": 0.3657
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.19,
+            "1": 0.2016,
+            "2": 0.6084
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.1275,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 1.4183,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "partial-evidence-long-report-without-the-failing-assertion",
+      "group": "negative",
+      "category": "partial-evidence",
+      "issueId": "#4",
+      "criterionId": "ac-37",
+      "observed": "needs-verification",
+      "expected": "insufficient-evidence",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "needs-verification",
+      "matched": false,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "criterion_not_satisfied",
+        "evidence_insufficient"
+      ],
+      "rationale": "A lot of evidence was supplied and none of it bears on the enumeration question. The criterion is not refuted; the evidence is simply off target.",
+      "reportId": "verify:ac-37:c4e5418c8ff1927a",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.4788,
+          "satisfied": 0.5544,
+          "evidenceSufficiency": 0.6162,
+          "offScope": 0.353,
+          "needsDeeperVerification": 0.3604
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.5016,
+            "1": 0.3805,
+            "2": 0.1178
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.0757,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.6162,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "contradictory-non-json-accepted",
+      "group": "adversarial",
+      "category": "contradictory-evidence",
+      "issueId": "#4",
+      "criterionId": "ac-38",
+      "observed": "off-scope",
+      "expected": "needs-verification",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "off-scope",
+      "matched": false,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "off_scope_detected",
+        "criterion_not_satisfied",
+        "evidence_insufficient"
+      ],
+      "rationale": "The diff shows the rejection being deleted and a green test protecting the opposite behaviour. The criterion is refuted by the change itself.",
+      "reportId": "verify:ac-38:df77ae6ef55068fc",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.6078,
+          "satisfied": 0.1111,
+          "evidenceSufficiency": 1.3556,
+          "offScope": 0.4814,
+          "needsDeeperVerification": 0.4178
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.2087,
+            "1": 0.227,
+            "2": 0.5643
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.0333,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 1.3556,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "contradictory-secret-echoed-in-error-message",
+      "group": "adversarial",
+      "category": "contradictory-evidence",
+      "issueId": "#4",
+      "criterionId": "ac-39",
+      "observed": "off-scope",
+      "expected": "needs-verification",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "off-scope",
+      "matched": false,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "off_scope_detected",
+        "criterion_not_satisfied",
+        "evidence_insufficient"
+      ],
+      "rationale": "The evidence shows an unbounded body being echoed, which is the exact opposite of the criterion. Nothing about this case is a gap in evidence: the work is wrong and must be redone.",
+      "reportId": "verify:ac-39:69ab86fe1030ddf4",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.5558,
+          "satisfied": 0.1486,
+          "evidenceSufficiency": 0.7795,
+          "offScope": 0.4472,
+          "needsDeeperVerification": 0.505
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.4165,
+            "1": 0.3875,
+            "2": 0.196
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.7795,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "off-scope-test-helper-rewrite-within-a-fix",
+      "group": "adversarial",
+      "category": "off-scope-change",
+      "issueId": "#4",
+      "criterionId": "ac-40",
+      "observed": "off-scope",
+      "expected": "off-scope",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "off-scope",
+      "matched": true,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "off_scope_detected"
+      ],
+      "rationale": "Rewriting a shared harness and converting an assertion library across the suite is unrelated to correcting one assertion. The criterion is met and the change is still not in scope.",
+      "reportId": "verify:ac-40:5299bbe6888ad255",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.8646,
+          "satisfied": 0.9247,
+          "evidenceSufficiency": 1.5697,
+          "offScope": 0.5884,
+          "needsDeeperVerification": 0.3573
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.147,
+            "1": 0.1362,
+            "2": 0.7167
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.3546,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 1.5697,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    },
+    {
+      "id": "partial-no-evidence-submitted-at-all",
+      "group": "negative",
+      "category": "partial-evidence",
+      "issueId": "#4",
+      "criterionId": "ac-41",
+      "observed": "needs-verification",
+      "expected": "needs-verification",
+      "expectedUnderCalibratedPolicy": null,
+      "observedUnderCalibratedPolicy": "needs-verification",
+      "matched": true,
+      "matchedReason": null,
+      "matchedUnderCalibratedPolicy": null,
+      "advisory": true,
+      "policyVersion": "verify-0.3.0",
+      "calibrated": false,
+      "reasons": [
+        "criterion_not_satisfied",
+        "evidence_insufficient"
+      ],
+      "rationale": "The caller submitted the criterion alone: no code, no test output, no summary. Nothing supports the criterion, so it is not satisfied on this submission and the work must be done and evidenced. The absence of evidence is the finding here, not a reason to stay silent.",
+      "reportId": "verify:ac-41:4c68139122eba260",
+      "labelAudit": "Labelled needs-verification, not insufficient-evidence, and the content is the reason. With no evidence at all there is no reading on which the criterion could hold, so a provider can only answer that it is not satisfied; that is a decisive negative and the policy routes it to needs-verification. Calling this a gap in the evidence would claim the work might already be done, which nothing here supports. AGENTS.md invariant 7 is the governing rule: a provider answer that carries no support must never resolve to a benign reading.",
+      "observedNumbers": {
+        "provider": "system-one",
+        "model": "kev-latest",
+        "gateValues": {
+          "criterionTestable": 0.7758,
+          "satisfied": 0.5433,
+          "evidenceSufficiency": 0.6278,
+          "offScope": 0.3853,
+          "needsDeeperVerification": 0.4582
+        },
+        "probabilities": {
+          "evidenceSufficiency": {
+            "0": 0.5427,
+            "1": 0.2868,
+            "2": 0.1705
+          }
+        },
+        "confidence": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.0583,
+          "offScope": null,
+          "needsDeeperVerification": null
+        },
+        "scores": {
+          "criterionTestable": null,
+          "satisfied": null,
+          "evidenceSufficiency": 0.6278,
+          "offScope": null,
+          "needsDeeperVerification": null
+        }
+      }
+    }
+  ],
+  "observedFields": {
+    "contains": [
+      "provider",
+      "model",
+      "gateValues",
+      "probabilities",
+      "confidence",
+      "scores"
+    ],
+    "excludes": [
+      "state",
+      "evidence",
+      "criterion",
+      "endpoint",
+      "apiKey",
+      "headers"
+    ]
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "scope": "protocol conformance across runtimes; not decision quality, latency, calibration, provider identity or OpenFox end-to-end evidence",
+  "runs": [
+    {
+      "target": "laya-compatible",
+      "runtimeVersion": null,
+      "command": "SEMANTIC_ENDPOINT=<redacted> SEMANTIC_PROVIDER_ID=laya-compatible npm run conformance -- benchmark/results/conformance",
+      "endpointClassification": "private",
+      "modelsObserved": [],
+      "compatible": true,
+      "strictCompatible": true,
+      "matchedCases": 11,
+      "totalCases": 11,
+      "capabilities": {
+        "noul": true,
+        "choice": true,
+        "choiceArrayCriteria": true,
+        "choiceObjectCriteria": true,
+        "score": true,
+        "batchedQuestions": true,
+        "objectState": true,
+        "arrayState": true,
+        "clientRejectsMalformedQuestion": true,
+        "runtimeRejectsMalformedWirePayload": true
+      },
+      "deviations": [],
+      "unverified": []
+    },
+    {
+      "target": "kev-local",
+      "runtimeVersion": null,
+      "command": "SEMANTIC_ENDPOINT=<redacted> SEMANTIC_PROVIDER_ID=kev-local npm run conformance -- benchmark/results/conformance",
+      "endpointClassification": "private",
+      "modelsObserved": [
+        "kev-latest"
+      ],
+      "compatible": false,
+      "strictCompatible": false,
+      "matchedCases": 9,
+      "totalCases": 11,
+      "capabilities": {
+        "noul": true,
+        "choice": true,
+        "choiceArrayCriteria": false,
+        "choiceObjectCriteria": true,
+        "score": true,
+        "batchedQuestions": true,
+        "objectState": true,
+        "arrayState": true,
+        "clientRejectsMalformedQuestion": true,
+        "runtimeRejectsMalformedWirePayload": "unverified"
+      },
+      "deviations": [
+        {
+          "id": "choice-array-criteria",
+          "detail": "expected pass, observed fail (http)"
+        },
+        {
+          "id": "malformed-wire-payload-rejected",
+          "detail": "expected fail, observed pass"
+        }
+      ],
+      "unverified": [
+        "runtimeRejectsMalformedWirePayload"
+      ]
+    }
+  ]
+}
