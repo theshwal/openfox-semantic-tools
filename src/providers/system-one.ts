@@ -2,6 +2,7 @@ import type { DecisionAnswer, DecisionProvider, DecisionRequest, DecisionRespons
 import { isRecord, validateRequest } from '../decision/validation.js'
 import { assertEgressAllowed, resolveEndpointClass, resolveEgressPolicy, type CallOrigin, type EndpointClass, type EgressPolicy } from '../egress.js'
 import { ProviderError } from '../errors.js'
+import { adaptRequestForPreset } from '../presets/adapt.js'
 
 export { ProviderError }
 export interface CacheSettings {
@@ -60,12 +61,17 @@ export class SystemOneHttpProvider implements DecisionProvider {
     const timeout = AbortSignal.timeout(this.settings.timeoutMs)
     const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout
     const model = request.model ?? this.settings.model
+    // Apply the one protocol deviation the preset actually declared, so the
+    // body on the wire matches the runtime's declared capabilities. The
+    // response is still validated against the ORIGINAL question set: a rewrite
+    // must never change what an answer is validated as.
+    const outbound = adaptRequestForPreset(request, this.settings.presetId)
     try {
       signal.throwIfAborted()
       const response = await this.transport(this.settings.endpoint, {
         method: 'POST', redirect: 'error', signal,
         headers: { 'Content-Type': 'application/json', ...(this.settings.apiKey ? { Authorization: `Bearer ${this.settings.apiKey}` } : {}) },
-        body: JSON.stringify({ ...request, ...(model ? { model } : {}) }),
+        body: JSON.stringify({ ...outbound, ...(model ? { model } : {}) }),
       })
       // Do not echo arbitrary upstream bodies: they can contain submitted source or credentials.
       if (!response.ok) { await response.body?.cancel(); throw new ProviderError('http', `System One HTTP ${response.status}`, response.status) }

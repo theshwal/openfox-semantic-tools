@@ -253,8 +253,17 @@ test('the plugin registers no transition handler and no hook', async () => {
     'semantic_reference_agreement',
     'semantic_scan',
     'semantic_search',
+    'semantic_transform_status',
     'semantic_verify_task',
   ])
+  // The status tool is a reader, not a gate: it cannot mark anything complete.
+  const status = fake.tools.get('semantic_transform_status')!
+  assert.equal(typeof status.execute, 'function')
+  const result = await status.execute({}, { sessionId: 's', workdir: process.cwd() })
+  assert.equal(result.success, true)
+  const report = JSON.parse(result.output ?? '{}') as Record<string, any>
+  assert.equal(report.advisory, true)
+  assert.equal(report.verdict, 'DEFER')
 })
 
 test('a positive verdict is still unreachable, so no workflow can skip verification', () => {

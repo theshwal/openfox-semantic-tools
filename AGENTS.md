@@ -16,7 +16,10 @@ Before changing plugin integration code, inspect the current upstream OpenFox co
 
 The OpenFox plugin API is evolving. Do not assume a capability seen on `develop` exists in a released version.
 
-Compatibility baseline for V0: OpenFox 2.0.157 for tools/settings.
+Compatibility baseline for V0: OpenFox **2.0.161** (`>=2.0.161` in
+`peerDependencies`). Tools and settings existed earlier — 2.0.157 and 2.0.160
+were each validated on a real host — but the minimum moved to 2.0.161 because
+the plugin now registers a released message transform.
 
 ## Architectural invariants
 
@@ -64,8 +67,10 @@ Current development priority:
 2. **#9 — measurement umbrella**: collect durable evidence for delivered
    capabilities (#33, #34 and #35) without turning the repository into a
    permanent provider leaderboard.
-3. **#6 — pre-LLM context relevance/reduction**: remains blocked until the
-   message-transform capability exists in a released OpenFox version.
+3. **#6 — pre-LLM context relevance/reduction**: the transform is implemented
+   and opt-in now that the message-transform capability shipped in a release
+   (2.0.161). What remains is measurement under #9 — no token or task-quality
+   effect has been measured yet, so `contextReduce` stays off by default.
 
 Delivered in the current cycle:
 
@@ -98,15 +103,24 @@ Do not expose guidance for a higher-level tool before that tool exists and has e
 
 ## OpenFox message transforms
 
-Current OpenFox `develop` exposes `registerMessageTransform`, which can mutate messages/system prompt before LLM dispatch and is a promising hook for context reduction.
+`registerMessageTransform` **shipped in OpenFox 2.0.161** (PR #377 / #393)
+together with the `transforms` manifest capability. It mutates
+messages/system prompt before LLM dispatch. It was absent from 2.0.157 and
+2.0.160, which is why the minimum supported version is now 2.0.161.
 
-It is not part of the 2.0.157 compatibility baseline. Before implementing any transform:
+The transform is implemented: `semantic-context-reduce` asks the provider which
+earlier conversation segments are no longer needed. It satisfies the
+preconditions that were listed when the API was develop-only:
 
-1. verify it exists in a released OpenFox package;
-2. update the minimum supported OpenFox version;
-3. make the transform opt-in;
-4. make failures fail open to the original messages;
-5. measure token savings and task-quality regressions.
+1. it exists in a released OpenFox package — 2.0.161;
+2. the minimum supported version was updated to 2.0.161;
+3. it is opt-in through the `contextReduce` setting, **off by default**;
+4. it fails open to the original messages on any provider error, timeout,
+   malformed answer, missing configuration or low-confidence verdict;
+5. measurement of token savings and task-quality regressions is still
+   outstanding. `docs/EVALUATION.md` defines exactly what must be recorded.
+   Until those numbers exist, do not state or imply that the transform saves
+   tokens, cost or time, and do not enable it by default.
 
 ## Provider contract guidance
 

@@ -22,6 +22,7 @@ test('registers the initial settings schema', () => {
     'semantic_reference_agreement',
     'semantic_scan',
     'semantic_search',
+    'semantic_transform_status',
     'semantic_verify_task',
   ])
 
@@ -40,7 +41,20 @@ test('registers the initial settings schema', () => {
     'cacheEnabled',
     'cacheTtlMs',
     'cacheMaxEntries',
+    'contextReduce',
   ])
+})
+
+test('the context-reduction transform is registered once and is off by default', () => {
+  const { registry, messageTransforms, settings } = fakeRegistry()
+  register(registry)
+  assert.equal(messageTransforms.length, 1, 'exactly one message transform')
+
+  const contextReduce = SETTINGS.fields.find((field) => field.key === 'contextReduce')
+  assert.equal(contextReduce?.type, 'boolean')
+  // Registering the transform must not opt an operator into it: the default is
+  // off, so an existing install behaves exactly as before this lot.
+  assert.equal(contextReduce?.default, false)
 })
 
 test('the decision cache is off by default and configurable', () => {

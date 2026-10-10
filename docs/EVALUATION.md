@@ -142,6 +142,74 @@ Measure:
 
 A smaller prompt that forces OpenFox to rediscover discarded context is not a win.
 
+### context reduction — recorded verdict: **DEFER**
+
+The message transform (`semantic-context-reduce`, registered through
+`registerMessageTransform`, released in OpenFox 2.0.161) is **implemented and
+opt-in**, and it is **not promoted**. The `contextReduce` setting defaults to
+`false` and there is no code path that turns it on.
+
+**What was measured.** `npm run transform:benchmark` runs three synthetic
+conversations through the transform offline against a deterministic stub and
+records main-model input tokens, semantic-provider calls and input tokens,
+provider **cost**, wall time and fallback rate. Offline results (character-based
+token estimate of `len/4`, not a real tokenizer):
+
+| Conversation | Baseline input | Candidate input | Semantic calls | Dropped |
+| --- | ---: | ---: | ---: | ---: |
+| long-tool-heavy-session | 172 | 172 | 1 | 0 |
+| short-session | 46 | 46 | 1 | 0 |
+| tool-only-session | 34 | 34 | 0 | 0 |
+
+The neutral stub reports every segment as still needed, so the honest result is
+**zero reduction**. The harness also runs a labelled `synthetic-drop-all`
+variant (172 → 57 estimated tokens) purely so the saving path executes and is
+visible; it is one canned answer applied to every conversation and is **not a
+result**.
+
+Provider **cost** is reported as `null`, never `0`, when no price is supplied:
+a zero would be the claim "this is free". Set `SEMANTIC_INPUT_USD_PER_MTOK` to
+price a run; the report then records a real figure, and the baseline still
+reads `0` because the transform disabled spends nothing.
+
+**The quality axis.** The token arithmetic says nothing about whether a
+provider can actually judge a segment. The harness therefore also runs the
+transform's own question ("is this segment still needed?") through the project's
+`evaluateReferenceAgreement` — the shipped labelled evaluator, not a second
+implementation that could drift — against four hand-labelled cases (a live
+request, a superseded read, a settled conclusion, an ambiguous note).
+
+Offline, against the neutral stub: 4 answered, 2 agreed, **accuracy 0.5**. That
+is the expected result for a stub that always answers "still needed": it agrees
+with the two cases labelled `true` and misses both labelled `false`. It is a
+plumbing measurement, not a provider claim.
+
+This axis is still **not task quality**: it never runs a model after a
+reduction, so it cannot detect the cost of a model having to rediscover
+discarded context. The report keeps `qualityMeasured: false` for the task axis
+and records the provider capability separately.
+
+**Why DEFER rather than PROMOTE or REJECT.**
+
+- *Not REJECT*: the plumbing is proven. Segmentation, batching, egress,
+  fail-open, the confidence floor and a reported reason on every no-op are
+  covered by `test/transform.test.ts`, and the host loads the transform
+  (harness `messageTransforms=1` on 2.0.161). The mechanism can reduce a
+  prompt when a provider says so.
+- *Not PROMOTE*: the decisive axis is still unmeasured. No model ran after a
+  reduction, so nothing is known about the cost of a model that has to
+  rediscover the discarded context — which is precisely the failure this
+  section warns about. The provider capability axis measures the provider, not
+  the task.
+- Offline runs use a stub, not a provider. No real runtime was asked which
+  segments are obsolete, so the provider-side premise is unvalidated.
+
+**What would change the verdict.** A real OpenFox A/B run, same tasks and same
+model, recording main-model input/output tokens, wall time, task success and
+re-read/retries caused by missing context. Promote only if tokens fall *and*
+task success is unchanged. Until then the setting stays off and no saving may
+be claimed in the README, the registry description or a release note.
+
 ## 5. Promotion rules
 
 Do not set universal probability thresholds in the provider layer.

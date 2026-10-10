@@ -76,11 +76,14 @@ today is opt-in and advisory.
 12. **#11 — semantic decision cache** — shipped, disabled by default, inert on
     error. Stays off until a benchmark shows a real repeated-call benefit.
 
-13. **#6 — context relevance/message transforms** — **blocked**. The
-    `registerMessageTransform` API exists only on OpenFox `develop`; it is not
-    in any released 2.0.0.x version (`v2.0.157` and `v2.0.160` were both
-    checked against `src/plugin/index.ts`). Do not start before it ships in a
-    release.
+13. **#6 — context relevance/message transforms** — **implemented, opt-in,
+    unmeasured**. The blocker is gone: `registerMessageTransform` and the
+    `transforms` capability shipped in OpenFox **2.0.161** (it was absent from
+    `v2.0.157` and `v2.0.160`, both checked against `src/plugin/index.ts`), so
+    the compatibility baseline moved to 2.0.161. The transform
+    (`semantic-context-reduce`) is off by default and fails open. What is left is
+    the #9 measurement — token saving and task-quality regression — so it stays
+    disabled until `docs/EVALUATION.md` has numbers for it.
 
 ## Phase 5 — distribution baseline
 
@@ -120,8 +123,10 @@ permission to make experimental features automatic.
 verification/discovery/impact/cache. It must not become a permanent provider
 leaderboard and does not block bounded functionality in #33 or #34.
 
-**#6 remains blocked** until a released OpenFox version exposes the required
-message-transform API. Do not implement against a develop-only/private surface.
+**#6 is no longer blocked**: the message-transform API shipped in OpenFox
+2.0.161 and the transform is implemented behind an off-by-default setting. It is
+still gated on #9 measurements, and it must not be implemented against a
+develop-only/private surface.
 
 ## Dependency graph
 
@@ -160,7 +165,7 @@ message-transform API. Do not implement against a develop-only/private surface.
                                   +--> production visual primitive only after GO
                                   +--> downstream consumers stay outside this repo
 
-OpenFox released message transforms -----> #6
+OpenFox 2.0.161 released message transforms -> #6 (done; #9 measures it)
 
 #1 + #2 + #3 ---------------------------> #13 release-readiness baseline
 ```

@@ -5,7 +5,12 @@
 set -euo pipefail
 
 HARNESS_PKG_DIR="${HARNESS_PKG_DIR:-/tmp/of-harness-probe}"
-OPENFOX_VERSION="${OPENFOX_VERSION:-2.0.160}"
+# The version under test is NOT written here: it is read from the single
+# declared baseline in package.json, so a bump is a one-line change that cannot
+# leave the harness, the tests and the peer range disagreeing.
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BASELINE="$(node -p "require('$PROJECT_DIR/package.json').openfox.compatibilityBaseline")"
+OPENFOX_VERSION="${OPENFOX_VERSION:-$BASELINE}"
 
 # The version actually installed in the tree is the version the harness will
 # load. Reusing a tree that holds a different release would make every reported

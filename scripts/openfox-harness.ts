@@ -9,6 +9,15 @@
  *   and are attributed to the plugin.
  * - Tools, skills and settings coexist; the plugin registers no hook and no
  *   workflow transition, confirmed by the host's own contribution counts.
+ * - The opt-in message transform is accepted by the host: the release under
+ *   test must load it and report `messageTransforms: 1` itself. This does NOT
+ *   run the transform — `contextReduce` is off, so it is inert.
+ *
+ * The OpenFox version under test is whatever `HARNESS_PKG_DIR` contains; the
+ * harness reads it from the installed package and reports it, and never pins a
+ * version itself. The version it INSTALLS comes from the single declared
+ * baseline in `package.json` (`openfox.compatibilityBaseline`), read by
+ * `scripts/setup-harness.sh`, so a bump is a one-line change.
  *
  * WHAT THIS DOES NOT PROVE
  * - NOT a live provider run: no hosted endpoint is contacted, so it says nothing
@@ -155,6 +164,22 @@ try {
     'manifest declares skills capability',
     manifest.openfox?.capabilities?.includes('skills') === true,
     `capabilities=${JSON.stringify(manifest.openfox?.capabilities)}`,
+  )
+  // `transforms` is a released capability since 2.0.161; declaring it is what
+  // tells the user, before install, that this plugin mutates the pre-LLM
+  // message stream.
+  record(
+    'manifest declares transforms capability',
+    manifest.openfox?.capabilities?.includes('transforms') === true,
+    `capabilities=${JSON.stringify(manifest.openfox?.capabilities)}`,
+  )
+  // The host validates and renders these, so a missing icon/author degrades the
+  // Plugins tab entry even though nothing fails to load.
+  record(
+    'manifest declares an icon and an author for the Plugins tab',
+    typeof manifest.openfox?.icon === 'string' && manifest.openfox.icon.length > 0 &&
+      typeof manifest.openfox?.author === 'string' && manifest.openfox.author.length > 0,
+    `author=${String(manifest.openfox?.author)} icon=${manifest.openfox?.icon ? 'present' : 'missing'}`,
   )
   record(
     'the project directory carries the build config the installer needs',
@@ -345,6 +370,15 @@ try {
       'host confirms no hook and no workflow transition is registered',
       listed.contributions?.hooks === 0 && listed.contributions?.transitions === 0,
       `hooks=${listed.contributions?.hooks} transitions=${listed.contributions?.transitions}`,
+    )
+    // 2.0.161 released `registerMessageTransform`, so the host now counts
+    // transforms in the contribution summary. This proves the host actually
+    // loaded the transform we register, rather than silently ignoring a method
+    // it does not know. The transform itself is inert: `contextReduce` is off.
+    record(
+      'host reports the registered message transform',
+      listed.contributions?.messageTransforms === 1,
+      `messageTransforms=${listed.contributions?.messageTransforms}`,
     )
   }
 

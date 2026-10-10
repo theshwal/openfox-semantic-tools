@@ -1,643 +1,269 @@
 # openfox-semantic-tools
 
-Experimental OpenFox plugin for **fast, typed semantic decisions** and, where it is measurably useful, **lower token usage and lower latency**.
+Typed semantic decisions for [OpenFox](https://github.com/co-l/openfox), against
+any System One-compatible endpoint — hosted or local.
 
-The project is intentionally provider-agnostic. The first transport target is the Jev / System One-style `POST /v1/systemone` API, so the same OpenFox tools can be backed by hosted Jev or by a compatible local/open-source runtime.
+Instead of spending a large generative model to answer small bounded questions
+("does this change satisfy criterion X?", "which of these regions is relevant?"),
+this plugin asks a small decision model and returns typed probabilities that
+ordinary code can consume.
 
-> Status: nine tools, two usage skills, presets, optional cache, egress,
-> calibration and advisory workflow, validated on OpenFox 2.0.157 and 2.0.160.
-> Dated provider observations are scoped in #9; no durable quality
-> certification or end-to-end savings claim is made. See
-> [Evaluation](#evaluation-what-counts-as-success).
-
-## Why this exists
-
-A coding agent often asks small, bounded questions with a large generative model:
-
-- Does this change satisfy a specific acceptance criterion?
-- Which of these code regions is most likely relevant?
-- Is this old tool output still useful for the current goal?
-- Does this function exhibit a given semantic behavior?
-- Is another expensive verifier pass actually needed?
-
-Those are not necessarily generation problems. A fast decision model may be able to answer them more cheaply and quickly, while returning probabilities that application code can consume directly.
-
-The goal is **not** to replace OpenFox's main model. The goal is to give OpenFox a small set of explicit semantic primitives and use them only when benchmarks show an end-to-end benefit.
-
-## Design principles
-
-1. **OpenFox plugin, not an OpenFox fork.** Prefer the public plugin API and keep any upstream request small and generic.
-2. **Protocol before vendor.** OpenFox-facing code depends on a decision-provider contract, not directly on Jev.
-3. **Typed decisions, not chat.** Preserve the System One primitives (`noul`, `choice`, `score`) instead of turning every decision into generated prose.
-4. **Use-case policy stays above the provider.** Thresholds, fallback rules and "pass/fail" semantics belong to each OpenFox use case.
-5. **Deterministic checks stay deterministic.** Tests, type checks, linters, file existence and exact parsing are not replaced by semantic inference.
-6. **Measure first.** A semantic step is kept only if it improves the relevant end-to-end metric without degrading task quality.
-7. **Privacy is explicit.** Remote providers may receive source code, diffs or session state. Local endpoints must remain a first-class option.
-
-## Initial architecture
-
-```text
-OpenFox
-  |
-  +-- semantic_decide            noul / choice / score, batched
-  +-- semantic_verify_task       advisory, one criterion per call
-  +-- semantic_issue_coverage    advisory, several explicit criteria
-  +-- semantic_search            advisory, local recall + semantic rerank or explicit candidates
-  +-- semantic_scan              advisory, explicit candidates only
-  +-- semantic_provider_self_test
-  +-- semantic_calibration_candidate
-  +-- semantic_question_calibration
-  +-- semantic_reference_agreement
-          |
-          v
-   use-case policy
-          |
-          v
-   DecisionProvider
-          |
-          v
-   System One HTTP adapter
-      |              |
-      +-- hosted Jev |
-      +-- local / compatible endpoints
+```
+noul    yes / no, with a probability
+choice  one of your labels, with a distribution
+score   a position on an ordered rubric, with a distribution
 ```
 
-The provider layer should accept one state plus one or more typed questions in a single request. It must not hard-code task-specific thresholds.
+> **What this is not.** It is not a cheaper main model, and it does not replace
+> tests, typechecks, linters or human review. Every tool here is **advisory**:
+> none of them can mark a task complete or merge-safe. See
+> [What it will never do](#what-it-will-never-do).
 
-## What this plugin actually registers
+![The plugin listed in OpenFox Settings → Plugins](docs/images/plugins-tab.png)
 
-Nine tools and two usage skills, all through the public Plugin API v2. Nothing
-below is planned; see [docs/ROADMAP.md](./docs/ROADMAP.md) for what is not.
+<sub>Settings → Plugins on OpenFox 2.0.161, captured against a throwaway instance.</sub>
 
-| Tool | Shape | Advisory? |
+---
+
+## Tested with
+
+You asked whether this actually works, and with what. Here is exactly what was
+run, against **real** semantic runtimes, and what came back.
+
+### Protocol conformance — three real runtimes
+
+`npm run conformance` against each runtime, scored against the documented
+System One protocol:
+
+| Runtime | Result | Deviation found |
 | --- | --- | --- |
-| `semantic_decide` | One state plus batched `noul`/`choice`/`score` questions. | No — it returns typed answers, not verdicts. |
-| `semantic_verify_task` | One acceptance criterion plus bounded evidence. | Yes — never a completion signal. |
-| `semantic_issue_coverage` | Several explicit criteria plus one bounded task/evidence block. | Yes — coverage/follow-up only, never merge-safe. |
-| `semantic_search` | Bounded local path/content recall, then per-file semantic reranking; explicit candidates remain supported. | Yes — candidates only. |
-| `semantic_scan` | Scores an explicit caller-supplied file list against a behavioural predicate. | Yes — candidates only. |
-| `semantic_provider_self_test` | Embedded synthetic smoke test against the configured endpoint. | Yes — never changes settings. |
-| `semantic_calibration_candidate` | Turns an operator-labelled case set into an inactive candidate profile. | Yes — never activates anything. |
-| `semantic_question_calibration` | Evaluates one arbitrary typed question against the operator's labelled cases. | Yes — evaluation evidence only, never a threshold. |
-| `semantic_reference_agreement` | Compares the provider against a caller-supplied reference judgment on a frozen case set. | Yes — concordance evidence, never a threshold or a ranking. |
+| **Laya-compatible** (self-hosted) | `compatible: true`, `strictCompatible: true`, 11/11 cases | none |
+| **Hosted Jev** (`jev-latest`, runtime reported `jev-1.13.0`) | reachable, single deviation | rejects `choice` with **array** criteria; object-map criteria work |
+| **Kev** (local, `kev-latest`) | 9/11 cases | same array-criteria rejection **plus** it accepted a malformed wire payload |
 
-| Skill | Covers |
+The array-criteria deviation is not worked around in the transport: it is
+recorded as a **declared capability** on the preset, and only that preset's
+requests are rewritten. `Kev` stays `unverified` even though it showed the same
+deviation, because its run was incomplete — an incomplete observation is not a
+clean one.
+
+### Verification behaviour — the honest, unflattering result
+
+`npm run verify:experiment -- --live`, 41 labelled cases per runtime:
+
+| Runtime | Cases matching the expected status |
 | --- | --- |
-| `semantic-verification` | When to use `semantic_verify_task` / `semantic_issue_coverage`, and when to fall back. |
-| `semantic-code-discovery` | When `semantic_search`/`semantic_scan` reduce exploration. |
+| Jev | 25/41 |
+| Kev | 17/41 |
+| Laya | 6/41 |
 
-Supporting features: global settings, provider presets with capability
-declarations, an optional decision cache (off by default), explicit endpoint
-classification and egress policy, a versioned calibration layer, and an opt-in
-advisory workflow file.
+**Read this as a negative finding, not a quality score.** The expectation set
+spans statuses the uncalibrated policy cannot emit, and on these runs
+**no runtime ever produced a positive status** (`observedPositiveStatuses` is
+empty for all three). The plugin was designed for exactly that outcome: with
+`calibrated: false` it cannot confirm a criterion, so a disagreeing answer
+degrades to `unknown` or a follow-up rather than to a false "done". Zero
+transport failures across all 123 live calls.
 
-**What is not here:** no automatic verification gate, no hook, no workflow
-transition, no context mutation, and no message transform. The plugin registers
-zero hooks and zero transitions, which the real host confirms.
+These are **not** new measurements and **not** a ranking. They are the dated
+snapshot already recorded in [#9](https://github.com/theshwal/openfox-semantic-tools/issues/9),
+reproduced here so a reader knows the plugin was exercised against real
+runtimes. No run was added while writing this file, no runtime is preferred,
+and no default provider is implied — `custom` remains the default preset.
 
-### The one hard blocker
+Full observations: [docs/LIVE-JEV-FINDINGS.md](docs/LIVE-JEV-FINDINGS.md).
+The underlying measurement is tracked in [#9](https://github.com/theshwal/openfox-semantic-tools/issues/9).
 
-OpenFox `develop` exposes `registerMessageTransform`, the natural hook for
-pre-LLM context reduction. That API was **absent from the two released versions
-checked here** (`v2.0.157` and `v2.0.160`, both read directly from
-`src/plugin/index.ts`), so context reduction is **blocked on the released-API
-issue** and is not implemented. Re-check upstream before starting it, and
-re-check further releases rather than assuming the whole line behaves alike.
+### The plugin itself
 
-## System One contract
+| Check | Result |
+| --- | --- |
+| Loaded by a real OpenFox **2.0.161** | 23/23, including host-reported `messageTransforms=1` |
+| Protocol against an offline stub | 13/13 cases, 0 deviations |
+| Typecheck, build, contract tests | 470 pass, 0 fail |
 
-The integration should model the public typed-decision shape rather than a Jev-specific SDK:
-
-- `noul`: yes/no proposition represented by a probability.
-- `choice`: choose among caller-provided options, with probabilities.
-- `score`: place state on an ordered rubric.
-
-Multiple questions about the same state should be batchable in one call.
-
-Compatible/local runtimes are evolving quickly. Current projects worth evaluating include:
-
-- [LiteVar/system-one](https://github.com/LiteVar/system-one) — local runtime exposing a Jev-compatible API.
-- [alvarobartt/sys1](https://github.com/alvarobartt/sys1) — Rust System One-compatible API for open decision models.
-- [yijunyu/jev-rs](https://github.com/yijunyu/jev-rs) — Jev-compatible engine / harness for local models.
-- [dzhng/jevgrep](https://github.com/dzhng/jevgrep) — useful reference for semantic code retrieval, not a provider abstraction.
-
-These are references/candidates, not dependencies or endorsements. Compatibility and quality must be tested.
-
-## Evaluation: what counts as success
-
-Every experimental feature should be compared with an OpenFox baseline on the same tasks.
-
-Record at least:
-
-- total input/output tokens consumed by the main generative model;
-- semantic-provider input and cost;
-- end-to-end wall-clock time;
-- number of main-model calls / verifier calls avoided;
-- semantic fallback rate;
-- task success / acceptance-criteria success;
-- false-pass and false-negative rate for verification use cases;
-- provider failures/timeouts;
-- cache hit rate if caching is later introduced.
-
-A feature that saves semantic-provider latency but makes the overall OpenFox task slower is a failure. A feature that saves tokens but increases false passes is also a failure.
-
-### What is actually measured today
-
-**No durable quality certification, and no end-to-end saving has been
-measured.** The shipped evidence is:
-
-- offline protocol conformance against a local stub (`npm run conformance:smoke`);
-- labelled fixtures replayed through a scripted transport (`npm run verify:experiment`);
-- replays of two committed number-only live snapshots (`npm run verify:replay`);
-- real-host plugin loading, settings, skills and tool registration on two
-  OpenFox releases (`npm run harness`, `npm run harness:agent-e2e`).
-
-Those live snapshots are dated observations scoped in #9, not a benchmark and
-not a certification. No false-pass rate exists. No token, cost or wall-time
-saving exists. Those fields stay `null` and are never written as zero. A
-measurement that was not made is unknown, not good.
-
-## Visual decision spike
-
-Visual screenshot decisions are being evaluated separately under issue #35.
-They are **not** registered as a plugin tool. The current labelled smoke set,
-reproducible harness, environment blockers and GO/DEFER boundary are documented
-in [docs/VISUAL-SPIKE.md](docs/VISUAL-SPIKE.md).
-
-## Safety and failure behavior
-
-- Provider failure must not silently become a positive decision.
-- Experimental optimization paths should fail open to the normal OpenFox behavior where possible.
-- High-impact decisions should keep an explicit LLM/human fallback until measured otherwise.
-- API credentials must use OpenFox secret settings and must never be logged.
-- Remote code/state transmission must be obvious in documentation and configuration.
-
-## OpenFox compatibility
-
-- OpenFox Plugin API: v2
-- Node.js: 24+
-- Language: TypeScript / ESM
-- **Minimum validated release: OpenFox 2.0.157** (`>=2.0.157` in
-  `peerDependencies`)
-- No OpenFox core patch, public or private
-
-Both ends of the range were validated by installing the package into a **real
-isolated host** in a throwaway tree — including through the host's own
-`POST /api/plugins/install` local-path route, not a hand-made copy.
-
-| Check | `2.0.157` (minimum) | `2.0.160` |
-| --- | --- | --- |
-| `npm run harness` (install, load, skills, tools, settings) | 20/20 | 20/20 |
-| `npm run harness:agent-e2e` (real agent turns, permissions, workflow) | 67/67 | 67/67 |
-
-Both hosts reported the same six tools, one skill source and thirteen settings
-fields, and confirmed zero hooks and zero transitions. The versions above are
-read back from each installed tree, never hardcoded.
-
-Authoritative upstream references:
-
-- [OpenFox plugin contract](https://github.com/co-l/openfox/blob/develop/docs/PLUGINS.md)
-- [OpenFox plugin API source](https://github.com/co-l/openfox/blob/v2.0.160/src/plugin/index.ts)
-- [Reference plugin](https://github.com/co-l/openfox/tree/develop/examples/hello-plugin)
-- [Installation recipes](docs/INSTALLATION.md)
-
-## Run it locally
+Reproduce all of it, offline and without spending anything:
 
 ```bash
+npm run verify:local
+```
+
+That command runs every automatic check and then prints exactly which steps
+remain manual.
+
+---
+
+## Install
+
+Requires **OpenFox 2.0.161 or later** and **Node 24+**.
+
+```bash
+git clone https://github.com/theshwal/openfox-semantic-tools.git
+cd openfox-semantic-tools
 npm ci --ignore-scripts
-npm run check
-npm run evaluate
-npm run verify:experiment
-npm pack --dry-run     # inspect the packed contents; see INSTALLATION.md
+npm run build
 ```
 
-See [docs/CONTRIBUTING.md](./docs/CONTRIBUTING.md) for the contributor loop.
+In OpenFox: **Settings → Plugins → install from local path**, and give the
+absolute path (it must start with `/`). Then enable it.
 
-The two harnesses are separate because they need a throwaway OpenFox install
-first (`scripts/setup-harness.sh`, which never touches your own OpenFox). Use
-one `HARNESS_PKG_DIR` per version:
+**→ In a hurry? [docs/QUICKSTART.md](docs/QUICKSTART.md)** — the same steps in
+five minutes, ending with a first `semantic_decide` call.
 
-```bash
-HARNESS_PKG_DIR=/tmp/of-harness-2.0.157 OPENFOX_VERSION=2.0.157 scripts/setup-harness.sh
-HARNESS_PKG_DIR=/tmp/of-harness-2.0.157 npm run harness    # loading, settings, skills
-HARNESS_PKG_DIR=/tmp/of-harness-2.0.157 npm run harness:agent-e2e  # real agent turns, permissions, workflow runtime
-```
+Installing the packed `.tgz` does not work — it ships no `tsconfig.json`, so the
+host's build step fails. The full explanation is in
+[docs/INSTALLATION.md](docs/INSTALLATION.md).
 
-Install the built package through OpenFox's plugin installation flow, then enable
-it. The exact recipes — and why a GitHub URL is not a pinned install — are in
-[docs/INSTALLATION.md](./docs/INSTALLATION.md).
+**→ Full instructions, settings reference, troubleshooting:
+[docs/USER-GUIDE.md](docs/USER-GUIDE.md).**
 
-Allow the semantic tools you want in the agent's tool list. Tool registration does not grant access. Each usage skill ships with the tools it describes: `semantic-verification` with `semantic_verify_task` and `semantic_issue_coverage`, `semantic-code-discovery` with `semantic_search` and `semantic_scan`.
+---
 
-Example tool arguments:
+## Settings
 
-```json
-{
-  "state": {"evidence": "Public synthetic excerpt"},
-  "questions": {
-    "satisfied": {"type": "noul", "instructions": "Does the supplied evidence satisfy the criterion?"},
-    "region": {"type": "choice", "instructions": "Choose the relevant region", "criteria": ["handler", "database"]},
-    "coverage": {"type": "score", "instructions": "Rate evidence completeness", "criteria": ["absent", "partial", "complete"]}
-  }
-}
-```
+Everything is configured in the plugin's own panel. Nothing is guessed for you.
 
-Output contains `provider`, optional `model`, `answers` and `latencyMs`. Noul responses normalize the wire field `noul` to `probability`. Choice/score retain their distributions. Score criteria must be ordered arrays in the currently verified common protocol. Failures return `success: false` with a JSON error containing `code` and a controlled message.
+| Setting | Required | Default | What it does |
+| --- | --- | --- | --- |
+| `backend` | no | `custom` | Selects a provider preset. A preset supplies **defaults and declared capabilities, never a host**. |
+| `endpoint` | **yes** | *(empty)* | The full POST URL of a System One-compatible runtime, e.g. `https://example.com/v1/systemone`. Empty means every tool fails with a clear message, by design. |
+| `model` | no | *(backend default)* | Provider model id. A value you type always wins over the preset's. |
+| `apiKey` | no | *(empty)* | Secret. Only needed if your endpoint requires one. Never logged, never returned in clear text. |
+| `runtimeVersion` | no | *(empty)* | An operator-typed label for your runtime. **Purely descriptive** — nothing verifies it. |
+| `calibrationProfileJson` | no | *(empty)* | An installed, measured calibration profile. Absent by default; see below. |
+| `calibrationOverridesJson` | no | *(empty)* | Manual gate overrides. Same caution. |
+| `timeoutMs` | no | `5000` | Maximum duration of one provider request (1–120000). |
+| `endpointClass` | no | `auto` | `auto` / `local` / `private` / `remote`. Forces the classification when auto-detection is wrong. |
+| `egressPolicy` | no | `allow` | `allow`, `block-remote-automatic`, or `block-remote-all`. See below — **read this one**. |
+| `cacheEnabled` | no | `false` | Reuse an identical previous answer. Only successful answers are ever reused, never an error. |
+| `cacheTtlMs` | no | `300000` | How long a cached answer may be reused. `0` disables reuse. |
+| `cacheMaxEntries` | no | `128` | Hard bound, oldest-first eviction. |
+| `contextReduce` | no | `false` | Experimental context reduction. **No measured benefit — leave it off.** See below. |
 
-**Data sent:** exactly the supplied state, questions and optional model. No repository scanning, context mutation or automatic workflow gating is enabled. The configured endpoint receives the content when the tool is invoked. Keys use OpenFox secret settings; HTTP errors report status without reflecting response bodies. Redirects are refused.
+![The plugin settings form](docs/images/plugin-settings.png)
 
-The default evaluation uses deterministic synthetic responses to test plumbing. It makes no quality or saving claim. To compare actual measurements, supply an array of `RunRecord` values (see `src/evaluation/records.ts`):
+<sub>The settings form rendered by the host from this plugin's schema — every
+field carries its own explanation, so nothing has to be looked up elsewhere.</sub>
 
-```bash
-npm run evaluate -- /path/to/measured-runs.json /path/to/report-directory
-```
+### `egressPolicy` — decide this before pointing at a remote host
 
-Unmeasured metrics are `null`, not zero. Baseline and candidate remain separate in the summary. Results stay uncommitted by default. See [implementation order and delivery boundaries](docs/IMPLEMENTATION.md).
+| Value | Effect |
+| --- | --- |
+| `allow` | Anything may be sent, including repository-derived content. This is the default. |
+| `block-remote-automatic` | **Explicit** tool calls still work; automatic ones (code discovery, context reduction) are blocked for remote hosts. **Recommended.** |
+| `block-remote-all` | Nothing reaches a remote host, even when you ask. |
 
-For opt-in live protocol checks, configure `SEMANTIC_ENDPOINT`, `SEMANTIC_API_KEY` and optionally `SEMANTIC_MODEL` securely in your environment, then run `npm run conformance`. The report omits the endpoint and credentials. Live checks are excluded from CI.
+The setting only ever *blocks*, so switching it later can never surprise you by
+sending more. Discovery and verification always mark their calls as
+`automatic`; `semantic_decide` is `explicit` because you called it yourself.
 
-```bash
-npm run conformance            # against SEMANTIC_ENDPOINT
-npm run conformance:smoke      # against a local offline stub, no credentials
-```
+### `contextReduce` — experimental, and honestly negative
 
-`npm run conformance:smoke` is the only conformance evidence reproducible in
-CI: it starts a local System One stub and runs the same case matrix, so it
-proves the transport, the suite and the report shape. It proves **nothing** about
-decision quality or about a real runtime. `SEMANTIC_UNSUPPORTED_MODEL` enables
-the negative model case.
+OpenFox 2.0.161 added `registerMessageTransform`, so the plugin now offers an
+optional transform that asks the provider which earlier messages are no longer
+needed before each LLM call.
 
-The report contains no provider identity and no provider verification: nothing a
-protocol probe can do establishes which system answered, and a public-looking
-hostname may resolve to loopback. It reports observations only —
-`remoteEndpointObserved`, `localEndpointObserved`, `protocolConformanceObserved`
-and the purely descriptive `providerLabelExplicitlyConfigured` — plus the
-`compatible` / `strictCompatible` verdicts and the authoritative `deviations`
-list. A `compatible: true` result against the stub says nothing about any hosted
-provider.
+It is **off by default**, and the recorded verdict in
+[docs/EVALUATION.md](docs/EVALUATION.md) is **DEFER**. Token arithmetic and
+provider cost were measured; task quality was **not**, and that is the axis that
+matters. A smaller prompt that makes the model rediscover what you removed is a
+loss, and nothing here establishes that it is a win.
 
-One opt-in live campaign has reached the official hosted endpoint and recorded a
-single real deviation (`choice` with array criteria), which is why the hosted
-preset declares `choiceArrayCriteria: false`. That declaration describes **one
-observed run**, not a permanent property of the runtime.
+If you enable it anyway: use `semantic_transform_status` to see what it actually
+did. Every outcome carries a reason (`no_candidates`, `low_confidence`,
+`egress_blocked`, …), so a no-op is never silent. It never drops the current
+request or anything after the last tool result.
 
-Two further live runs — 7-case `verify-0.2.1` campaigns against Kev and Laya —
-are committed as number-only snapshots. They are **verification** campaigns over
-the policy, not the conformance matrix, so no conformance deviation list exists
-for those runtimes. These seven-case verification snapshots are not a
-conformance matrix or a quality certification; dated comparison observations are
-scoped in #9, with no durable quality/savings claim.
-See [providers and egress](docs/PROVIDERS.md).
+---
 
-## Hybrid code discovery
+## Tools
 
-`semantic_search` accepts a natural-language query with or without an explicit
-candidate list.
-
-With explicit candidates, behaviour stays bounded to those paths. Without
-candidates, the plugin first performs **local-only deterministic recall**:
-
-1. walk the repository under hard file-count bounds;
-2. ignore generated/vendor directories and symbolic links;
-3. score cheap path/content token matches;
-4. keep at most 24 local candidates;
-5. read only that shortlist under the existing per-file/total byte bounds;
-6. ask one semantic score question **per file in one batched provider call**.
-
-This fixes an important limitation of the previous implementation: one semantic
-score for the whole candidate set cannot rank files against one another.
-
-The report exposes `semanticApplied` and, when recall was used, a `recall`
-block with scan counts and local candidates. If the semantic provider fails or
-remote automatic egress is blocked **after auto-recall**, search returns the
-deterministic local shortlist with `semanticApplied: false` and
-`rankingSource: local-recall`. No repository content is sent in that fallback.
-Explicit-candidate calls keep the historical fail-closed semantic behaviour.
-
-`semantic_scan` deliberately does **not** gain repository scanning: it still
-requires explicit candidates.
-
-This is advisory retrieval, not exhaustive proof. Missing from the shortlist
-does not mean irrelevant. End-to-end recall/task-success measurements remain
-under #9.
-
-## Decision cache (optional, off by default)
-
-An identical previous answer can be reused instead of calling the provider
-again, which helps during retries and verifier loops. Three settings control it:
-
-| Setting | Default | Meaning |
+| Tool | Purpose | Can it conclude? |
 | --- | --- | --- |
-| `cacheEnabled` | `false` | Turns the cache on. Off means behaviour is unchanged. |
-| `cacheTtlMs` | `300000` | How long an entry may be reused. `0` disables reuse. |
-| `cacheMaxEntries` | `128` | Hard bound, oldest-first eviction. |
+| `semantic_decide` | One state, several batched `noul`/`choice`/`score` questions. | No — it returns probabilities. |
+| `semantic_verify_task` | One acceptance criterion against bounded evidence. | No — cannot mark anything satisfied while uncalibrated. |
+| `semantic_issue_coverage` | Several criteria against one task/evidence block. | No — coverage and follow-ups only. |
+| `semantic_search` | Find code from a query; bounded local recall, then reranking. | No — ranked candidates. |
+| `semantic_scan` | Score an explicit file list against a behavioural predicate. | No — ranked candidates. |
+| `semantic_provider_self_test` | Synthetic smoke test of your endpoint. Free. | No — never changes settings. |
+| `semantic_transform_status` | What the optional transform did, and why. | No — a pure reader. |
+| `semantic_calibration_candidate` | Turn your labelled cases into an inactive profile. | No — never activates anything. |
+| `semantic_question_calibration` | Score one question against your cases. | No — never sets a threshold. |
+| `semantic_reference_agreement` | Compare the provider to your reference judgments. | No — never ranks providers. |
 
-It is deliberately conservative:
+Registering a tool does **not** grant access. Add it to the agent's
+`allowedTools` (Settings → Agents), or the agent cannot call it.
 
-- the key covers the tool namespace, preset, endpoint, model, protocol version,
-  state, questions **with their criteria**, and the policy version for a
-  higher-level result — never the question text alone;
-- no secret reaches a key: userinfo and credential-looking query parameters are
-  stripped, and the key is an opaque digest that is safe to log;
-- a **non-secret** query parameter is kept, so `?tenant=a` and `?tenant=b`
-  cannot share entries;
-- the store is rebuilt when the provider identity changes, including the
-  credential, because a different key can address a different tenant on the same
-  host. The fingerprint is opaque and never leaves the process;
-- only successful answers are stored, so an error, timeout or malformed response
-  is never replayed as a result;
-- values are cloned in and out, so a caller cannot corrupt the store;
-- the generic decision namespace is separate from any policy outcome.
+---
 
-It cannot calibrate anything and cannot make a positive verdict reachable.
-Benchmark evidence is still missing, which is why it stays disabled by default.
-See [providers, egress and cache](docs/PROVIDERS.md).
+## Skills
 
-## Controlling what leaves the machine
+The plugin ships two skills that teach an agent *when* to use these tools and
+*when not to*. They are guidance only — a skill never grants tool access.
 
-Every semantic call sends its state to the configured endpoint. Two settings
-make that boundary explicit:
-
-- **Endpoint class** — auto-detected as `local`, `private` or `remote`, with a
-  manual override for unusual networks.
-- **Egress policy** — `allow` (default), `block-remote-automatic` (refuses
-  automatic remote calls for repository/session-derived content while keeping
-  deliberate `semantic_decide` calls) or `block-remote-all` (refuses every remote
-  call).
-
-Local and private endpoints are never blocked. A blocked call returns a
-structured `egress_blocked` failure **before** any request is sent and is never
-silently rerouted. Automatic calls opt into the policy explicitly via
-`DecisionOptions.origin`; a call that does not declare an origin is treated as
-explicit, because the tool is only ever invoked deliberately today.
-
-Redaction of state is deliberately not implemented: it would change the meaning
-of the question. Control the boundary by choosing a local or private endpoint,
-or by restricting the policy. See [providers and egress](docs/PROVIDERS.md).
-
-## Advisory acceptance-criteria check (experiment)
-
-`semantic_verify_task` asks a small decision model whether **one** acceptance
-criterion is actually satisfied by the evidence you supply, after your
-deterministic checks have run. It is an **experiment**, not a completion gate.
-
-```json
-{
-  "criterionId": "ac-1",
-  "criterion": "The timeout setting is bounded between 1 and 120000 ms.",
-  "issueId": "#4",
-  "evidence": {
-    "summary": "Added a numeric timeout setting validated at construction.",
-    "diffExcerpts": ["+ if (settings.timeoutMs > 120000) throw ..."],
-    "deterministicTestResults": ["ok 1 - settings defaults and invalid configuration"]
-  },
-  "evidenceRefs": ["src/providers/system-one.ts", "test/provider.test.ts#timeout-bounds"]
-}
-```
-
-One criterion per call. `evidenceRefs` are recorded in the report for your own
-traceability and are **never transmitted**; only the criterion, summary, diff
-excerpts and test output leave the machine. Oversized evidence is rejected
-rather than truncated, so a cut excerpt can never become a silent false pass.
-
-The result is always advisory:
-
-| Status | Meaning |
+| Skill | Teaches |
 | --- | --- |
-| `unknown` | Not decided: missing evidence, uncertainty band, uncommitted answer, or no calibration |
-| `needs-verification` | The criterion does not look satisfied, or a deeper pass is advised |
-| `insufficient-evidence` | The evidence does not directly address the criterion |
-| `off-scope` | The change touches unrelated behaviour |
-| `pass-candidate` | **Not reachable today** (see below) |
+| `semantic-verification` | When a bounded semantic check on one acceptance criterion is worth running after the deterministic checks, how to read each status, and when to fall back to the normal verifier. |
+| `semantic-code-discovery` | When `semantic_search` / `semantic_scan` actually reduce exploration, and when grep, symbols or a failing test already answer the question. |
 
-**There is currently no `pass-candidate` outcome in production.** The shipped
-policy is explicitly uncalibrated: no labelled run against a real provider has
-been performed, so even when every gate is met the tool reports `unknown` and
-falls back to the normal verification path. This is deliberate — a positive
-verdict is the dangerous direction for this use case, and the false-pass rate is
-unknown rather than zero.
+Both are deliberately provider-neutral: they contain no provider name,
+endpoint, URL or model id, and both state that tests, typechecks, linters and
+human review stay mandatory.
 
-A failed call (provider error, timeout, cancellation, blocked egress) returns
-`success: false` with a controlled code. It is never a verdict.
+An observed host behaviour worth knowing: a plugin tool is permission-checked
+only when the agent's `allowedTools` names at least one non-builtin tool. An
+agent restricted to builtins only is not restricted from plugin tools at all.
 
-**Origin and egress:** this tool always assembles repository/session-derived
-content, so it always declares an `automatic` call origin. With
-`egressPolicy: block-remote-automatic` and a remote endpoint, it fails with
-`egress_blocked` before any request is sent. Explicit `semantic_decide` calls
-remain allowed under the same policy.
+---
 
-**Not implemented, on purpose:** no workflow transition, no hook, no
-completion signal, no automatic "done" behaviour. The tool cannot accept a task
-or close a criterion. Workflow integration is a separate decision (issue #12)
-gated on measured false-pass evidence.
+## What it will never do
 
-### Issue-level coverage over explicit criteria
+These are guarantees, enforced by tests:
 
-`semantic_issue_coverage` reuses the exact same verification questions,
-policy, calibration profile/overrides and automatic egress classification as
-`semantic_verify_task`. It exists so a downstream build workflow can assess a
-bounded list of acceptance criteria without inventing its own aggregation
-logic.
+- Never replaces tests, typechecks, linters or human review.
+- Never marks a task complete or merge-safe.
+- Never branches a workflow on a semantic result — no transition handler and no
+  hook are registered.
+- Never blocks a turn; a transform cannot veto one.
+- Never deletes the current request or anything after the last tool result.
+- Never turns a provider error, timeout or malformed answer into a positive
+  result. It becomes a structured failure.
+- Never logs or echoes an API key, and never reflects an upstream error body.
+- Never follows a redirect.
+- Never sends repository content anywhere without an endpoint you configured and
+  a policy that allows it.
 
-Its coverage labels are deliberately conservative:
+---
 
-| Coverage | Meaning |
+## Honest limits
+
+- **No quality certification exists.** The live runs above are dated
+  observations, not a benchmark.
+- **No saving is claimed** — no token, cost, latency or quality figure, because
+  none has been measured. Unmeasured fields are recorded as `null`, never `0`.
+- **No provider is endorsed.** `custom` is the default preset and stays that
+  way. A preset's capabilities are *declared* from real conformance runs;
+  `unverified` means nobody asked, never "it works".
+- **The calibration layer ships inactive.** Until you install a measured
+  profile, verification cannot emit a positive verdict. That is deliberate.
+
+---
+
+## Further reading
+
+| Document | For |
 | --- | --- |
-| `covered` | The existing verification policy produced a calibrated `pass-candidate`. |
-| `missing` | The criterion is testable, evidence is sufficient, and the existing `satisfied` gate is decisively unmet. |
-| `uncertain` | Every ambiguous, insufficient, uncalibrated or otherwise non-decisive case. |
+| [docs/QUICKSTART.md](docs/QUICKSTART.md) | Five minutes from clone to a first call. |
+| [docs/USER-GUIDE.md](docs/USER-GUIDE.md) | Operating the plugin: install, settings, tools, skills, troubleshooting. |
+| [docs/INSTALLATION.md](docs/INSTALLATION.md) | Install recipes, and why the tarball fails. |
+| [docs/PROVIDERS.md](docs/PROVIDERS.md) | The System One protocol, presets and capabilities. |
+| [docs/EVALUATION.md](docs/EVALUATION.md) | What counts as success, and every recorded verdict. |
+| [docs/CALIBRATION.md](docs/CALIBRATION.md) | Building and installing a calibration profile. |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Internal design and the module map. |
+| [docs/TRACEABILITY.md](docs/TRACEABILITY.md) | Every requirement mapped to the file and test that proves it. |
+| [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md) | Harness results, release state, what remains. |
+| [docs/LIVE-JEV-FINDINGS.md](docs/LIVE-JEV-FINDINGS.md) | The bounded live run, including what it found. |
 
-`offScopeEvidence` is reported separately per criterion. The aggregate
-`needsFollowup` is true whenever a criterion is not `covered` or off-scope
-evidence is present. It is **not** a merge gate or a statement that a PR is
-safe. Provider failure, timeout, blocked egress or malformed output fails the
-tool as a whole and must fall back to normal verification.
+## Licence
 
-`task` and the bounded evidence block may be transmitted to the configured
-semantic endpoint. `evidenceRefs` remain local trace metadata and are never
-sent.
-
-### Measuring the check
-
-```bash
-npm run verify:experiment            # offline, scripted transport, no credentials
-```
-
-This replays a labelled fixture set (positive, negative and adversarial cases)
-through the real tool and the real policy, and writes
-`benchmark/results/verify/{report.json,runs.json,summary.md}`.
-
-It is **plumbing evidence only**. The transport is scripted, so the answers are
-authored rather than inferred, and the report therefore records
-`measured: false` with `falsePassRate: null`. A null rate is not a zero rate.
-Token savings, avoided verifier calls and task regressions remain unmeasured.
-
-For an opt-in live run, set `SEMANTIC_ENDPOINT` (and `SEMANTIC_API_KEY` if
-required) and pass `--live`. The live path replaces only the transport; the tool
-and the policy under test are identical. It is excluded from CI.
-
-```bash
-SEMANTIC_ENDPOINT=... npm run verify:experiment -- --live
-```
-
-### Replaying the recorded campaigns
-
-```bash
-npm run verify:replay                   # offline, no credentials
-```
-
-Two live `verify-0.2.1` campaigns are committed as sanitized, number-only
-snapshots under `benchmark/snapshots/verify-0.2.1/`, with a readable companion
-at `benchmark/snapshots/provider-smoke-2026-10-01.md`. They carry the observed
-status, the reasons and the per-gate numbers, and nothing else: no state, no
-evidence, no criterion text, no endpoint, no credential.
-
-The replay re-derives those recorded numbers under the frozen `verify-0.2.1`
-rules and under the shipped policy. The frozen rules must reproduce the status
-each run recorded — if they do not, the comparison column means nothing, and
-the replay fails. This is **arithmetic on recorded numbers, not a measurement**:
-it never writes a rate and never claims a false-pass count.
-
-## Usage skills
-
-The plugin registers two usage skills through the public `registerSkillSource`
-API (present in the Plugin API v2 baseline):
-
-- `semantic-verification` — when to use the check, when **not** to, which
-  evidence to assemble, how to read each status, and when to fall back to the
-  normal verifier. It states that tests, typechecks, linters and human review
-  remain mandatory.
-- `semantic-code-discovery` — when semantic search and scoring actually reduce
-  repository exploration, and when grep, symbols or tests already answer the
-  question.
-
-The skills carry no provider name, endpoint, URL or model id, and they never
-imply they grant tool access: the matching tools must still be listed in the
-agent's allowed tools.
-
-### Permissions, as observed on a real host
-
-Verified with `npm run harness:agent-e2e` against isolated OpenFox `2.0.157` and
-`2.0.160`, 67/67 checks on each; see `docs/TRACEABILITY.md` for the full
-evidence.
-
-| Configuration | Observed behaviour |
-| --- | --- |
-| Skill loaded, tool not in `allowedTools` | the host refuses the call with an allow-list message; no provider request is made |
-| Tool in `allowedTools`, skill never loaded | the tool executes normally; the skill is guidance, not a precondition |
-| Tool in `allowedTools` and `load_skill` called | both skills load through the normal `load_skill` tool, then the tool executes |
-
-One host caveat is worth knowing: a plugin tool is only permission-checked when
-the agent's `allowedTools` names **at least one** non-builtin tool. An agent
-whose list is builtins-only is not restricted from plugin tools at all.
-
-### Advisory workflow: the agent is opt-in
-
-The advisory workflow's semantic step runs as the agent named in the workflow
-document. The shipped default is the stock `builder`, which does **not** have
-`semantic_verify_task` in its `allowedTools`, so the step reports the tool as
-unavailable and continues to the normal verifier. That is safe, but it means the
-advice is never actually produced.
-
-To really get the advice, write the workflow with an agent that has the tool:
-
-```ts
-import { advisoryWorkflowFor } from 'openfox-semantic-tools'
-
-const workflow = advisoryWorkflowFor('my-agent-with-verification')
-```
-
-Only the advisory step's `agentId` changes. The deterministic checks, the normal
-verifier and every transition condition are identical in both forms, so opting
-in cannot shorten verification.
-
-## Provider calibration and self-test
-
-Semantic-provider numeric scales are not treated as interchangeable. Verification now supports a versioned calibration profile plus explicit operator overrides with the precedence:
-
-`explicit override > active calibration profile > conservative defaults`.
-
-A profile is never applied unless its own `active` field is true, and a profile whose configured provider/model/version no longer matches is reported as stale/unverified and is not applied.
-
-Four advisory tools are available:
-
-- `semantic_provider_self_test` — runs a small embedded synthetic smoke test against the configured endpoint and reports protocol reachability, profile freshness, observed gate ranges, warnings and fallback categories. It reads no repository/session content and never changes settings.
-- `semantic_calibration_candidate` — turns an operator-owned labelled numeric case set into an inactive, observation-only candidate profile. It never invents thresholds or activates the result.
-- `semantic_question_calibration` — evaluates ONE arbitrary typed question (`noul`, `choice` or `score`) against the operator's own labelled cases and reports how that exact question behaves for the configured provider/model.
-- `semantic_reference_agreement` — runs the same frozen question and case set through the provider and compares the result against a caller-supplied reference judgment (an LLM reference is supplied as input, never called from the plugin), reporting agreement/concordance, the disagreements and the agreements the provider was unsure about. Reviewed cases become labelled cases for `semantic_question_calibration`.
-
-Configure `calibrationProfileJson`, `calibrationOverridesJson`, and optionally `runtimeVersion` in plugin settings. See `docs/CALIBRATION.md` for the schema, freshness rules and safety model.
-
-The dated Jev/Kev/Laya snapshot is evidence for why this layer exists, not a leaderboard and not a built-in permissive profile.
-
-### Arbitrary question calibration
-
-`semantic_question_calibration` is the operator-facing surface for a question
-that is not one of the five verification gates:
-
-```jsonc
-{
-  "question": { "type": "noul", "instructions": "Does this note contain a precise diagnosis?" },
-  "cases": [
-    { "id": "clear", "state": "...", "expected": true },
-    { "id": "vague", "state": "...", "expected": false }
-  ],
-  "questionVersion": "notes-v1"
-}
-```
-
-`expected` is a boolean for `noul`, a criterion key for `choice` and a rubric
-level index for `score`. The report keeps each primitive in its own domain — a
-`noul` probability with false-positive/false-negative counts and a Brier score,
-a `choice` confusion matrix and per-class agreement, a `score` absolute error in
-level units — and never normalizes them into a common 0..1 number. Metrics that
-were not measured are `null`, never `0`.
-
-The report is always `advisory: true, active: false` and carries the provider
-identity plus a fingerprint of the exact question, so a candidate measured on
-one question can never be read as calibration for another. Its candidate block
-holds observations only: it derives no threshold and never activates anything.
-The labelled states are sent to the provider but are not written into the
-report.
-
-### Reference agreement
-
-`semantic_reference_agreement` answers a different question: on a frozen case
-set, does the semantic provider usually agree with the main/reference LLM, and
-where do they diverge? It is an onboarding and calibration aid, not a
-leaderboard and not a substitute for labelled evaluation.
-
-OpenFox exposes no plugin API for invoking the active main LLM, so the reference
-judgments are **input**, produced before the call by the operator's own model in
-a workflow step or by a human. The plugin adds no second LLM client and no
-second credential:
-
-```jsonc
-{
-  "question": { "type": "noul", "instructions": "Does this note contain a precise diagnosis?" },
-  "cases": [
-    { "id": "clear", "state": "...", "referenceAnswer": true, "disposition": "clear" },
-    { "id": "vague", "state": "...", "referenceAnswer": false }
-  ],
-  "reference": { "source": "llm", "model": "main-model-x", "promptVersion": "notes-prompt-v3" },
-  "reviewed": [{ "id": "vague", "expected": false }]
-}
-```
-
-A case accepts no semantic answer field, so the reference cannot be
-contaminated by the provider result. `reference.model` is required for an LLM
-reference: a reference without a model would read as a repeatable measurement
-when it is not.
-
-The report names the metric honestly. With an LLM reference it is
-**agreement/concordance**, because a second model is not ground truth, and the
-word "accuracy" appears nowhere in it; only `source: "human"` reports accuracy.
-Disagreements are first-class review items, raw probabilities/distributions/
-confidence stay visible, and uncertainty is first-class on both sides:
-`lowConfidenceAgreements` lists the agreements the provider itself was unsure
-about, and `referenceAmbiguous` lists the cases whose reference judgment the
-operator declared `ambiguous` (via the per-case `disposition`). With `reviewed`
-supplied, `promotion.labelledCases` returns the reviewed cases in exactly the
-shape `semantic_question_calibration` accepts, so they feed the labelled
-evaluation without reformatting. The report is `advisory: true, active: false`,
-derives no threshold and ranks no provider.
+MIT. See [LICENSE](./LICENSE).

@@ -17,3 +17,18 @@ benchmark/results/*
 
 # Local live-campaign runner: reads an operator-provided key file, never committed.
 live-jev-runner.mjs
+
+# Provider evidence under `benchmark/evidence/` is committed ON PURPOSE: it is
+# the dated record a review depends on, and it cannot be re-derived without
+# spending a provider call. That is why the rule is a policy, not a default:
+#
+# - a committed report keeps its per-case OBSERVATIONS (probabilities,
+#   confidences, gate values), because those are the evidence;
+# - anything else that is regenerable stays ignored, and
+# - no raw endpoint, key, header or private path may ever be committed here.
+#
+# If a report starts carrying source or session content rather than public
+# fixture text, it must be reduced or excluded, not committed as-is. See
+# docs/IMPLEMENTATION.md for the number-only rule that applies to the smaller
+# campaign snapshots.
+benchmark/evidence/**

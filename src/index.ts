@@ -4,6 +4,9 @@ import { createIssueCoverageTool } from './verify/coverage.js'
 import { createDiscoveryTool } from './discovery/tool.js'
 import { DEFAULT_BACKEND_ID, PRESETS } from './presets/index.js'
 import { SKILL_SOURCE } from './skills/source.js'
+import { createContextTransform } from './transform/index.js'
+import { createTransformStatusTool } from './transform/status-tool.js'
+import { TransformStatusStore } from './transform/status.js'
 import { ADVISORY_VERIFICATION_WORKFLOW, advisoryWorkflowFor, listAdvisoryWorkflows } from './workflow/templates.js'
 import { createProviderSelfTestTool } from './calibration/self-test.js'
 import { createCalibrationCandidateTool } from './calibration/candidate-tool.js'
@@ -181,6 +184,16 @@ export const SETTINGS: PluginSettingsSchema = {
       },
       default: 128,
     },
+    {
+      key: 'contextReduce',
+      type: 'boolean',
+      label: { en: 'Context reduction (no measured benefit)', fr: 'Réduction de contexte (aucun bénéfice mesuré)' },
+      description: {
+        en: 'OFF by default. Current verdict: DEFER — no measured token, cost or task-quality benefit. It asks the provider which earlier conversation segments are no longer needed before each LLM call, never drops the current request or anything after the last tool result, and keeps the context unchanged whenever the provider errors or is unsure. Use `semantic_transform_status` to see what it actually did. See docs/EVALUATION.md in the repository before enabling.',
+        fr: 'DÉSACTIVÉ par défaut. Verdict actuel : DEFER — aucun bénéfice mesuré en tokens, coût ou qualité de tâche. Demande au fournisseur quels segments de conversation antérieurs ne sont plus utiles avant chaque appel LLM, ne supprime jamais la demande courante ni ce qui suit le dernier résultat d\'outil, et conserve le contexte inchangé en cas d\'erreur ou d\'incertitude du fournisseur. Utilisez `semantic_transform_status` pour voir ce qu\'il a réellement fait. Voir docs/EVALUATION.md dans le dépôt avant de l\'activer.',
+      },
+      default: false,
+    },
   ],
 }
 
@@ -206,4 +219,12 @@ export function register(registry: PluginRegistry): void {
   registry.registerTool(createReferenceAgreementTool(readSettings))
   // Skills carry usage guidance only; they never grant tool access.
   registry.registerSkillSource(SKILL_SOURCE)
+  // Opt-in and inert by default: with `contextReduce` off this transform
+  // returns the messages unchanged and contacts no endpoint. See
+  // docs/EVALUATION.md before enabling it.
+  const transformStatus = new TransformStatusStore()
+  registry.registerMessageTransform(createContextTransform(readSettings, fetch, transformStatus))
+  // The read path for the transform's own metadata: without it, `contextReduce`
+  // is a toggle whose effect an operator cannot observe.
+  registry.registerTool(createTransformStatusTool(transformStatus))
 }
