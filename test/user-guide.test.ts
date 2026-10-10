@@ -154,3 +154,31 @@ test('the README links only files that exist', async () => {
     assert.ok(existsSync(target), `README links a missing file: ${match[1]}`)
   }
 })
+
+test('every screenshot in the README exists and is inside the packed files', async () => {
+  const { existsSync, statSync } = await import('node:fs')
+  const { readFile: read } = await import('node:fs/promises')
+  const readme = await read(resolve(import.meta.dirname, '../README.md'), 'utf8')
+  const images = [...readme.matchAll(/!\[[^\]]*\]\((?:\.\/)?([^)]+\.png)\)/g)].map((m) => m[1]!)
+  assert.ok(images.length > 0, 'the README is expected to show the plugin in the UI')
+
+  const pkg = JSON.parse(
+    await read(resolve(import.meta.dirname, '../package.json'), 'utf8'),
+  ) as { files?: string[] }
+  const packed = pkg.files ?? []
+
+  for (const image of images) {
+    const target = resolve(import.meta.dirname, '..', image)
+    assert.ok(existsSync(target), `README references a missing screenshot: ${image}`)
+    // A screenshot outside the `files` allowlist would render on GitHub and
+    // 404 in the published package.
+    const prefix = image.split('/')[0]!
+    assert.ok(
+      packed.includes(prefix),
+      `${image} would not be packed: package.json "files" does not include "${prefix}"`,
+    )
+    // And it should be a real PNG, not a placeholder.
+    const size = statSync(target).size
+    assert.ok(size > 5000, `${image} is only ${size} bytes — likely a blank capture`)
+  }
+})

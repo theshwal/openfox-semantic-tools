@@ -30,6 +30,12 @@ npm run build
 Then in OpenFox: **Settings → Plugins → install from local path**, and give the
 absolute path (it must start with `/`). Enable it.
 
+![The plugin listed in OpenFox Settings → Plugins](./images/plugins-tab.png)
+
+<sub>The card shows the declared capabilities, the contribution counts the host
+itself computed (`10 tools · 1 skills · 14 settings · 1 transforms`), and the
+author. Captured on OpenFox 2.0.161 against a throwaway instance.</sub>
+
 Why not the packed `.tgz`? `npm pack` ships only `dist/`, `README.md` and
 `docs/`, so the installer finds a `build` script with no `tsconfig.json` beside
 it and the install fails. Full explanation, and the GitHub-URL caveat, in
@@ -46,6 +52,11 @@ That runs every offline check and then prints exactly which steps remain manual.
 ## 2. Configure
 
 All settings live in the plugin's own panel. Two rows matter first.
+
+![The plugin settings form](./images/plugin-settings.png)
+
+<sub>Rendered by the host from this plugin's schema. Every field carries its own
+explanation, so nothing here has to be looked up elsewhere.</sub>
 
 ### `endpoint` — required
 

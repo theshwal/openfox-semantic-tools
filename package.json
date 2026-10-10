@@ -17,7 +17,7 @@
     "displayName": "Semantic Tools",
     "description": "Fast typed semantic decisions for OpenFox workflows, with hosted or local System One-compatible providers.",
     "author": "theshwal",
-    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M8 12h3l2-4 2 8 2-4h1\"/></svg>",
+    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#3b82f6\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M8 12h3l2-4 2 8 2-4h1\"/></svg>",
     "capabilities": [
       "settings",
       "tools",

@@ -19,6 +19,10 @@ score   a position on an ordered rubric, with a distribution
 > none of them can mark a task complete or merge-safe. See
 > [What it will never do](#what-it-will-never-do).
 
+![The plugin listed in OpenFox Settings → Plugins](docs/images/plugins-tab.png)
+
+<sub>Settings → Plugins on OpenFox 2.0.161, captured against a throwaway instance.</sub>
+
 ---
 
 ## Tested with
@@ -97,6 +101,9 @@ npm run build
 In OpenFox: **Settings → Plugins → install from local path**, and give the
 absolute path (it must start with `/`). Then enable it.
 
+**→ In a hurry? [docs/QUICKSTART.md](docs/QUICKSTART.md)** — the same steps in
+five minutes, ending with a first `semantic_decide` call.
+
 Installing the packed `.tgz` does not work — it ships no `tsconfig.json`, so the
 host's build step fails. The full explanation is in
 [docs/INSTALLATION.md](docs/INSTALLATION.md).
@@ -126,6 +133,11 @@ Everything is configured in the plugin's own panel. Nothing is guessed for you.
 | `cacheTtlMs` | no | `300000` | How long a cached answer may be reused. `0` disables reuse. |
 | `cacheMaxEntries` | no | `128` | Hard bound, oldest-first eviction. |
 | `contextReduce` | no | `false` | Experimental context reduction. **No measured benefit — leave it off.** See below. |
+
+![The plugin settings form](docs/images/plugin-settings.png)
+
+<sub>The settings form rendered by the host from this plugin's schema — every
+field carries its own explanation, so nothing has to be looked up elsewhere.</sub>
 
 ### `egressPolicy` — decide this before pointing at a remote host
 
@@ -235,6 +247,7 @@ These are guarantees, enforced by tests:
 
 | Document | For |
 | --- | --- |
+| [docs/QUICKSTART.md](docs/QUICKSTART.md) | Five minutes from clone to a first call. |
 | [docs/USER-GUIDE.md](docs/USER-GUIDE.md) | Operating the plugin: install, settings, tools, skills, troubleshooting. |
 | [docs/INSTALLATION.md](docs/INSTALLATION.md) | Install recipes, and why the tarball fails. |
 | [docs/PROVIDERS.md](docs/PROVIDERS.md) | The System One protocol, presets and capabilities. |
