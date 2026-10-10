@@ -1,8 +1,10 @@
 # Implementation order and delivery status
 
 Current delivery state updated through the #35 Phase A evidence cycle on
-2026-10-03. OpenFox compatibility evidence still targets released tags
-`v2.0.157` and `v2.0.160`. No OpenFox core modifications.
+2026-10-03. The OpenFox compatibility baseline is `2.0.161`; the recorded
+harness evidence still comes from released tags `v2.0.157` and `v2.0.160`,
+which are history rather than the current minimum. No OpenFox core
+modifications.
 
 ## Current shape
 
@@ -11,10 +13,11 @@ Nine tools (`semantic_decide`, `semantic_verify_task`,
 `semantic_provider_self_test`, `semantic_calibration_candidate`,
 `semantic_question_calibration`, `semantic_reference_agreement`),
 two usage skills, global settings, presets,
-an optional cache, explicit egress policy, a calibration layer and an opt-in
-advisory workflow file. Nothing registers a
-hook or a workflow transition. #35 currently adds benchmark/evidence artifacts
-only.
+an optional cache, explicit egress policy, a calibration layer, an opt-in
+advisory workflow file and one registered message transform
+(`semantic-context-reduce`, inert unless `contextReduce` is enabled). Nothing
+registers a hook or a workflow transition. #35 currently adds
+benchmark/evidence artifacts only.
 
 | Order | Issues | Delivery / gate |
 | --- | --- | --- |
@@ -27,13 +30,13 @@ only.
 | 7 | #4, #14 (verification) | Experimental post-build criterion checks, then matching usage skill. No automatic completion. Implemented: `semantic_verify_task` (one criterion per call, automatic origin, versioned uncalibrated policy), offline labelled fixture runner, `semantic-verification` skill. Verified offline only. |
 | 8 | #5, #14 (discovery) | Implemented: `semantic_search` and `semantic_scan` over a caller-narrowed candidate list, plus the `semantic-code-discovery` skill. Advisory only; the agent confirms candidates with normal code tools. |
 | 9 | #11, #12 | Implemented: optional decision cache (off by default) and an opt-in advisory workflow file. The plugin registers no hook and no transition, so verification cannot be shortened. |
-| 10 | #6 | **Blocked**: `registerMessageTransform` is not in any released 2.0.0.x version. |
+| 10 | #6 | **Implemented, opt-in, unmeasured**: `registerMessageTransform` and the `transforms` capability shipped in OpenFox 2.0.161, so the minimum supported version moved there. `semantic-context-reduce` is registered but inert unless the `contextReduce` setting is enabled; it fails open. Token and task-quality effects are unmeasured, so the setting stays off by default. |
 | 11 | #13 (release readiness) | Completed: CI, offline suite, package/install recipes and isolated-host validation are in place; package version 0.1.0 is prepared. No Git tag, GitHub release or registry publication is implied. |
 | 12 | #33 | **Completed**: `semantic_issue_coverage` aggregates explicit criteria through the existing verification policy/calibration/egress path. Advisory only; no merge gate. |
 | 13 | #34 | **Completed**: bounded local recall feeds true per-file semantic reranking in `semantic_search`; explicit candidates remain supported and `semantic_scan` stays explicit-candidate. No persistent index/vector DB. |
 | 14 | #35 | **Backend viability GO / production DEFER**: labelled smoke manifest + versioned harness + Qwen VLM baseline + typed OpenJev System One baseline are recorded. OpenJev is 7/7 on the smoke set at 875 ms median with typed probabilities. Production API remains blocked on the 31-case action-state safety gate. |
 
-Completed issues above were implemented and checked separately. #33 and #34 are now delivered. #35 remains evidence-only for production: backend viability is now demonstrated by the typed OpenJev smoke run, but the production GO/DEFER gate still requires the frozen action-state corpus and safety metrics. #9 collects measured impact after functionality exists; it is not a provider-tuning loop. #6 stays blocked on a released message-transform API. A fixture run is protocol evidence, not decision-quality or OpenFox end-to-end evidence.
+Completed issues above were implemented and checked separately. #33 and #34 are now delivered. #35 remains evidence-only for production: backend viability is now demonstrated by the typed OpenJev smoke run, but the production GO/DEFER gate still requires the frozen action-state corpus and safety metrics. #9 collects measured impact after functionality exists; it is not a provider-tuning loop. #6 is implemented and opt-in; what it still lacks is the #9 measurement that would justify enabling it. A fixture run is protocol evidence, not decision-quality or OpenFox end-to-end evidence.
 
 ## Current boundaries
 
@@ -116,14 +119,20 @@ replaces only the transport and is excluded from CI.
 
 The `semantic-verification` skill ships with this tool through
 `registerSkillSource`, which exists in the Plugin API v2 baseline (verified
-against OpenFox 2.0.157 and 2.0.160), so the minimum supported version is
-unchanged. `semantic-code-discovery` shipped with #5; it teaches `semantic_search`
-and `semantic_scan`, which now exist, so guidance is never advertised for a tool
+against OpenFox 2.0.157 and 2.0.160). It did not by itself raise the minimum
+supported version; that moved to 2.0.161 when the message transform was added.
+`semantic-code-discovery` shipped with #5; it teaches `semantic_search` and
+`semantic_scan`, which now exist, so guidance is never advertised for a tool
 the agent cannot call.
 
 ## Compatibility validated on both ends of the range
 
-The declared minimum `2.0.157` and the then-current `2.0.160` were each
+**The compatibility baseline is now `2.0.161`** (`>=2.0.161` in
+`peerDependencies`), raised from `2.0.157` because the released
+message-transform API this plugin registers arrived in 2.0.161.
+
+The table below is the recorded history. The former declared minimum `2.0.157`,
+the then-current `2.0.160`, and the current baseline `2.0.161` were each
 installed into their own throwaway tree, through the host's own public
 `POST /api/plugins/install` route, and loaded the plugin:
 
@@ -132,11 +141,25 @@ installed into their own throwaway tree, through the host's own public
 | `2.0.157` | 20/20 | 67/67 |
 | `2.0.160` | 20/20 | 67/67 |
 
-Both reported six tools, one skill source and thirteen settings fields, with
-zero hooks and zero transitions.
+The two earlier releases each reported six tools, one skill source and
+thirteen settings fields, with zero hooks and zero transitions.
 
-The declared minimum is therefore **not** raised, and no private API was used.
-The reported version is always read back from the installed tree; a report can
+| `2.0.161` | 23/23 | not run |
+
+The `2.0.161` row is the current baseline and was actually executed:
+`HARNESS_PKG_DIR=/tmp/of-harness-2.0.161 npm run harness` installed OpenFox
+2.0.161 into a throwaway tree and reported 23/23, including two checks that
+only exist because of this release — the manifest declares the `transforms`
+capability, and the host itself reported `messageTransforms=1`, proving the
+released message-transform API loaded our transform instead of ignoring it.
+The harness also reported nine tools, one skill source, fourteen settings
+fields, and still zero hooks and zero transitions.
+
+`harness:agent-e2e` was **not** re-run against 2.0.161: that suite needs a live
+LLM provider and a real agent turn, so it is not reproducible offline. No
+`agent-e2e` count is claimed for 2.0.161.
+
+No private API is used. The reported version is always read back from the installed tree; a report can
 no longer name a release it did not run against. See
 [docs/INSTALLATION.md](./INSTALLATION.md) for the install recipes and
 [docs/TRACEABILITY.md](./TRACEABILITY.md) for the mapped requirements.

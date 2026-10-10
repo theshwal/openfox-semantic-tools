@@ -13,7 +13,7 @@ OpenFox Plugin API
        |
        v
 OpenFox contributions
-(settings / tools / later transforms)
+(settings / tools / skills / transforms)
        |
        v
 Use-case policy
@@ -261,21 +261,31 @@ end-to-end work without lowering task success. Those measurements belong to #9.
 
 Purpose: score historical messages/tool outputs against the current goal and remove or compress low-value items before the main LLM call.
 
-OpenFox `develop` currently has a public `registerMessageTransform` contribution that can mutate messages/system prompt before LLM dispatch. This would be a much cleaner integration point than observational hooks.
+OpenFox released a public `registerMessageTransform` contribution in **2.0.161**
+(PR #377 / #393), with the `transforms` capability. It mutates
+messages/system prompt before LLM dispatch, which is a cleaner integration
+point than observational hooks. The API was absent from `v2.0.157` and
+`v2.0.160`, both checked directly against `src/plugin/index.ts`.
 
-However, **this is blocked**: the API is in no released OpenFox version. It is
-absent from `v2.0.157` and from `v2.0.160`, both checked directly against
-`src/plugin/index.ts`. Treat this feature as a later experiment, and only after
-the API lands in a release.
+The plugin therefore registers one transform, `semantic-context-reduce`
+(`src/transform/`), which asks the provider which earlier conversation segments
+are no longer needed before each LLM dispatch. It is inert unless the
+`contextReduce` setting is enabled, and that setting is off by default, so
+registration alone changes nothing.
 
-Design rules:
+Design rules, as implemented:
 
-- opt-in;
-- fail open;
-- preserve system/safety/instruction messages;
-- never drop the current user request;
-- record what was removed and estimated token impact;
-- benchmark task quality, not just prompt size.
+- opt-in (`contextReduce`, default `false`);
+- fail open — provider error, timeout, malformed answer, missing configuration
+  or a low-confidence verdict returns the original messages;
+- preserve system/safety/instruction messages and never drop the current user
+  request: only eligible history segments are offered to the provider;
+- record what was removed in transform metadata
+  (`semantic.segmentsOffered`, `semantic.segmentsDropped`, `semantic.uncertain`)
+  rather than asserting an estimated token impact;
+- benchmark task quality, not just prompt size. **No token, latency or
+  task-quality measurement exists yet**; `docs/EVALUATION.md` defines what must
+  be recorded first. The setting therefore stays off by default.
 
 ## 6. Failure model
 
@@ -316,36 +326,45 @@ Therefore:
 - document what each tool sends;
 - make custom/local endpoints first-class;
 - avoid sending more context than the decision needs;
-- future context transforms must be explicit/opt-in.
+- the context transform is explicit/opt-in and fails open.
 
 ## 8. Compatibility strategy
 
 ### Stable baseline
 
-OpenFox 2.0.157:
+OpenFox 2.0.161 is the compatibility baseline (`>=2.0.161` in
+`peerDependencies`):
 
 - Plugin API v2;
 - tools;
 - settings;
 - skills;
 - hooks;
-- workflow transition handlers.
+- workflow transition handlers;
+- `registerMessageTransform` and the `transforms` capability.
 
-The plugin stays inside this surface and never needs a host patch. Both `2.0.157`
-and `2.0.160` were validated by loading the built package into a real isolated
+The plugin stays inside this surface and never needs a host patch. `2.0.157` and
+`2.0.160` were validated by loading the built package into a real isolated
 host, which confirmed the then-current six-tool baseline, one skill source and
 thirteen settings fields, with zero hooks and zero transitions. Issue #33 adds a
 seventh tool using the same public tool registration surface; the historical
 host count is not rewritten as if that run had included the later tool.
 
-### Future capability
+The minimum was raised from 2.0.157 to 2.0.161 because of the released transform
+API, and the harness **was** re-run there:
+`HARNESS_PKG_DIR=/tmp/of-harness-2.0.161 npm run harness` reported 23/23 on
+`openfox@2.0.161`, with the host itself counting nine tools, one skill source,
+fourteen settings fields and `messageTransforms=1`. `harness:agent-e2e` was not
+re-run at 2.0.161 — it needs a live LLM provider and a real agent turn — so no
+agent-e2e count is claimed for that release.
 
-OpenFox `develop` exposes `registerMessageTransform` and the `transforms`
-capability. It is **not** in `v2.0.157` or `v2.0.160`. Before using it:
+### Transforms
 
-- verify the API in an actual release;
-- update package compatibility;
-- add integration tests against that release.
+`registerMessageTransform` is released in 2.0.161 and is used by
+`semantic-context-reduce`. It is registered unconditionally but is inert unless
+`contextReduce` is enabled. Re-verify the contract against a future release
+before relying on further transform fields, and do not implement against a
+develop-only or private surface.
 
 ## 9. Candidate providers/runtimes
 

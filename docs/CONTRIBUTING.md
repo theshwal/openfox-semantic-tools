@@ -102,8 +102,8 @@ If you touched the OpenFox-facing contract, also run the isolated harness
 against the **minimum** supported release, not only the newest:
 
 ```bash
-HARNESS_PKG_DIR=/tmp/of-harness-2.0.157 OPENFOX_VERSION=2.0.157 scripts/setup-harness.sh
-HARNESS_PKG_DIR=/tmp/of-harness-2.0.157 npm run harness
+HARNESS_PKG_DIR=/tmp/of-harness-2.0.161 OPENFOX_VERSION=2.0.161 scripts/setup-harness.sh
+HARNESS_PKG_DIR=/tmp/of-harness-2.0.161 npm run harness
 ```
 
 The setup script refuses to reuse a tree that holds a different version and

@@ -1,0 +1,30 @@
+From cc5cecb2ba44c069f294d3acb77b29e036a5416c Mon Sep 17 00:00:00 2001
+From: theshwal <>
+Date: Sat, 10 Oct 2026 15:52:13 +0200
+Subject: [PATCH] feat(registry): add openfox-semantic-tools
+
+---
+ plugins-registry.json | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/plugins-registry.json b/plugins-registry.json
+index 0e7a94a..3d91314 100644
+--- a/plugins-registry.json
++++ b/plugins-registry.json
+@@ -142,5 +142,13 @@
+     "githubUrl": "https://github.com/JamesDAdams/openfox-multi-rep",
+     "author": "James Adams",
+     "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"#3b82f6\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><line x1=\"6\" y1=\"3\" x2=\"6\" y2=\"15\"/><circle cx=\"18\" cy=\"6\" r=\"3\"/><circle cx=\"6\" cy=\"18\" r=\"3\"/><path d=\"M18 9a9 9 0 0 1-9 9\"/></svg>"
++  },
++  {
++    "name": "openfox-semantic-tools",
++    "displayName": "Semantic Tools",
++    "description": "Typed noul/choice/score decision tools against any System One-compatible endpoint (hosted or local). Advisory only, with an opt-in, unmeasured context-reduction transform.",
++    "githubUrl": "https://github.com/theshwal/openfox-semantic-tools",
++    "author": "theshwal",
++    "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M8 12h3l2-4 2 8 2-4h1\"/></svg>"
+   }
+ ]
+-- 
+2.47.3
+

@@ -4,11 +4,17 @@ Experimental OpenFox plugin for **fast, typed semantic decisions** and, where it
 
 The project is intentionally provider-agnostic. The first transport target is the Jev / System One-style `POST /v1/systemone` API, so the same OpenFox tools can be backed by hosted Jev or by a compatible local/open-source runtime.
 
-> Status: nine tools, two usage skills, presets, optional cache, egress,
-> calibration and advisory workflow, validated on OpenFox 2.0.157 and 2.0.160.
+> Status: ten tools, two usage skills, presets, optional cache, egress,
+> calibration, advisory workflow and an opt-in message transform; compatibility
+> baseline OpenFox 2.0.161, re-validated by the isolated harness (23/23).
 > Dated provider observations are scoped in #9; no durable quality
 > certification or end-to-end savings claim is made. See
 > [Evaluation](#evaluation-what-counts-as-success).
+
+**Looking to use it?** Start with **[docs/USER-GUIDE.md](./docs/USER-GUIDE.md)** —
+install, configuration, each tool, what it will never do, and troubleshooting.
+This README covers why the project exists and how it is evaluated; the guide
+covers operating it.
 
 ## Why this exists
 
@@ -80,6 +86,7 @@ below is planned; see [docs/ROADMAP.md](./docs/ROADMAP.md) for what is not.
 | `semantic_calibration_candidate` | Turns an operator-labelled case set into an inactive candidate profile. | Yes — never activates anything. |
 | `semantic_question_calibration` | Evaluates one arbitrary typed question against the operator's labelled cases. | Yes — evaluation evidence only, never a threshold. |
 | `semantic_reference_agreement` | Compares the provider against a caller-supplied reference judgment on a frozen case set. | Yes — concordance evidence, never a threshold or a ranking. |
+| `semantic_transform_status` | Reports what the opt-in context-reduction transform did: applied turns, segments dropped, and the reason a turn was left unchanged. | Yes — a pure reader, never a gate. |
 
 | Skill | Covers |
 | --- | --- |
@@ -92,17 +99,43 @@ classification and egress policy, a versioned calibration layer, and an opt-in
 advisory workflow file.
 
 **What is not here:** no automatic verification gate, no hook, no workflow
-transition, no context mutation, and no message transform. The plugin registers
-zero hooks and zero transitions, which the real host confirms.
+transition, and no automatic context mutation. The plugin registers zero hooks
+and zero transitions, which the real host confirms.
 
-### The one hard blocker
+### Message transform (opt-in, experimental)
 
-OpenFox `develop` exposes `registerMessageTransform`, the natural hook for
-pre-LLM context reduction. That API was **absent from the two released versions
-checked here** (`v2.0.157` and `v2.0.160`, both read directly from
-`src/plugin/index.ts`), so context reduction is **blocked on the released-API
-issue** and is not implemented. Re-check upstream before starting it, and
-re-check further releases rather than assuming the whole line behaves alike.
+OpenFox **2.0.161** (PR #377 / #393) released `registerMessageTransform` with
+the `transforms` manifest capability. That API was absent from `v2.0.157` and
+`v2.0.160`, both read directly from `src/plugin/index.ts`, which is why the
+compatibility baseline moved.
+
+The plugin now registers one transform, `semantic-context-reduce`. Before each
+LLM dispatch it asks the provider which earlier conversation segments are no
+longer needed. It is controlled by the `contextReduce` setting, which is
+**off by default**, so registering the transform changes no behaviour and
+contacts no endpoint until an operator enables it.
+
+It fails open: a provider error, timeout, malformed answer, missing
+configuration or low-confidence verdict returns the original messages
+unchanged. A transform cannot veto a turn, so the worst outcome is the context
+the model would have seen anyway.
+
+It also never offers the **live turn** for reduction. Only messages strictly
+before the last tool result — or before the trailing `user` turn when there is
+no tool result — are candidates, so the request the model is answering cannot
+be dropped, however confident the provider claims to be.
+
+Every outcome carries a reason (`disabled`, `no_candidates`,
+`egress_blocked`, `provider_unavailable`, `invalid_response`,
+`low_confidence`, `total_wipe_refused`, …). **`semantic_transform_status` is
+where you read it**: it reports the applied turn count, segments dropped and the
+reasons seen, from counts only — no message content is retained. Without that
+tool the setting would be a toggle whose effect you could not observe.
+
+**No token, cost, latency or task-quality effect has been measured.**
+`docs/EVALUATION.md` defines what must be recorded before any saving is
+claimed, and it is not claimed here. The recorded verdict is **DEFER**. Leave
+the setting off unless you have read that document.
 
 ## System One contract
 
@@ -177,27 +210,52 @@ in [docs/VISUAL-SPIKE.md](docs/VISUAL-SPIKE.md).
 - OpenFox Plugin API: v2
 - Node.js: 24+
 - Language: TypeScript / ESM
-- **Minimum validated release: OpenFox 2.0.157** (`>=2.0.157` in
-  `peerDependencies`)
+- **Minimum supported release: OpenFox 2.0.161** (`>=2.0.161` in
+  `peerDependencies`), raised from `2.0.157` because the released
+  message-transform API this plugin registers arrived in 2.0.161
 - No OpenFox core patch, public or private
 
-Both ends of the range were validated by installing the package into a **real
-isolated host** in a throwaway tree — including through the host's own
-`POST /api/plugins/install` local-path route, not a hand-made copy.
+Both ends of the earlier range were validated by installing the package into a
+**real isolated host** in a throwaway tree — including through the host's own
+`POST /api/plugins/install` local-path route, not a hand-made copy. Those runs
+happened at the versions named and are kept here as history.
 
-| Check | `2.0.157` (minimum) | `2.0.160` |
-| --- | --- | --- |
-| `npm run harness` (install, load, skills, tools, settings) | 20/20 | 20/20 |
-| `npm run harness:agent-e2e` (real agent turns, permissions, workflow) | 67/67 | 67/67 |
+| Check | `2.0.157` (former minimum) | `2.0.160` | `2.0.161` (current baseline) |
+| --- | --- | --- | --- |
+| `npm run harness` (install, load, skills, tools, settings) | 20/20 | 20/20 | 23/23 |
+| `npm run harness:agent-e2e` (real agent turns, permissions, workflow) | 67/67 | 67/67 | not run |
 
-Both hosts reported the same six tools, one skill source and thirteen settings
+The `2.0.161` column is the current baseline and was actually executed
+(`HARNESS_PKG_DIR=/tmp/of-harness-2.0.161 npm run harness`): 23/23 on
+`openfox@2.0.161`, including two checks that only exist because of this release
+— the manifest declares the `transforms` capability, and the host itself
+reported `messageTransforms=1`, proving the released message-transform API
+loaded the transform instead of ignoring it. `harness:agent-e2e` was **not**
+re-run there: it needs a live LLM provider and a real agent turn, so no count is
+claimed for it.
+
+The two earlier hosts reported the same six tools, one skill source and thirteen
+settings
 fields, and confirmed zero hooks and zero transitions. The versions above are
 read back from each installed tree, never hardcoded.
+
+### Also new in 2.0.161
+
+The baseline move also brings these released host features into view. This
+plugin uses none of them yet, and adopting any of them is a separate decision:
+
+- `registerDangerLevel` and the `PluginVcsProvider` type;
+- settings field types `list` and `status`, and the settings props
+  `linkButton`, `readOnly` and `storageKey`;
+- UI contribution slots `plugin.menu` and `composer.top`;
+- manifest fields `openfox.icon`, `openfox.logo` and `openfox.author`, which
+  the host validates and shows in the Plugins tab. This manifest declares
+  `openfox.icon` and `openfox.author`.
 
 Authoritative upstream references:
 
 - [OpenFox plugin contract](https://github.com/co-l/openfox/blob/develop/docs/PLUGINS.md)
-- [OpenFox plugin API source](https://github.com/co-l/openfox/blob/v2.0.160/src/plugin/index.ts)
+- [OpenFox plugin API source](https://github.com/co-l/openfox/blob/v2.0.161/src/plugin/index.ts)
 - [Reference plugin](https://github.com/co-l/openfox/tree/develop/examples/hello-plugin)
 - [Installation recipes](docs/INSTALLATION.md)
 
@@ -218,9 +276,9 @@ first (`scripts/setup-harness.sh`, which never touches your own OpenFox). Use
 one `HARNESS_PKG_DIR` per version:
 
 ```bash
-HARNESS_PKG_DIR=/tmp/of-harness-2.0.157 OPENFOX_VERSION=2.0.157 scripts/setup-harness.sh
-HARNESS_PKG_DIR=/tmp/of-harness-2.0.157 npm run harness    # loading, settings, skills
-HARNESS_PKG_DIR=/tmp/of-harness-2.0.157 npm run harness:agent-e2e  # real agent turns, permissions, workflow runtime
+HARNESS_PKG_DIR=/tmp/of-harness-2.0.161 OPENFOX_VERSION=2.0.161 scripts/setup-harness.sh
+HARNESS_PKG_DIR=/tmp/of-harness-2.0.161 npm run harness    # loading, settings, skills
+HARNESS_PKG_DIR=/tmp/of-harness-2.0.161 npm run harness:agent-e2e  # real agent turns, permissions, workflow runtime
 ```
 
 Install the built package through OpenFox's plugin installation flow, then enable
@@ -518,8 +576,8 @@ agent's allowed tools.
 ### Permissions, as observed on a real host
 
 Verified with `npm run harness:agent-e2e` against isolated OpenFox `2.0.157` and
-`2.0.160`, 67/67 checks on each; see `docs/TRACEABILITY.md` for the full
-evidence.
+`2.0.160`, 67/67 checks on each — recorded runs at those versions, not at the
+current 2.0.161 baseline; see `docs/TRACEABILITY.md` for the full evidence.
 
 | Configuration | Observed behaviour |
 | --- | --- |
