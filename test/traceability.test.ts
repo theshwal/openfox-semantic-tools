@@ -57,6 +57,20 @@ test('every requirement row ends in a verdict, never an empty cell', () => {
   }
 })
 
+test('requirement ids are unique, so every anchor resolves to one requirement', async () => {
+  // Two rows were once added with ids that already existed further down, so
+  // `docs/TRACEABILITY.md#A17` resolved to two different requirements while
+  // the build stayed green. Ids are anchors, so uniqueness is part of the contract.
+  const doc = await readFile(resolve(import.meta.dirname, '../docs/TRACEABILITY.md'), 'utf8')
+  const ids = [...doc.matchAll(/^\| (A\d+) \|/gm)].map((match) => match[1]!)
+  const seen = new Set()
+  const duplicates = new Set()
+  for (const id of ids) {
+    if (seen.has(id)) duplicates.add(id)
+    seen.add(id)
+  }
+  assert.deepEqual([...duplicates], [], `duplicate requirement ids: ${[...duplicates].join(', ')}`)
+})
 test('the summary counts match the tables', () => {
   const rows = requirementRows()
 

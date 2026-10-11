@@ -198,6 +198,60 @@ declare module 'openfox/plugin' {
     contentSource?: PluginUiContentSource
   }
 
+  /**
+   * Events the host emits to plugins, as declared by the 2.0.161 API.
+   *
+   * Read from `/tmp/of-harness-probe/node_modules/openfox/dist/plugin/index.d.ts`
+   * (see `PluginHookEvent` there). Listed in full so a drift test can compare
+   * the two, and because `registerHook` accepts only these literals.
+   */
+  export type PluginHookEvent =
+    | 'session.created'
+    | 'turn.completed'
+    | 'workflow.step.completed'
+    | 'workflow.execution.changed'
+    | 'task.completed'
+    | 'message.created'
+    | 'tool.completed'
+    | 'llm.completed'
+    | 'criterion.updated'
+    | 'provider.changed'
+    | 'devserver.started'
+    | 'devserver.stopped'
+    | 'devserver.state.changed'
+    | 'context.compacted'
+    | 'retry.triggered'
+
+  export interface PluginHookPayload {
+    readonly event: PluginHookEvent
+    readonly sessionId: string
+    readonly projectId?: string
+    readonly timestamp: string
+    /**
+     * Event-specific data.
+     *
+     * Deliberately `Record<string, unknown>` upstream, and deliberately NOT
+     * narrowed here. What each event actually carries was measured on a real
+     * host rather than assumed: see `scripts/hook-observation-pass.ts`
+     * (`npm run hooks:observe`) and the written result in
+     * `docs/HOOK-PAYLOADS.md`. Anything that reads `data` must narrow it, and
+     * must never persist a value it has not classified.
+     */
+    readonly data: Record<string, unknown>
+  }
+
+  /**
+   * A hook handler.
+   *
+   * RETURNS void. That is the whole point of N1-3: a handler observes, it
+   * cannot decide. There is no return channel through which a plugin could
+   * accept, refuse or alter a tool call, a turn or a workflow step, so no
+   * feature in this repository may rest on a veto. The host currently offers
+   * no such capability for plugins; `registerHook` is the only hook surface it
+   * declares.
+   */
+  export type PluginHookHandler = (payload: PluginHookPayload) => void | Promise<void>
+
   export interface PluginRegistry {
     readonly context: {
       settings(scope?: 'global' | 'project', projectId?: string): Record<string, string | number | boolean>
@@ -206,6 +260,8 @@ declare module 'openfox/plugin' {
     registerSettings(schema: PluginSettingsSchema): void
     registerSkillSource(source: PluginSkillSource): void
     registerMessageTransform(transform: PluginMessageTransform): void
+    /** Observability only; requires the `hooks` capability. See PluginHookHandler. */
+    registerHook(event: PluginHookEvent, handler: PluginHookHandler): void
     /** Declarative UI, released in the Plugin API v2 `ui` capability. */
     registerUiComponent(component: PluginUiComponent): void
     /** A header/menu action. Opens one of this plugin's own panels. */

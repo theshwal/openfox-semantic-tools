@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
 import { register } from '../src/index.ts'
-import { SKILL_SOURCE, SKILL_SOURCE_ID, SEMANTIC_VERIFICATION_SKILL } from '../src/skills/source.ts'
+import { SKILL_SOURCE, SKILL_SOURCE_ID, SEMANTIC_VERIFICATION_SKILL, SEMANTIC_CODE_DISCOVERY_SKILL } from '../src/skills/source.ts'
 import { fakeRegistry } from './helpers/registry.ts'
 
 async function loadedSkills() {
@@ -104,6 +104,44 @@ test('the skill does not hard-code thresholds without evidence', () => {
   assert.match(prompt, /calibration/i)
   assert.ok(prompt.includes('semantic_provider_self_test'))
   assert.ok(prompt.includes('semantic_calibration_candidate'))
+})
+
+test('every registered tool is either taught by a skill or explicitly excluded', async () => {
+  // A tool nobody can reach through guidance is prompt surface with no payoff:
+  // the agent has no reason to call it, and its output is never read. That is
+  // how `semantic_hook_status` shipped without a mention, so the omission is
+  // what this test exists to prevent.
+  const { register } = await import('../src/index.ts')
+  const { fakeRegistry } = await import('./helpers/registry.ts')
+  const fake = fakeRegistry()
+  register(fake.registry)
+
+  const taught = `${SEMANTIC_VERIFICATION_SKILL.prompt}\n${SEMANTIC_CODE_DISCOVERY_SKILL.prompt}`
+  // Tools that are operators' instruments rather than agent instruments. Each
+  // one must state WHY, so an exclusion is a decision and not an oversight.
+  const operatorOnly: Record<string, string> = {
+    semantic_decide:
+      'the primitive itself: the agent already knows what it asked, so guidance about WHEN to ask is all a skill could add',
+    semantic_usage_report:
+      'operator bookkeeping: an operator opens it, and it reports across sessions rather than within a turn',
+    semantic_transform_status: 'operator instrument: it exists to explain the transform, not to steer a turn',
+    semantic_reference_agreement: 'operator instrument: the evidence behind a threshold is produced by hand',
+    semantic_calibration_candidate: 'operator instrument: it never activates anything, so an agent has no use for it',
+    semantic_question_calibration:
+      'operator instrument: it scores one question against labelled cases, which is measurement work done by hand',
+  }
+
+  for (const name of fake.tools.keys()) {
+    const reason = operatorOnly[name]
+    if (reason !== undefined) {
+      assert.ok(reason.length > 20, `${name} must carry a real reason for being operator-only`)
+      continue
+    }
+    assert.ok(
+      taught.includes(name),
+      `${name} is neither taught by a skill nor listed as operator-only: an unreachable tool is dead weight`,
+    )
+  }
 })
 
 test('the manifest declares the skills capability exactly once', async () => {

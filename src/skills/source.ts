@@ -191,6 +191,18 @@ is local-only and does not transmit the repository sweep to the provider.
   rather than an empty list, and that message names what could not be read
   (\`Not read: path (reason)\`). Read it before broadening the query or
   concluding the code is absent: the files may exist and simply be unreadable.
+
+## Reading the host's own behaviour
+
+Call \`semantic_hook_status\` when the question is about the SESSION rather
+than the code: it reports what the HOST did, not what these tools did. Two
+fields decide how to read it. \`measured: false\` means the event has never
+fired — **never observed is not the same as did not occur** — and
+\`complete: false\` while any subscribed event is still unmeasured.
+
+The report carries data-key TYPES, never values, so nothing you submitted is
+echoed back. A hook handler returns void, so an observation is never a
+decision point.
 - With explicit candidates, a failed semantic call remains a failed call. With
   auto-recall search, provider failure may return the local shortlist with
   \`semanticApplied: false\`; confirm those candidates with normal code tools.

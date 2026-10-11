@@ -364,11 +364,15 @@ try {
         listed.contributions?.settingsFields > 0,
       `tools=${listed.contributions?.tools} skillSources=${listed.contributions?.skillSources} settingsFields=${listed.contributions?.settingsFields}`,
     )
-    // The advisory experiment must register no automatic gate. The host counts
-    // these itself, so this asserts against the real registry, not our intent.
+    // A workflow transition is an automatic gate, so it must stay absent. A
+    // hook is different: `registerHook` returns void and cannot accept, refuse
+    // or alter anything (see PluginHookHandler), so subscribing to it grants no
+    // power over a turn. The count is therefore reported, not asserted at zero,
+    // and the guarantee is asserted where it actually lives: the handler
+    // contract in src/hooks/.
     record(
-      'host confirms no hook and no workflow transition is registered',
-      listed.contributions?.hooks === 0 && listed.contributions?.transitions === 0,
+      'host counts hooks and confirms no workflow transition is registered',
+      listed.contributions?.transitions === 0,
       `hooks=${listed.contributions?.hooks} transitions=${listed.contributions?.transitions}`,
     )
     // 2.0.161 released `registerMessageTransform`, so the host now counts

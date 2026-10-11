@@ -232,7 +232,7 @@ test('the advisory workflow is opt-in: it is never installed automatically', asy
   assert.equal(DEFAULT_POLICY.calibrated, false, 'the policy stays uncalibrated')
 })
 
-test('the plugin registers no transition handler and no hook', async () => {
+test('the plugin registers no transition handler, and its hooks cannot decide', async () => {
   // The templates are documentation. The plugin itself must not be able to
   // branch a workflow on a semantic result.
   const { register } = await import('../src/index.ts')
@@ -241,12 +241,15 @@ test('the plugin registers no transition handler and no hook', async () => {
   const registry = fake.registry as unknown as Record<string, unknown>
   register(fake.registry)
   // The fake records only what it implements; the plugin must not reach for
-  // anything else, so a handler or hook registration would be impossible here.
+  // anything else, so a transition-handler registration would be impossible.
   assert.equal(registry.registerTransitionHandler, undefined)
-  assert.equal(registry.registerHook, undefined)
+  // Hooks ARE registered and are read-only: `PluginHookHandler` returns void
+  // upstream, so a handler cannot accept, refuse or alter a workflow step.
+  assert.ok(fake.hooks.size > 0, 'the read-only observer subscribes to the emitted events')
   assert.deepEqual([...fake.tools.keys()].sort(), [
     'semantic_calibration_candidate',
     'semantic_decide',
+    'semantic_hook_status',
     'semantic_issue_coverage',
     'semantic_provider_self_test',
     'semantic_question_calibration',

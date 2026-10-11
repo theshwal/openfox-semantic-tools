@@ -1,4 +1,6 @@
 import type {
+  PluginHookEvent,
+  PluginHookHandler,
   PluginMessageTransform,
   PluginRegistry,
   PluginSettingsSchema,
@@ -39,6 +41,7 @@ export function fakeRegistry(
   tools: Map<string, PluginTool>
   skillSources: PluginSkillSource[]
   messageTransforms: PluginMessageTransform[]
+  hooks: Map<string, PluginHookHandler>
   settings: PluginSettingsSchema[]
   settingsCalls: Array<string | undefined>
   components: PluginUiComponent[]
@@ -62,6 +65,7 @@ export function fakeRegistry(
   const actions: PluginUiAction[] = []
   const panels: PluginUiPanel[] = []
   const rpcs = new Map<string, RpcHandler>()
+  const hooks = new Map<string, PluginHookHandler>()
   const registry = {
     context: {
       settings(scope?: 'global' | 'project') {
@@ -93,6 +97,9 @@ export function fakeRegistry(
     registerRpc(method: string, handler: RpcHandler) {
       rpcs.set(method, handler)
     },
+    registerHook(event: PluginHookEvent, handler: PluginHookHandler) {
+      hooks.set(event, handler)
+    },
   } as unknown as PluginRegistry
   return {
     registry,
@@ -105,6 +112,7 @@ export function fakeRegistry(
     actions,
     panels,
     rpcs,
+    hooks,
     settingsValues,
   }
 }

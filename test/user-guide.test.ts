@@ -45,11 +45,25 @@ test('the guarantees the guide advertises are the ones the code keeps', async ()
   const guide = await readFile(GUIDE, 'utf8')
   const source = await readFile(resolve(import.meta.dirname, '../src/index.ts'), 'utf8')
 
-  // "Never branches a workflow on a semantic result."
+  // "Never branches a workflow on a semantic result." A transition handler is
+  // the registration that could do that, so it must stay absent.
   assert.equal(
-    /registerTransitionHandler|registerHook/.test(source),
+    /registerTransitionHandler/.test(source),
     false,
-    'the guide promises no transition handler and no hook; the plugin must register neither',
+    'the guide promises no transition handler; the plugin must register none',
+  )
+  // Hooks ARE registered. The guide must therefore say plainly that a handler
+  // returns void and cannot decide, because the guarantee now rests on that
+  // shape rather than on the hook being absent.
+  assert.match(
+    source,
+    /registerHook/,
+    'the observer subscribes to host events',
+  )
+  assert.match(
+    guide,
+    /returns? void/i,
+    'the guide must state that a hook handler cannot decide anything',
   )
   // "The current request is never deleted."
   const messages = await readFile(resolve(import.meta.dirname, '../src/transform/messages.ts'), 'utf8')

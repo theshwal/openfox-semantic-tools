@@ -16,6 +16,7 @@ test('registers the initial settings schema', () => {
   assert.deepEqual([...tools.keys()].sort(), [
     'semantic_calibration_candidate',
     'semantic_decide',
+    'semantic_hook_status',
     'semantic_issue_coverage',
     'semantic_provider_self_test',
     'semantic_question_calibration',

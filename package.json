@@ -24,7 +24,8 @@
       "skills",
       "transforms",
       "ui",
-      "rpc"
+      "rpc",
+      "hooks"
     ],
     "timeoutMs": 125000
   },
@@ -45,6 +46,8 @@
     "workflow:install": "node dist/workflow/emit.js",
     "visual:spike": "node --import tsx scripts/visual-spike.ts",
     "transform:benchmark": "node --import tsx scripts/transform-benchmark.ts",
+    "hooks:observe": "node --import tsx scripts/hook-observation-pass.ts",
+    "setup-harness": "bash scripts/setup-harness.sh",
     "verify:local": "node --import tsx scripts/verify-local.ts"
   },
   "peerDependencies": {
