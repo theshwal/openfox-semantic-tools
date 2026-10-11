@@ -7,6 +7,11 @@ coverage/
 *.log
 .DS_Store
 
+# Local OpenFox project config: dev.json, per-agent settings, cached state.
+# Machine-local by definition — it carries absolute paths and local ports, so
+# committing it would break every other checkout.
+.openfox/
+
 # Locally reproducible replay output stays untracked.
 benchmark/results/*
 # Measured visual results ARE the evidence a review depends on, so they are

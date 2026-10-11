@@ -185,9 +185,20 @@ test('the plugin adds no second LLM client, no new setting and no new outbound c
       `${name} must not contain a second LLM client`,
     )
   }
-  // No new credential or endpoint setting. The two opt-in booleans reuse the
-  // endpoint and key already configured above: they introduce no new
-  // credential, no new host and no new egress surface.
+// No new credential or endpoint setting. Four fields were added after this
+  // guard was written, and none introduces one:
+  //
+  // - `contextReduce`, an opt-in boolean that reuses the endpoint and key
+  //   already configured above.
+  // - `confidenceThreshold`, a pure presentation dial. It holds a number, names
+  //   no host and is read in-process before any request is built, so it cannot
+  //   widen what leaves the machine.
+  // - `activityPanel` / `activityLocale`, the session activity panel's switch and
+  //   its display language. A boolean and a locale tag: neither names a host,
+  //   and both are read locally.
+  //
+  // All four are asserted to stay non-secret below, so a future "just add a
+  // key" change fails loudly instead of widening the egress surface silently.
   assert.deepEqual(
     SETTINGS.fields.map((field) => field.key),
     [
@@ -204,11 +215,22 @@ test('the plugin adds no second LLM client, no new setting and no new outbound c
       'cacheEnabled',
       'cacheTtlMs',
       'cacheMaxEntries',
+      'confidenceThreshold',
       'contextReduce',
       'activityPanel',
       'activityLocale',
     ],
   )
+  for (const key of [
+    'confidenceThreshold',
+    'contextReduce',
+    'activityPanel',
+    'activityLocale',
+  ]) {
+    const field = SETTINGS.fields.find((entry) => entry.key === key)
+    assert.notEqual(field?.type, 'password', `${key} must never hold a credential`)
+    assert.notEqual(field?.secret, true, `${key} must never be marked secret-bearing`)
+  }
 })
 
 test('both calibration tools share one wrapper implementation, not a copy', async () => {

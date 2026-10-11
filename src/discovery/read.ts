@@ -2,6 +2,7 @@ import { readFile, lstat, realpath } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 
 import { ProviderError } from '../errors.js'
+import type { SkipReasonCode } from '../relevance/envelope.js'
 
 /** Hard bounds on one discovery call. Exceeding any of them is a refusal. */
 export const MAX_CANDIDATE_FILES = 40
@@ -14,15 +15,45 @@ export interface CandidateFile {
   readonly content: string
 }
 
+/** A requested path that yielded no usable content, and why. */
+export interface SkippedFile {
+  /** Repository-relative path, POSIX-style, safe to display. */
+  readonly path: string
+  readonly reason: SkipReasonCode
+}
+
 export interface BoundedRead {
   readonly files: readonly CandidateFile[]
   readonly bytes: number
-  /** Requested paths that did not yield readable content. */
-  readonly skipped: readonly string[]
+  /**
+   * Every requested path that did not yield usable content, named one by one.
+   *
+   * A reason is recorded rather than the path merely being dropped: "this file
+   * was never read" and "this file was read and found irrelevant" are opposite
+   * conclusions, and a bare count cannot tell them apart.
+   */
+  readonly skipped: readonly SkippedFile[]
 }
 
 function reject(message: string, code = 'invalid_arguments'): never {
   throw new ProviderError(code, message)
+}
+
+/**
+ * Renders skipped files so a refusal can still say WHAT was not read.
+ *
+ * An empty candidate set is exactly when this matters most: the caller
+ * otherwise cannot tell "nothing matched" from "everything I asked for was
+ * unreadable", and would conclude the code does not exist. Bounded, because
+ * an unbounded list would put the whole repository into an error string.
+ */
+const MAX_SKIPPED_NAMED = 10
+
+export function describeSkipped(skipped: readonly SkippedFile[]): string {
+  if (skipped.length === 0) return ''
+  const named = skipped.slice(0, MAX_SKIPPED_NAMED).map((entry) => `${entry.path} (${entry.reason})`)
+  const rest = skipped.length - named.length
+  return ` Not read: ${named.join(', ')}${rest > 0 ? `, and ${rest} more` : ''}.`
 }
 
 /**
@@ -69,7 +100,7 @@ export async function readBoundedCandidates(
   }
 
   const files: CandidateFile[] = []
-  const skipped: string[] = []
+  const skipped: SkippedFile[] = []
   let bytes = 0
 
   for (const raw of paths) {
@@ -84,14 +115,14 @@ export async function readBoundedCandidates(
     // can never pull foreign content into the transmitted state.
     const stats = await lstat(target).catch(() => null)
     if (stats === null) {
-      skipped.push(raw)
+      skipped.push({ path: raw, reason: 'missing' })
       continue
     }
     if (stats.isSymbolicLink()) {
       reject(`Candidate path is a symbolic link and is refused: ${raw}`)
     }
     if (!stats.isFile()) {
-      skipped.push(raw)
+      skipped.push({ path: raw, reason: 'not-a-file' })
       continue
     }
     if (stats.size > MAX_FILE_BYTES) {
@@ -106,9 +137,19 @@ export async function readBoundedCandidates(
       reject(`Candidate path escapes the root: ${raw}`)
     }
 
-    const content = await readFile(target, 'utf8')
+    let content: string
+    try {
+      content = await readFile(target, 'utf8')
+    } catch {
+      skipped.push({ path: raw, reason: 'unreadable' })
+      continue
+    }
+    if (content.includes('\0')) {
+      skipped.push({ path: raw, reason: 'binary' })
+      continue
+    }
     if (!content.trim()) {
-      skipped.push(raw)
+      skipped.push({ path: raw, reason: 'empty' })
       continue
     }
     bytes += Buffer.byteLength(content, 'utf8')
@@ -120,7 +161,8 @@ export async function readBoundedCandidates(
 
   if (files.length === 0) {
     reject(
-      'No readable file content was assembled. Narrow or correct the candidate paths before scanning.',
+      'No readable file content was assembled. Narrow or correct the candidate paths before scanning.' +
+        describeSkipped(skipped),
       'insufficient_evidence',
     )
   }

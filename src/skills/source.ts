@@ -175,6 +175,22 @@ is local-only and does not transmit the repository sweep to the provider.
 - Entries with \`usable: false\` carry no usable semantic score. Confirm the
   candidate yourself instead of treating an unusable semantic answer as
   relevance evidence.
+- Each candidate carries \`thresholdStatus\`: \`above\`, \`below\` or \`unknown\`,
+  plus \`thresholdReason\` stating the same thing in words. Read the reason
+  rather than reconstructing it. \`below\` still means worth confirming — it is
+  not a dismissal. \`unknown\` means **nothing was judged**, which is a
+  different conclusion from judged-and-weak: an absent or unusable answer is
+  never treated as a pass.
+- \`relevance\` is present on every result and says what was NOT looked at. Read
+  \`relevance.skippedByReason\` (counts per reason, with a path sample) and
+  \`relevance.skippedTotal\` before concluding that a file does not exist: those
+  files were never judged (too large, binary, empty, unreadable). The fixed
+  sentences in \`relevance.caveats\` apply to the whole report — read them once.
+  **An empty result never proves absence.**
+- A call that returns NO candidates at all fails with \`insufficient_evidence\`
+  rather than an empty list, and that message names what could not be read
+  (\`Not read: path (reason)\`). Read it before broadening the query or
+  concluding the code is absent: the files may exist and simply be unreadable.
 - With explicit candidates, a failed semantic call remains a failed call. With
   auto-recall search, provider failure may return the local shortlist with
   \`semanticApplied: false\`; confirm those candidates with normal code tools.
@@ -192,8 +208,22 @@ is local-only and does not transmit the repository sweep to the provider.
 `,
 }
 
+/**
+ * The skills this source ships.
+ *
+ * A list rather than two scattered constants, so the usage report, the
+ * registration and a test cannot disagree about what exists.
+ */
+export const SKILLS: readonly PluginSkill[] = [
+  SEMANTIC_CODE_DISCOVERY_SKILL,
+  SEMANTIC_VERIFICATION_SKILL,
+]
+
+/** Skill ids, for the usage catalogue. Derived, never hand-maintained. */
+export const SKILL_NAMES: readonly string[] = SKILLS.map((skill) => skill.id)
+
 export const SKILL_SOURCE: PluginSkillSource = {
   id: SKILL_SOURCE_ID,
   label: { en: 'Semantic tools', fr: 'Outils sémantiques' },
-  load: () => [SEMANTIC_CODE_DISCOVERY_SKILL, SEMANTIC_VERIFICATION_SKILL],
+  load: () => [...SKILLS],
 }

@@ -138,6 +138,7 @@ Everything is configured in the plugin's own panel. Nothing is guessed for you.
 | `cacheEnabled` | no | `false` | Reuse an identical previous answer. Only successful answers are ever reused, never an error. |
 | `cacheTtlMs` | no | `300000` | How long a cached answer may be reused. `0` disables reuse. |
 | `cacheMaxEntries` | no | `128` | Hard bound, oldest-first eviction. |
+| `confidenceThreshold` | no | `75` | Your confidence dial, in percent. Labels each discovery candidate `above` or `below`. **It only labels** — see below. |
 | `contextReduce` | no | `false` | Experimental context reduction. **No measured benefit — leave it off.** See below. |
 | `activityPanel` | no | `true` | A "Semantic activity" panel opened from the Plugins menu. In-memory only; reports observed usage, never a quality claim. See below. |
 | `activityLocale` | no | `auto` | Language of the panel's table rows. Every other label follows the OpenFox interface on its own; only a table has to be told. |
@@ -158,6 +159,34 @@ field carries its own explanation, so nothing has to be looked up elsewhere.</su
 The setting only ever *blocks*, so switching it later can never surprise you by
 sending more. Discovery and verification always mark their calls as
 `automatic`; `semantic_decide` is `explicit` because you called it yourself.
+
+### `confidenceThreshold` — your dial, not a verdict
+
+Every discovery result carries a **relevance envelope**: what was looked
+at, what was **not** looked at (named one by one, with the reason), what
+the number is worth, and what it does **not** guarantee. The fourth part is
+fixed text on every result, because a reader who sees it twice must be
+able to trust it twice.
+
+Your dial then labels each candidate `above` or `below`. It has three
+properties that are enforced by tests, not by convention:
+
+- **It only labels.** A below-threshold candidate stays in the list,
+  marked. Nothing is filtered away from you.
+- **It cannot promote.** A missing, unusable or failed answer stays
+  `unknown`, whatever the dial says. Set it to 0 and a broken answer is
+  still not a pass.
+- **It is read on every call.** Change it and the next tool call uses the
+  new value; nothing to reload.
+
+At the 75% default you will see more `below` than you might expect, and
+that is the point: it pushes the agent to confirm a candidate instead of
+trusting it. Lower it if you want a shorter list.
+
+The number it labels is a **provider confidence** — how concentrated the
+model's distribution was over its own answer. It is **not** a measured
+probability that the file is correct, no ground-truth check backs it, and
+nothing here has been calibrated. That is stated on every single result.
 
 ### `contextReduce` — experimental, and honestly negative
 
@@ -228,6 +257,7 @@ session you are looking at, and its numbers reflect the moment it was opened.
 | `semantic_calibration_candidate` | Turn your labelled cases into an inactive profile. | No — never activates anything. |
 | `semantic_question_calibration` | Score one question against your cases. | No — never sets a threshold. |
 | `semantic_reference_agreement` | Compare the provider to your reference judgments. | No — never ranks providers. |
+| `semantic_usage_report` | How often each skill was offered and each capability invoked. | No — bookkeeping only, contacts nothing. |
 
 Registering a tool does **not** grant access. Add it to the agent's
 `allowedTools` (Settings → Agents), or the agent cannot call it.

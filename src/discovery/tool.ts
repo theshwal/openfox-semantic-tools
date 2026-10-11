@@ -4,7 +4,12 @@ import type { PluginTool } from 'openfox/plugin'
 
 import { ProviderError, SystemOneHttpProvider } from '../providers/system-one.js'
 import { parseSettings } from '../settings.js'
-import { readBoundedCandidates, MAX_CANDIDATE_FILES } from './read.js'
+import { resolveConfidenceThreshold } from '../relevance/threshold.js'
+import {
+  describeSkipped,
+  readBoundedCandidates,
+  MAX_CANDIDATE_FILES,
+} from './read.js'
 import { localRecall, type LocalRecallResult } from './recall.js'
 import { buildDiscoveryQuestions, buildDiscoveryState, parseDiscoveryArgs } from './request.js'
 import {
@@ -83,15 +88,25 @@ export function createDiscoveryTool(
       const startedAt = Date.now()
       try {
         const parsed = parseDiscoveryArgs(args, context.workdir, field, questionId)
+        // Read on every call, never captured: the operator's dial must take
+        // effect on the next tool call, without a reload.
+        const settings = readSettings(context.projectId)
+        const threshold = resolveConfidenceThreshold(settings)
         let candidates = parsed.candidates
 
         if (name === 'semantic_search' && candidates.length === 0) {
           recall = await localRecall(parsed.root, parsed.question)
           candidates = recall.candidates.map((candidate) => candidate.path)
           if (candidates.length === 0) {
+            // B1-18: an empty candidate set is exactly when the caller must
+            // learn WHAT was not readable. Without this, a repository whose
+            // files are all oversized or binary reads as "the code does not
+            // exist", which is a different and much stronger claim.
             throw new ProviderError(
               'insufficient_evidence',
-              'Local recall found no repository files matching the query. Use normal code tools or refine the query.',
+              'Local recall found no repository files matching the query.' +
+                describeSkipped(recall.skipped) +
+                ' Use normal code tools or refine the query.',
             )
           }
         }
@@ -106,7 +121,7 @@ export function createDiscoveryTool(
         const id = reportId(name, parsed.question, read.files.map((file) => file.path))
 
         try {
-          const provider = new SystemOneHttpProvider(parseSettings(readSettings(context.projectId)), transport)
+          const provider = new SystemOneHttpProvider(parseSettings(settings), transport)
           const response = await provider.decide(request, {
             signal: context.signal,
             origin: 'automatic',
@@ -121,6 +136,7 @@ export function createDiscoveryTool(
             response,
             ranked,
             recall,
+            threshold,
           )
           activity.record({
             tool: name,
@@ -146,6 +162,7 @@ export function createDiscoveryTool(
               read,
               recall,
               `semantic_fallback:${error.code}`,
+              threshold,
             )
             activity.record({
               tool: name,

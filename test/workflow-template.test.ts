@@ -254,6 +254,7 @@ test('the plugin registers no transition handler and no hook', async () => {
     'semantic_scan',
     'semantic_search',
     'semantic_transform_status',
+    'semantic_usage_report',
     'semantic_verify_task',
   ])
   // The status tool is a reader, not a gate: it cannot mark anything complete.

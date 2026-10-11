@@ -92,6 +92,75 @@ longer needed, before each LLM call. Its recorded verdict is **DEFER**: no token
 cost, latency or task-quality benefit has been measured. Leave it off unless
 you have read [EVALUATION.md](./EVALUATION.md) and accept the risk.
 
+### `confidenceThreshold` — your dial
+
+Defaults to **75**. It is the one number you control that decides how a
+discovery result is presented.
+
+Every discovery result carries a **relevance envelope** with four parts,
+always present, never omitted:
+
+| Part | What it tells you |
+| --- | --- |
+| `searched` | How many files were scanned, how many reached the semantic stage, how many directories were pruned. |
+| `skippedByReason` | How many files were **not** looked at, counted per reason, each with a short sample of paths. |
+| `caveats.scoreMeans` | What the returned number actually is. |
+| `caveats.scoreUnverifiedMeans` | What it does **not** guarantee. |
+
+The fixed sentences in `caveats` are emitted **once per report**, not once per
+candidate. A 40-file scan would otherwise repeat ~570 characters of boilerplate
+40 times in the agent's context. `caveats.version` lets a consumer cache them.
+
+The named `skipped` sample is capped at 10 per reason, and `skippedTotal` always
+carries the exact count, so a bounded list never hides a total.
+
+Each candidate then carries `thresholdStatus`: `above`, `below`, or `unknown`.
+Three behaviours are enforced by tests rather than by convention:
+
+- **It only labels.** A `below` candidate stays in the list, marked. No
+  candidate is ever filtered away from you.
+- **It cannot promote.** `unknown` stays `unknown` whatever you set, so a
+  missing, unusable, timed-out or failed answer can never become a pass. Set
+  the dial to `0` and a broken answer is still not a pass.
+- **It is read per call.** Change it and the next tool call uses the new value;
+  there is nothing to reload or restart.
+
+At 75 you will see more `below` than you might expect, and that is the point:
+it pushes the agent to confirm a candidate rather than trust it. Lower it for a
+shorter list. Both `75` and `0.75` are accepted.
+
+Every candidate also carries `thresholdReason`, the same verdict in words:
+
+- `above` → *"confidence 0.80 is at or above the threshold 0.75"*
+- `below` → *"confidence 0.50 is below the threshold 0.75; still worth
+  confirming by reading it"*
+- `unknown` → *"no usable provider confidence was returned, so this is not
+  classified against the threshold"*
+
+`unknown` deliberately does not read like a rejection. It means nothing was
+judged, which is a different conclusion from "judged and found weak".
+
+Two rules worth keeping in your head while reading any result:
+
+- The number is a **provider confidence** — how concentrated the model
+  distribution was over its own answer. It is **not** a measured probability
+  that the file is correct, and nothing here has been calibrated against ground
+  truth.
+- An **empty result does not prove absence**. Files that were skipped, filtered,
+  oversized or unreadable were never judged. Read `skipped` before concluding
+  the code does not exist.
+
+When the candidate list comes back **completely empty**, there is no envelope to
+carry those reasons, so they survive into the refusal itself:
+
+```
+No readable file content was assembled. Narrow or correct the candidate paths
+before scanning. Not read: src/logo.png (binary), src/vide.ts (empty).
+```
+
+So the skip reasons reach you on a miss too. The list is capped at ten names
+plus a count, so a refusal never turns into a directory listing.
+
 ### `cacheEnabled` — off by default
 
 Reuses an identical previous answer instead of asking again. Only successful
@@ -173,8 +242,11 @@ Same contract, wider scope. Reports coverage and follow-ups; never merge-safe.
 - `semantic_scan`: scores an explicit file list you supply. It never guesses
   which files to read.
 
-Both return **ranked candidates**, never verdicts. Confirm them with `read_file`
-/ `semantic_search` as you normally would.
+Both return **ranked candidates**, never verdicts, and both carry the
+relevance envelope described under `confidenceThreshold` above. Read the
+`relevance.skipped` list before treating an empty result as an answer: a file
+that was too large, binary, or inside an unreadable directory was never judged.
+Confirm candidates with `read_file` as you normally would.
 
 ### `semantic_provider_self_test` — check the wiring
 
@@ -195,6 +267,33 @@ reasons only: no message content is retained.
 
 If you enable `contextReduce` and nothing seems to happen, this is where you
 look. A no-op is always explained.
+
+### `semantic_usage_report` — did anything get used?
+
+Answers one question nothing else could: how often each skill was **offered** to
+the agent, versus how often each capability was **actually invoked**.
+
+**The two counts do not come from the same place, and the report says so.** A
+skill load is something this plugin observes, so skills carry a real
+`offered`/`used` pair. A tool becomes reachable through the agent's
+`allowedTools`, which the plugin never sees — so a tool row shows
+`used` only, and reads *"available, never used"* until it is actually called.
+No figure is inferred, and nothing is counted per turn because nothing observes
+turns.
+
+That asymmetry is the point. A skill loaded every session and read never is
+prompt overhead you are paying for. A tool nobody ever called is a capability
+you may not need. Both are visible; neither is guessed.
+
+It writes a file under your OpenFox config directory and returns the report
+inline. It contacts no provider, changes no setting, and judges no code. The
+ledger holds **names and counts only** — no endpoint, no credential, no file
+content, no repository path. Counters are bucketed by day and older buckets are
+purged, so it cannot grow without limit.
+
+Counters are held in memory and written when you ask for the report or when the
+host exits, rather than on every tool call: writing synchronously per call would
+block the agent's event loop on disk for optional bookkeeping.
 
 ### Calibration tools — for operators, not for everyday use
 

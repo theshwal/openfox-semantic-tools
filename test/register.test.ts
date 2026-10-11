@@ -23,6 +23,7 @@ test('registers the initial settings schema', () => {
     'semantic_scan',
     'semantic_search',
     'semantic_transform_status',
+    'semantic_usage_report',
     'semantic_verify_task',
   ])
 
@@ -41,6 +42,7 @@ test('registers the initial settings schema', () => {
     'cacheEnabled',
     'cacheTtlMs',
     'cacheMaxEntries',
+    'confidenceThreshold',
     'contextReduce',
     'activityPanel',
     'activityLocale',
