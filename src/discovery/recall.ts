@@ -2,6 +2,7 @@ import { opendir, readFile, realpath } from 'node:fs/promises'
 import { relative, resolve, sep } from 'node:path'
 
 import { ProviderError } from '../errors.js'
+import type { SkipReasonCode } from '../relevance/envelope.js'
 import { MAX_FILE_BYTES, MAX_CANDIDATE_FILES } from './read.js'
 
 export const MAX_RECALL_SCANNED_FILES = 2_000
@@ -28,11 +29,25 @@ export interface LocalRecallCandidate {
   readonly signals: readonly string[]
 }
 
+/** A file the walk saw but could not use as a candidate, and why. */
+export interface RecallSkip {
+  readonly path: string
+  readonly reason: SkipReasonCode
+}
+
 export interface LocalRecallResult {
   readonly candidates: readonly LocalRecallCandidate[]
   readonly scannedFiles: number
   readonly scoredFiles: number
   readonly ignoredDirectories: number
+  /**
+   * Files seen but not scored.
+   *
+   * This is what makes "nothing matched" distinguishable from "nothing could
+   * be read": an oversized or binary file never became a candidate, so its
+   * absence from the result list says nothing about its relevance.
+   */
+  readonly skipped: readonly RecallSkip[]
 }
 
 function tokens(text: string): string[] {
@@ -82,6 +97,7 @@ export async function localRecall(root: string, query: string): Promise<LocalRec
   let scoredFiles = 0
   let ignoredDirectories = 0
   const scored: LocalRecallCandidate[] = []
+  const skipped: RecallSkip[] = []
 
   async function walk(directory: string): Promise<void> {
     if (scannedFiles >= MAX_RECALL_SCANNED_FILES) return
@@ -119,13 +135,26 @@ export async function localRecall(root: string, query: string): Promise<LocalRec
       try {
         const raw = await readFile(full)
         // Keep the recall stage aligned with what the semantic reader can later
-        // consume. Oversized or binary files are not valid semantic candidates.
-        if (raw.byteLength > MAX_FILE_BYTES || raw.includes(0)) continue
+        // consume. Oversized or binary files are not valid semantic candidates,
+        // so they are NAMED rather than silently dropped: the caller must be
+        // able to see that a file existed and was never judged.
+        if (raw.byteLength > MAX_FILE_BYTES) {
+          skipped.push({ path: rel, reason: 'too-large' })
+          continue
+        }
+        if (raw.includes(0)) {
+          skipped.push({ path: rel, reason: 'binary' })
+          continue
+        }
         content = raw.toString('utf8').toLowerCase()
       } catch {
+        skipped.push({ path: rel, reason: 'unreadable' })
         continue
       }
-      if (!content.trim()) continue
+      if (!content.trim()) {
+        skipped.push({ path: rel, reason: 'empty' })
+        continue
+      }
 
       let score = 0
       const signals: string[] = []
@@ -165,5 +194,6 @@ export async function localRecall(root: string, query: string): Promise<LocalRec
     scannedFiles,
     scoredFiles,
     ignoredDirectories,
+    skipped,
   }
 }

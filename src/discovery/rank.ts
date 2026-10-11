@@ -1,4 +1,12 @@
 import type { DecisionAnswer, DecisionResponse } from '../decision/types.js'
+import {
+  buildRelevanceEnvelope,
+  thresholdReason,
+  thresholdStatus,
+  type RelevanceEnvelope,
+  type SkipReasonCode,
+  type ThresholdVerdict,
+} from '../relevance/envelope.js'
 import { discoveryQuestionId } from './request.js'
 import type { LocalRecallCandidate, LocalRecallResult } from './recall.js'
 
@@ -6,7 +14,14 @@ import type { LocalRecallCandidate, LocalRecallResult } from './recall.js'
  * A ranked result is a CANDIDATE, never a verdict. The caller must confirm it
  * with deterministic tools before acting on it.
  */
-export interface RankedCandidate {
+/**
+ * A candidate before the operator dial is applied.
+ *
+ * `applyThreshold` is the ONLY way a `RankedCandidate` comes into existence,
+ * so the threshold fields cannot be forgotten: the type system refuses a
+ * reported candidate that was never classified.
+ */
+export interface RankedCandidateBase {
   readonly path: string
   /** Semantic expectation E[level], null when semantic ranking was unavailable. */
   readonly score: number | null
@@ -15,6 +30,25 @@ export interface RankedCandidate {
   readonly usable: boolean
   readonly rankingSource: 'semantic' | 'local-recall'
   readonly localRecallScore?: number
+}
+
+export interface RankedCandidate extends RankedCandidateBase {
+  /** The operator dial, echoed so the caller reads the same number. */
+  readonly threshold: number
+  /**
+   * Where this candidate falls against that dial. `unknown` whenever no usable
+   * number exists: a threshold classifies, it never promotes.
+   */
+  readonly thresholdStatus: ThresholdVerdict
+  /**
+   * Why it landed there, in words.
+   *
+   * A2-8 requires a below-threshold candidate to stay visible AND carry its
+   * reason. Reading `thresholdStatus` alone forces the caller to reconstruct
+   * the comparison from two numbers, and `unknown` is indistinguishable
+   * from "discarded" unless the reason spells out that nothing was judged.
+   */
+  readonly thresholdReason: string
 }
 
 export interface DiscoveryReport {
@@ -27,6 +61,12 @@ export interface DiscoveryReport {
     readonly skippedPaths: readonly string[]
   }
   readonly advisory: true
+  /**
+   * The mandatory honesty contract: what was looked at, what was not, what the
+   * number is worth and what it does not guarantee. Every report carries one;
+   * there is no code path that builds a discovery result without it.
+   */
+  readonly relevance: RelevanceEnvelope
   readonly candidates: readonly RankedCandidate[]
   readonly semanticApplied: boolean
   readonly provider: string | null
@@ -55,7 +95,7 @@ function readNumber(answer: unknown, key: 'score' | 'confidence'): number | null
 function rankOne(
   path: string,
   answer: DecisionAnswer | undefined,
-): { candidate: RankedCandidate; reasons: string[] } {
+): { candidate: RankedCandidateBase; reasons: string[] } {
   const typed = answer as
     | { type?: string; score?: unknown; probabilities?: unknown; confidence?: unknown }
     | undefined
@@ -117,13 +157,42 @@ function rankOne(
   }
 }
 
+/**
+ * Applies the operator's dial to an already-ranked list.
+ *
+ * It runs as a separate pass so the ranking itself stays independent of the
+ * presentation policy: changing the threshold never reorders anything, it only
+ * relabels. A `local-recall` entry has no provider confidence, so it is
+ * classified `unknown` rather than handed a number it never had.
+ */
+export function applyThreshold(
+  candidates: readonly RankedCandidateBase[],
+  threshold: number,
+): RankedCandidate[] {
+  return candidates.map((candidate) => {
+    const value =
+      candidate.rankingSource === 'semantic' && candidate.usable ? candidate.confidence : null
+    return {
+      ...candidate,
+      threshold,
+      thresholdStatus: thresholdStatus(value, threshold),
+      thresholdReason: thresholdReason(
+        candidate.confidence,
+        threshold,
+        candidate.usable,
+        candidate.rankingSource,
+      ),
+    }
+  })
+}
+
 /** Parse one per-file answer from a single batched request and sort best-first. */
 export function rankCandidates(
   files: readonly { path: string; content: string }[],
   answers: Record<string, DecisionAnswer | undefined>,
   questionId: string,
-): { candidates: RankedCandidate[]; reasons: string[] } {
-  const candidates: RankedCandidate[] = []
+): { candidates: RankedCandidateBase[]; reasons: string[] } {
+  const candidates: RankedCandidateBase[] = []
   const reasons: string[] = []
   files.forEach((file, index) => {
     const ranked = rankOne(file.path, answers[discoveryQuestionId(questionId, index)])
@@ -137,7 +206,10 @@ export function rankCandidates(
   return { candidates, reasons: [...new Set(reasons)] }
 }
 
-export function localFallbackCandidates(recall: LocalRecallResult): RankedCandidate[] {
+export function localFallbackCandidates(
+  recall: LocalRecallResult,
+  threshold: number,
+): RankedCandidate[] {
   return recall.candidates.map((candidate) => ({
     path: candidate.path,
     score: null,
@@ -146,6 +218,11 @@ export function localFallbackCandidates(recall: LocalRecallResult): RankedCandid
     usable: true,
     rankingSource: 'local-recall',
     localRecallScore: candidate.score,
+    threshold,
+    // A deterministic lexical score is NOT a provider confidence, so it is
+    // deliberately left unclassified rather than compared to the dial.
+    thresholdStatus: 'unknown' as const,
+    thresholdReason: thresholdReason(null, threshold, true, 'local-recall'),
   }))
 }
 
@@ -154,10 +231,15 @@ export function buildReport(
   reportId: string,
   questionId: string,
   question: string,
-  read: { files: readonly { path: string; content: string }[]; bytes: number; skipped: readonly string[] },
+  read: {
+    files: readonly { path: string; content: string }[]
+    bytes: number
+    skipped: readonly { path: string; reason: SkipReasonCode }[]
+  },
   response: DecisionResponse,
-  ranked: { candidates: RankedCandidate[]; reasons: string[] },
-  recall?: LocalRecallResult,
+  ranked: { candidates: RankedCandidateBase[]; reasons: string[] },
+  recall: LocalRecallResult | undefined,
+  threshold: number,
 ): DiscoveryReport {
   return {
     reportId,
@@ -166,10 +248,23 @@ export function buildReport(
       questionId,
       question,
       candidatePaths: read.files.map((file) => file.path),
-      skippedPaths: read.skipped,
+      skippedPaths: read.skipped.map((entry) => entry.path),
     },
     advisory: true,
-    candidates: ranked.candidates,
+    relevance: buildRelevanceEnvelope({
+      searched: {
+        filesScanned: recall?.scannedFiles ?? read.files.length,
+        candidatesScored: read.files.length,
+        ...(recall ? { ignoredDirectories: recall.ignoredDirectories } : {}),
+      },
+      skipped: [
+        ...(recall?.skipped ?? []),
+        ...read.skipped,
+      ],
+      numberKind: 'provider-confidence',
+      threshold,
+    }),
+    candidates: applyThreshold(ranked.candidates, threshold),
     semanticApplied: true,
     provider: response.provider,
     ...(response.model ? { model: response.model } : {}),
@@ -194,9 +289,14 @@ export function buildLocalFallbackReport(
   reportId: string,
   questionId: string,
   question: string,
-  read: { files: readonly { path: string; content: string }[]; bytes: number; skipped: readonly string[] },
+  read: {
+    files: readonly { path: string; content: string }[]
+    bytes: number
+    skipped: readonly { path: string; reason: SkipReasonCode }[]
+  },
   recall: LocalRecallResult,
   reason: string,
+  threshold: number,
 ): DiscoveryReport {
   return {
     reportId,
@@ -205,10 +305,23 @@ export function buildLocalFallbackReport(
       questionId,
       question,
       candidatePaths: read.files.map((file) => file.path),
-      skippedPaths: read.skipped,
+      skippedPaths: read.skipped.map((entry) => entry.path),
     },
     advisory: true,
-    candidates: localFallbackCandidates(recall),
+    relevance: buildRelevanceEnvelope({
+      searched: {
+        filesScanned: recall.scannedFiles,
+        // No provider number exists on this path, so nothing was scored
+        // SEMANTICALLY. Reporting a count here would be a bare lexical
+        // shortlist wearing a semantic label.
+        candidatesScored: 0,
+        ignoredDirectories: recall.ignoredDirectories,
+      },
+      skipped: [...recall.skipped, ...read.skipped],
+      numberKind: 'none',
+      threshold,
+    }),
+    candidates: localFallbackCandidates(recall, threshold),
     semanticApplied: false,
     provider: null,
     latencyMs: 0,

@@ -29,7 +29,7 @@ test('reads only the requested files that exist inside the root', async () => {
   assert.equal(files[0].content, 'export const a = 1\n')
   assert.ok(bytes > 0)
   // The other file in src/ was not swept in: discovery is not a repository scan.
-  assert.deepEqual(skipped, [])
+  assert.deepEqual(skipped, [], 'an empty skip list stays explicit')
 })
 
 test('a missing file is reported as skipped, never silently replaced', async () => {
@@ -37,7 +37,8 @@ test('a missing file is reported as skipped, never silently replaced', async () 
   const { files, skipped } = await readBoundedCandidates(root, ['src/a.ts', 'src/ghost.ts'])
 
   assert.deepEqual(files.map((f) => f.path), ['src/a.ts'])
-  assert.deepEqual(skipped, ['src/ghost.ts'])
+  // A1-2: the skipped file is NAMED with a reason, not merely counted.
+  assert.deepEqual(skipped, [{ path: 'src/ghost.ts', reason: 'missing' }])
 })
 
 test('too many candidates is refused rather than truncated', async () => {

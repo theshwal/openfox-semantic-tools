@@ -3,7 +3,7 @@ import { createVerifyTool } from './verify/tool.js'
 import { createIssueCoverageTool } from './verify/coverage.js'
 import { createDiscoveryTool } from './discovery/tool.js'
 import { DEFAULT_BACKEND_ID, PRESETS } from './presets/index.js'
-import { SKILL_SOURCE } from './skills/source.js'
+import { SKILL_SOURCE, SKILL_NAMES } from './skills/source.js'
 import { createContextTransform } from './transform/index.js'
 import { createTransformStatusTool } from './transform/status-tool.js'
 import { TransformStatusStore } from './transform/status.js'
@@ -15,6 +15,13 @@ import { createReferenceAgreementTool } from './calibration/reference-tool.js'
 import { ActivityStore } from './activity/index.js'
 import { createActivityRecorder } from './activity/recorder.js'
 import { registerActivityPanel } from './activity/panel.js'
+import { createUsageReportTool } from './usage/tool.js'
+import { UsageLedger, defaultUsageLedgerDir } from './usage/ledger.js'
+import { withUsageAll, seedCatalogue, withUsageSkillSource } from './usage/wrap.js'
+import {
+  THRESHOLD_DESCRIPTION_EN,
+  THRESHOLD_DESCRIPTION_FR,
+} from './relevance/threshold.js'
 
 /**
  * Advisory workflow templates, exported as reference data.
@@ -188,6 +195,16 @@ export const SETTINGS: PluginSettingsSchema = {
       default: 128,
     },
     {
+      key: 'confidenceThreshold',
+      type: 'number',
+      label: { en: 'Confidence threshold (%)', fr: 'Seuil de confiance (%)' },
+      description: {
+        en: THRESHOLD_DESCRIPTION_EN,
+        fr: THRESHOLD_DESCRIPTION_FR,
+      },
+      default: 75,
+    },
+    {
       key: 'contextReduce',
       type: 'boolean',
       label: { en: 'Context reduction (no measured benefit)', fr: 'Réduction de contexte (aucun bénéfice mesuré)' },
@@ -225,7 +242,18 @@ export const SETTINGS: PluginSettingsSchema = {
   ],
 }
 
-export function register(registry: PluginRegistry): void {
+/**
+ * Registers every contribution.
+ *
+ * `options.usage` exists so a test can observe the SAME ledger the registered
+ * tools write to. Production callers omit it and get the default location; a
+ * test that constructed its own ledger would be asserting against a second,
+ * unrelated file.
+ */
+export function register(
+  registry: PluginRegistry,
+  options: { usage?: UsageLedger } = {},
+): void {
   registry.registerSettings(SETTINGS)
   // `registry.context` is only readable WHILE a plugin is registering: the host
   // clears it in `endPlugin()` right after `register()` returns. Reading it
@@ -236,21 +264,42 @@ export function register(registry: PluginRegistry): void {
   // *accessor* is registration-scoped.
   const context = registry.context
   const readSettings = (projectId?: string) => context.settings('global', projectId)
-  // In-memory only: the registry is bounded and discarded with the session, so
+// In-memory only: the registry is bounded and discarded with the session, so
   // an operator who turns the panel off keeps nothing behind.
   const activityStore = new ActivityStore()
   const activity = createActivityRecorder(activityStore, readSettings)
-  registry.registerTool(createDecisionTool(readSettings, fetch, activity))
-  registry.registerTool(createVerifyTool(readSettings, {}, activity))
-  registry.registerTool(createIssueCoverageTool(readSettings, {}, activity))
-  registry.registerTool(createDiscoveryTool('semantic_search', readSettings, fetch, activity))
-  registry.registerTool(createDiscoveryTool('semantic_scan', readSettings, fetch, activity))
-  registry.registerTool(createProviderSelfTestTool(readSettings))
-  registry.registerTool(createCalibrationCandidateTool())
-  registry.registerTool(createQuestionCalibrationTool(readSettings))
-  registry.registerTool(createReferenceAgreementTool(readSettings))
+  // One list, registered in one pass, so the README table, the usage catalogue
+  // and what is actually exposed cannot drift apart.
+  //
+  // Each tool gets BOTH recorders, because they answer different questions and
+  // neither can answer the other's:
+  //   - `activity` is per-session, in memory, and judges each call
+  //     (usable? repeated? abandoned?). It is discarded with the session.
+  //   - `usage` is cumulative, on disk, and counts only proposed-vs-invoked.
+  //     It never sees the content of a call.
+  // The activity recorder is passed as the tool's own transport-facing
+  // argument; the usage recorder wraps the result, so neither has to know
+  // about the other.
+  const tools = [
+    createDecisionTool(readSettings, fetch, activity),
+    createVerifyTool(readSettings, {}, activity),
+    createIssueCoverageTool(readSettings, {}, activity),
+    createDiscoveryTool('semantic_search', readSettings, fetch, activity),
+    createDiscoveryTool('semantic_scan', readSettings, fetch, activity),
+    createProviderSelfTestTool(readSettings),
+    createCalibrationCandidateTool(),
+    createQuestionCalibrationTool(readSettings),
+    createReferenceAgreementTool(readSettings),
+  ]
+  // The usage ledger is built BEFORE the skill source below, because that source
+  // is wrapped with it: a skill load is the one moment the plugin can observe a
+  // capability actually being presented to the agent.
+  const usage = options.usage ?? new UsageLedger(defaultUsageLedgerDir())
+  // Seed the shipped catalogue so the report lists every capability from the
+  // first run, rather than only the ones that happened to be used.
+  seedCatalogue(usage, tools.map((tool) => tool.name), SKILL_NAMES)
   // Skills carry usage guidance only; they never grant tool access.
-  registry.registerSkillSource(SKILL_SOURCE)
+  registry.registerSkillSource(withUsageSkillSource(SKILL_SOURCE, usage))
   // Opt-in and inert by default: with `contextReduce` off this transform
   // returns the messages unchanged and contacts no endpoint. See
   // docs/EVALUATION.md before enabling it.
@@ -259,6 +308,24 @@ export function register(registry: PluginRegistry): void {
   // The read path for the transform's own metadata: without it, `contextReduce`
   // is a toggle whose effect an operator cannot observe.
   registry.registerTool(createTransformStatusTool(transformStatus))
+  // Every real invocation is counted. Names and counts only: no endpoint,
+  // credential, file content or repository path is ever recorded.
+  for (const tool of withUsageAll(tools, usage)) {
+    registry.registerTool(tool)
+  }
+  registry.registerTool(createUsageReportTool(usage))
+  // Counters are buffered in memory rather than written on every tool call,
+  // which would block the agent's event loop on disk for optional bookkeeping.
+  // `semantic_usage_report` flushes on demand; this covers the normal exit.
+  if (options.usage === undefined) {
+    process.once('exit', () => {
+      try {
+        usage.flushPendingSync()
+      } catch {
+        // Losing a few usage counts at exit is acceptable; failing loudly is not.
+      }
+    })
+  }
   // Observability only: a declarative section in the host's own Stats panel.
   // It registers no hook and no transition handler, so it cannot influence a
   // turn or branch a workflow on a semantic result.
