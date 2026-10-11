@@ -139,6 +139,8 @@ Everything is configured in the plugin's own panel. Nothing is guessed for you.
 | `cacheTtlMs` | no | `300000` | How long a cached answer may be reused. `0` disables reuse. |
 | `cacheMaxEntries` | no | `128` | Hard bound, oldest-first eviction. |
 | `contextReduce` | no | `false` | Experimental context reduction. **No measured benefit — leave it off.** See below. |
+| `activityPanel` | no | `true` | A "Semantic activity" panel opened from the Plugins menu. In-memory only; reports observed usage, never a quality claim. See below. |
+| `activityLocale` | no | `auto` | Language of the panel's table rows. Every other label follows the OpenFox interface on its own; only a table has to be told. |
 
 ![The plugin settings form](docs/images/plugin-settings.png)
 
@@ -173,6 +175,42 @@ If you enable it anyway: use `semantic_transform_status` to see what it actually
 did. Every outcome carries a reason (`no_candidates`, `low_confidence`,
 `egress_blocked`, …), so a no-op is never silent. It never drops the current
 request or anything after the last tool result.
+
+### `activityPanel` — showing how the semantic tools were used
+
+On by default, this adds a **Semantic tools** section to the OpenFox Stats
+panel for the current session.
+
+It reports what the plugin can actually prove about its own calls: how many
+there were, how long the provider took, how many answers came back unusable
+(no candidate carried a score, or the provider returned an unusable
+distribution), and how many times the same question was asked twice — which is
+a **proven** sign the first attempt did not settle anything. Questions are never
+kept: each one is reduced to a short digest, so a repeat is visible without the
+wording being stored.
+
+Every line states its own proof level: `[proven]` for something the plugin
+established itself, `[reported status]` for a number copied from a report, and a
+separately-counted `heuristic, unproven` bucket for the one guess it makes.
+
+It does **not** show a "share of tool calls" ratio: that denominator lives in the
+host's session stats, which a plugin can only reach through a hook this one does
+not register. What it does show is each tool's share of the semantic calls made
+in the session — a real number, with a real denominator, named once in the
+section's closing note rather than repeated on every row.
+
+What it deliberately does not do is claim the semantic path is better. A call
+with no evidence either way is reported as **indeterminate**, never as "useless".
+Measuring that would need a deterministic control group, which nobody is going to
+pay for twice.
+
+Everything stays **in memory**, is bounded, and is discarded with the session:
+nothing is written to disk and nothing is sent anywhere. Turn `activityPanel`
+off and nothing is recorded at all — not recorded and hidden, simply not
+recorded.
+
+Open it from the Plugins menu (puzzle icon, top right). It is scoped to the
+session you are looking at, and its numbers reflect the moment it was opened.
 
 ---
 

@@ -4,6 +4,7 @@ import { parseSettings } from './settings.js'
 import { ProviderError, SystemOneHttpProvider, type HttpSettings } from './providers/system-one.js'
 import { DecisionCache, NAMESPACE_DECIDE, cacheKey } from './cache/index.js'
 import { createHash } from 'node:crypto'
+import { NULL_ACTIVITY_RECORDER, type ActivityRecorder } from './activity/recorder.js'
 
 /**
  * Opaque fingerprint of everything that can change a provider answer.
@@ -33,12 +34,38 @@ function providerFingerprint(settings: HttpSettings): string {
     )
     .digest('hex')
 }
-export function createDecisionTool(readSettings: (projectId?: string) => Record<string, unknown>, transport: typeof fetch = fetch): PluginTool {
+/**
+ * A stable digest of every question instruction in a batched decision call.
+ *
+ * `semantic_decide` has no single question field, so the repeat detection
+ * needs one comparable value. Concatenating the instructions in key order and
+ * hashing them yields a digest that is equal exactly when the same batch was
+ * asked again, and reveals nothing about the wording.
+ */
+function digestDecisionQuestions(questions: unknown): string {
+  if (questions === null || typeof questions !== 'object' || Array.isArray(questions)) return ''
+  const entries = Object.entries(questions as Record<string, unknown>)
+    .map(([id, question]) => {
+      const instructions =
+        question !== null && typeof question === 'object'
+          ? (question as { instructions?: unknown }).instructions
+          : undefined
+      return `${id}:${typeof instructions === 'string' ? instructions : ''}`
+    })
+    .sort()
+  return entries.join('|')
+}
+
+export function createDecisionTool(readSettings: (projectId?: string) => Record<string, unknown>, transport: typeof fetch = fetch, activity: ActivityRecorder = NULL_ACTIVITY_RECORDER): PluginTool {
   // One cache per tool instance, so entries survive across calls. It stays empty
   // unless the operator enables it, and it is rebuilt from the current settings
   // on the first use.
   let cache: DecisionCache | null = null
   let cacheFingerprint = ''
+  // Activity ids are a local counter, never the cache key: the key is a digest
+  // over the endpoint and the transmitted state, and neither may be recorded.
+  let activitySeq = 0
+  const nextActivityId = (): string => `decide:${(activitySeq += 1)}`
   return {
     name: 'semantic_decide',
     description: 'Explicitly send bounded state to the configured System One endpoint for typed semantic probabilities. Does not replace tests or mark tasks complete.',
@@ -54,6 +81,11 @@ export function createDecisionTool(readSettings: (projectId?: string) => Record<
       },
     },
     async execute(args, context) {
+      // A generic primitive call carries no single question field, so the
+      // repeat detection compares one digest built from every instruction in
+      // the batch. Computed before the try so the failure path can record it
+      // too, and empty rather than throwing when the batch is malformed.
+      const decisionQuestion = digestDecisionQuestions(args.questions)
       try {
         validateRequest(args)
         const settings = parseSettings(readSettings(context.projectId))
@@ -92,14 +124,40 @@ export function createDecisionTool(readSettings: (projectId?: string) => Record<
         )
         const cached = cache.get(key)
         if (cached !== undefined) {
+          activity.record({
+            tool: 'semantic_decide',
+            kind: 'decide',
+            reportId: nextActivityId(),
+            context,
+            question: decisionQuestion,
+            success: true,
+            latencyMs: 0,
+          })
           return { success: true, output: JSON.stringify({ ...(cached as object), cache: 'hit' }) }
         }
         // Only a successful response is stored: a provider error, timeout or
         // malformed payload throws above and never reaches `set`.
         const response = await provider.decide(args, { signal: context.signal })
         cache.set(key, response)
+        activity.record({
+          tool: 'semantic_decide',
+          kind: 'decide',
+          reportId: nextActivityId(),
+          context,
+          question: decisionQuestion,
+          success: true,
+          latencyMs: response.latencyMs ?? 0,
+        })
         return { success: true, output: JSON.stringify({ ...response, cache: 'miss' }) }
       } catch (error) {
+        activity.record({
+          tool: 'semantic_decide',
+          kind: 'decide',
+          reportId: 'decide:failed',
+          context,
+          question: decisionQuestion,
+          success: false,
+        })
         const code = error instanceof ProviderError ? error.code : 'invalid_arguments'
         // Only our controlled errors are safe to expose; settings access can throw secret-bearing errors.
         const message = error instanceof ProviderError ? error.message : 'Invalid arguments or unavailable plugin settings'

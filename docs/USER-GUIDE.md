@@ -98,6 +98,31 @@ Reuses an identical previous answer instead of asking again. Only successful
 answers are ever reused, never an error. Leave it off unless you have measured
 a benefit.
 
+### `activityPanel` — on by default, and harmless to turn off
+
+Adds a **Semantic activity** panel, opened from the Plugins menu (puzzle icon,
+top right) and scoped to the session on screen. It shows how many semantic calls
+that session made, how long the provider took, how many answers came back
+unusable, and how many times the same question was asked twice.
+
+Each line tells you how much it is worth: `[proven]` means the plugin established
+it, `[reported status]` means the number was copied from a report, and one
+bucket is explicitly marked `heuristic, unproven`. Questions are never kept —
+only a digest of each, so a repeat is visible without the wording being stored.
+
+Two things worth knowing before you read anything into it:
+
+- **It reports observed usage, not quality.** It cannot tell you the semantic
+  path beat the deterministic one, because nothing in it compares the two. A
+  call with no evidence either way is shown as **indeterminate**, never as
+  useless. Deciding whether these tools earn their cost is a separate piece of
+  work, described in [EVALUATION.md](./EVALUATION.md).
+- **Nothing is kept.** Everything is in memory, bounded, and gone with the
+  session. Nothing is written to disk and nothing is sent anywhere. Turn the
+  setting off and nothing is recorded at all.
+
+A session with no semantic call says so, rather than showing an empty panel.
+
 ## 3. Allow the tools you want
 
 Registering a tool does **not** grant access. Add the tools to the agent's

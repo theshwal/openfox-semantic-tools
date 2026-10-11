@@ -42,6 +42,8 @@ test('registers the initial settings schema', () => {
     'cacheTtlMs',
     'cacheMaxEntries',
     'contextReduce',
+    'activityPanel',
+    'activityLocale',
   ])
 })
 

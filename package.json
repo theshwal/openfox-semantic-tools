@@ -22,7 +22,9 @@
       "settings",
       "tools",
       "skills",
-      "transforms"
+      "transforms",
+      "ui",
+      "rpc"
     ],
     "timeoutMs": 125000
   },

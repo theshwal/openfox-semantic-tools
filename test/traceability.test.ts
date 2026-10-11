@@ -6,29 +6,46 @@ import { resolve } from 'node:path'
 const TRACE = await readFile(resolve(import.meta.dirname, '../docs/TRACEABILITY.md'), 'utf8')
 
 /**
- * Requirement rows are table lines whose first cell is an id or a label. The
- * header rows of each table are skipped, as is the `## Scope discipline` table,
- * which records invariants rather than issue requirements, and the host-findings
- * table, which records observed host BEHAVIOUR rather than a requirement.
+ * Requirement rows are table lines whose first cell is an id or a label.
+ *
+ * A table is opted OUT by an explicit `<!-- not-requirements: ... -->` marker
+ * on the line ABOVE its heading, so the exclusion is a contract in the document
+ * rather than a regex over row prose: rewording a row can no longer silently
+ * change the counted total, and the failure message points at the marker that
+ * was removed.
  */
 function requirementRows(): string[] {
   const lines = TRACE.split('\n')
-  const scopeStart = lines.findIndex((l) => l.startsWith('## Scope discipline'))
-  const findingsStart = lines.findIndex((l) => l.startsWith('### Host findings'))
   const summaryStart = lines.findIndex((l) => l.startsWith('## Summary'))
-  return lines
-    .slice(0, summaryStart)
-    .filter(
-      (line, index) =>
-        index < scopeStart &&
-        index < findingsStart &&
-        line.startsWith('| ') &&
-        line.endsWith('|') &&
-        !line.startsWith('| ---') &&
-        !line.includes('| Requirement |') &&
-        !line.includes('| Verdict |') &&
-        !line.includes('| # |'),
-    )
+  const rows: string[] = []
+  let optedOut = false
+  for (let index = 0; index < summaryStart; index += 1) {
+    const line = lines[index]!
+    if (line.startsWith('<!-- not-requirements')) {
+      optedOut = true
+      continue
+    }
+    if (line.startsWith('#')) {
+      // The marker is looked up past any blank lines, so it may sit directly
+      // above the heading. A `##` always re-evaluates; a `###` only does when
+      // a marker is actually attached to it, so a plain sub-heading inside an
+      // opted-out section stays opted out.
+      let above = index - 1
+      while (above >= 0 && lines[above]!.trim() === '') above -= 1
+      const marker = above >= 0 ? lines[above]! : ''
+      if (line.startsWith('## ') || marker.startsWith('<!-- not-requirements')) {
+        optedOut = marker.startsWith('<!-- not-requirements')
+      }
+      continue
+    }
+    if (optedOut) continue
+    if (!line.startsWith('| ') || !line.endsWith('|')) continue
+    if (line.startsWith('| ---')) continue
+    if (line.includes('| Requirement |') || line.includes('| Verdict |')) continue
+    if (line.includes('| # |') || line.includes('| Finding |')) continue
+    rows.push(line)
+  }
+  return rows
 }
 
 test('every requirement row ends in a verdict, never an empty cell', () => {

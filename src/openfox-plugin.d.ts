@@ -125,11 +125,106 @@ declare module 'openfox/plugin' {
     ): Promise<PluginMessageTransformResult | Array<Record<string, unknown>>> | PluginMessageTransformResult | Array<Record<string, unknown>>
   }
 
+  /**
+   * Declarative UI mounted in a host-rendered zone.
+   *
+   * Verified against the released Plugin API v2 baseline (2.0.161): the
+   * `ui` capability and `registerUiComponent` are both present, and
+   * `stats.modal` is one of the zones the client actually renders. Only the
+   * fields this plugin uses are declared, so the mirror stays small.
+   */
+  export type DeclarativeNode =
+    | { type: 'text'; text: LocalizedString; muted?: boolean; className?: string }
+    | { type: 'keyValue'; items: Array<{ key: LocalizedString; value: string }> }
+    | { type: 'table'; columns: LocalizedString[]; rows: string[][] }
+    | { type: 'card'; title?: LocalizedString; tone?: string; children: DeclarativeNode[] }
+    | { type: 'stack'; direction?: 'row' | 'column'; gap?: string; children: DeclarativeNode[] }
+    | { type: 'callout'; tone?: string; title?: LocalizedString; text: LocalizedString }
+    | { type: 'details'; title: LocalizedString; defaultOpen?: boolean; children: DeclarativeNode[] }
+    | { type: 'divider' }
+
+  export interface PluginUiContentSource {
+    kind: 'rpc'
+    method: string
+    refreshMs?: number
+  }
+
+  export interface PluginVisibilityCondition {
+    hasSession?: boolean
+    hasProject?: boolean
+    hasMessage?: boolean
+  }
+
+  export interface PluginSettingsTab {
+    id: string
+    label: LocalizedString
+  }
+
+  export type PluginActivation =
+    | { kind: 'rpc'; method: string; params?: Record<string, unknown> }
+    | { kind: 'openPanel'; panelId: string }
+    | { kind: 'closePanel' }
+    | { kind: 'openSettings'; tab?: string }
+    | { kind: 'openUrl'; url: string }
+
+  export interface PluginUiAction {
+    id: string
+    slot: string
+    label: LocalizedString
+    icon?: string
+    variant?: 'default' | 'primary' | 'danger' | 'ghost'
+    tooltip?: LocalizedString
+    visibleWhen?: PluginVisibilityCondition
+    onActivate: PluginActivation
+  }
+
+  export interface PluginUiPanel {
+    id: string
+    title: LocalizedString
+    size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | 'full'
+    kind: 'declarative' | 'iframe'
+    content?: DeclarativeNode[]
+    footer?: DeclarativeNode[]
+    url?: string
+  }
+
+  export interface PluginUiComponent {
+    id: string
+    zone: string
+    position?: 'before' | 'inside' | 'after'
+    order?: number
+    visibleWhen?: PluginVisibilityCondition
+    component: DeclarativeNode
+    contentSource?: PluginUiContentSource
+  }
+
   export interface PluginRegistry {
-    readonly context: { settings(scope?: 'global' | 'project', projectId?: string): Record<string, string | number | boolean> }
+    readonly context: {
+      settings(scope?: 'global' | 'project', projectId?: string): Record<string, string | number | boolean>
+    }
     registerTool(tool: PluginTool): void
     registerSettings(schema: PluginSettingsSchema): void
     registerSkillSource(source: PluginSkillSource): void
     registerMessageTransform(transform: PluginMessageTransform): void
+    /** Declarative UI, released in the Plugin API v2 `ui` capability. */
+    registerUiComponent(component: PluginUiComponent): void
+    /** A header/menu action. Opens one of this plugin's own panels. */
+    registerUiAction(action: PluginUiAction): void
+    /** A panel this plugin owns, declarative or iframe. */
+    registerUiPanel(panel: PluginUiPanel): void
+    /**
+     * An extra tab in the Plugins settings modal. Declared for completeness of
+     * the settings surface; the activity panel does not register one, because
+     * `registerSettings` already renders its own schema-driven tab.
+     */
+    registerSettingsTab(tab: PluginSettingsTab): void
+    /** RPC endpoint; requires the `rpc` capability when capabilities are declared. */
+    registerRpc(
+      method: string,
+      handler: (
+        params: Record<string, unknown>,
+        context: PluginToolContext,
+      ) => unknown | Promise<unknown>,
+    ): void
   }
 }

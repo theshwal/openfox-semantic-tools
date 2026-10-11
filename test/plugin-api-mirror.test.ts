@@ -138,3 +138,49 @@ test('the tool context is unchanged by the transform work', () => {
     assert.ok(new RegExp(`\\b${field}\\??:`).test(line), `PluginToolContext must keep ${field}`)
   }
 })
+
+test('the mirrored UI and RPC contributions exist in the released host', options, async () => {
+  // `PluginRegistry` lives in the plugin entry while the UI shapes live in the
+  // shared bundle, so each symbol is looked up where it is actually declared
+  // rather than in one combined read.
+  const registryUpstream = await readUpstream('PluginRegistry')
+  for (const method of ['registerUiComponent', 'registerRpc', 'registerSettingsTab']) {
+    assert.ok(
+      new RegExp(`\\b${method}\\s*\\(`).test(registryUpstream),
+      `the released host must still expose ${method}`,
+    )
+    assert.ok(new RegExp(`\\b${method}\\s*\\(`).test(mirror), `the mirror must declare ${method}`)
+  }
+  for (const symbol of ['PluginUiComponent', 'PluginUiContentSource', 'PluginSettingsTab', 'DeclarativeNode']) {
+    const upstream = await readUpstream(symbol)
+    assert.ok(upstream.includes(symbol), `upstream must still declare ${symbol}`)
+    assert.ok(mirror.includes(symbol), `the mirror must declare ${symbol}`)
+  }
+})
+
+test('the zone the activity panel targets is a zone the host declares', options, async () => {
+  const upstream = await readUpstream('PluginZoneId')
+  // `stats.modal` is rendered by the 2.0.161 client; a zone the host declares
+  // but never mounts would make the section silently invisible.
+  assert.match(upstream, /'stats\.modal'/, 'stats.modal must be a declared zone upstream')
+  const mirror = await readFile(
+    resolve(import.meta.dirname, '../src/openfox-plugin.d.ts'),
+    'utf8',
+  )
+  assert.match(mirror, /zone: string/)
+})
+
+test('the manifest declares the capabilities the host enforces for these contributions', async () => {
+  // Offline and unconditional: the host rejects every RPC when a non-empty
+  // capability list omits `rpc`, so this is a load-time failure, not a runtime
+  // one, and CI installs no OpenFox.
+  const manifest = JSON.parse(
+    await readFile(resolve(import.meta.dirname, '../package.json'), 'utf8'),
+  ) as { openfox: { capabilities: string[] } }
+  for (const capability of ['ui', 'rpc']) {
+    assert.ok(
+      manifest.openfox.capabilities.includes(capability),
+      `package.json must declare the '${capability}' capability it uses`,
+    )
+  }
+})

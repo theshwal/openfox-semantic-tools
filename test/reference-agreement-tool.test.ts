@@ -185,9 +185,9 @@ test('the plugin adds no second LLM client, no new setting and no new outbound c
       `${name} must not contain a second LLM client`,
     )
   }
-  // No new credential or endpoint setting. The only addition is `contextReduce`,
-  // an opt-in boolean that reuses the endpoint and key already configured above:
-  // it introduces no new credential, no new host and no new egress surface.
+  // No new credential or endpoint setting. The two opt-in booleans reuse the
+  // endpoint and key already configured above: they introduce no new
+  // credential, no new host and no new egress surface.
   assert.deepEqual(
     SETTINGS.fields.map((field) => field.key),
     [
@@ -205,6 +205,8 @@ test('the plugin adds no second LLM client, no new setting and no new outbound c
       'cacheTtlMs',
       'cacheMaxEntries',
       'contextReduce',
+      'activityPanel',
+      'activityLocale',
     ],
   )
 })

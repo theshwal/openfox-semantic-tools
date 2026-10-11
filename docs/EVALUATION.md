@@ -261,3 +261,38 @@ It is:
 > On which OpenFox decisions does a typed semantic call reduce total generative work without reducing task quality?
 
 Provider comparison comes after that.
+
+## 8. The activity panel is a baseline, not an answer
+
+The **Semantic activity** panel — opened from the Plugins menu, scoped to the
+session on screen, enabled by the `activityPanel` setting — is easy to mistake
+for the measurement this document asks for. It is not, and the distinction is
+the whole point:
+
+- **What it is**: an *observed propensity*. How often these tools were called,
+  how much provider time they cost, how often their answer was not usable, and
+  how often the same question was asked twice. Every line carries its proof
+  level, and a question is reduced to a digest at the boundary so no wording is
+  retained.
+- **What it is not**: a quality result. It cannot say the semantic path beat the
+  deterministic one, because nothing here compares the two.
+
+Every number it shows is a fact about the session. None of them is evidence of
+benefit. A call with no evidence either way is displayed as **indeterminate**,
+deliberately never as "useless", because turning silence into a negative verdict
+is exactly the error this repository's other features were gated against.
+
+Establishing whether these tools earn their place still requires section 1's
+baseline: the same task run twice, once with the semantic path available and
+once without. The panel makes that comparison cheap to *set up* — it records
+which sessions actually used the tools, and therefore which ones a control group
+would have to exclude — but it does not run it, and no promotion rule in section
+5 may cite it.
+
+One metric it cannot contribute at all is a **semantic-versus-deterministic
+share of tool calls**. The denominator lives in the host's per-session stats,
+which a plugin reaches only through a session hook (this plugin registers none)
+or by calling the server back over HTTP (it does not). Rather than show a
+plausible-looking ratio, the section reports each tool's share of the *semantic*
+calls made in the session and names that denominator in the row label. The
+cross-path ratio therefore stays explicitly unmeasured.

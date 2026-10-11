@@ -12,6 +12,9 @@ import { createProviderSelfTestTool } from './calibration/self-test.js'
 import { createCalibrationCandidateTool } from './calibration/candidate-tool.js'
 import { createQuestionCalibrationTool } from './calibration/question-tool.js'
 import { createReferenceAgreementTool } from './calibration/reference-tool.js'
+import { ActivityStore } from './activity/index.js'
+import { createActivityRecorder } from './activity/recorder.js'
+import { registerActivityPanel } from './activity/panel.js'
 
 /**
  * Advisory workflow templates, exported as reference data.
@@ -194,6 +197,31 @@ export const SETTINGS: PluginSettingsSchema = {
       },
       default: false,
     },
+    {
+      key: 'activityPanel',
+      type: 'boolean',
+      label: { en: 'Semantic activity panel', fr: 'Panneau d\'activité sémantique' },
+      description: {
+        en: 'ON by default. Adds a "Semantic tools" section to the OpenFox Stats panel, showing how many semantic calls this session made and how often their answer was not usable. Everything stays in memory and is discarded with the session: nothing is written to disk and nothing is sent anywhere. Turn OFF to record nothing at all and render no section. It reports observed usage, never a quality claim.',
+        fr: 'ACTIVÉ par défaut. Ajoute une section « Outils sémantiques » au panneau Stats d\'OpenFox, indiquant le nombre d\'appels sémantiques de cette session et la fréquence de réponses inexploitables. Tout reste en mémoire et est supprimé avec la session : rien n\'est écrit sur disque et rien n\'est envoyé ailleurs. Désactiver n\'enregistre rien du tout et n\'affiche aucune section. Il rapporte un usage observé, jamais une revendication de qualité.',
+      },
+      default: true,
+    },
+    {
+      key: 'activityLocale',
+      type: 'select',
+      label: { en: 'Panel language', fr: 'Langue du panneau' },
+      description: {
+        en: "Language of the activity panel's TABLE rows. Every other label follows the OpenFox interface automatically; only a table needs to be told. 'auto' follows this setting.",
+        fr: "Langue des lignes de tableau du panneau d'activité. Tous les autres libellés suivent automatiquement l'interface OpenFox ; seul un tableau doit être informé. « auto » suit ce réglage.",
+      },
+      options: [
+        { value: 'auto', label: { en: 'Follow this setting', fr: 'Suivre ce réglage' } },
+        { value: 'en', label: { en: 'English', fr: 'Anglais' } },
+        { value: 'fr', label: { en: 'Français', fr: 'Français' } },
+      ],
+      default: 'auto',
+    },
   ],
 }
 
@@ -208,11 +236,15 @@ export function register(registry: PluginRegistry): void {
   // *accessor* is registration-scoped.
   const context = registry.context
   const readSettings = (projectId?: string) => context.settings('global', projectId)
-  registry.registerTool(createDecisionTool(readSettings))
-  registry.registerTool(createVerifyTool(readSettings))
-  registry.registerTool(createIssueCoverageTool(readSettings))
-  registry.registerTool(createDiscoveryTool('semantic_search', readSettings))
-  registry.registerTool(createDiscoveryTool('semantic_scan', readSettings))
+  // In-memory only: the registry is bounded and discarded with the session, so
+  // an operator who turns the panel off keeps nothing behind.
+  const activityStore = new ActivityStore()
+  const activity = createActivityRecorder(activityStore, readSettings)
+  registry.registerTool(createDecisionTool(readSettings, fetch, activity))
+  registry.registerTool(createVerifyTool(readSettings, {}, activity))
+  registry.registerTool(createIssueCoverageTool(readSettings, {}, activity))
+  registry.registerTool(createDiscoveryTool('semantic_search', readSettings, fetch, activity))
+  registry.registerTool(createDiscoveryTool('semantic_scan', readSettings, fetch, activity))
   registry.registerTool(createProviderSelfTestTool(readSettings))
   registry.registerTool(createCalibrationCandidateTool())
   registry.registerTool(createQuestionCalibrationTool(readSettings))
@@ -227,4 +259,11 @@ export function register(registry: PluginRegistry): void {
   // The read path for the transform's own metadata: without it, `contextReduce`
   // is a toggle whose effect an operator cannot observe.
   registry.registerTool(createTransformStatusTool(transformStatus))
+  // Observability only: a declarative section in the host's own Stats panel.
+  // It registers no hook and no transition handler, so it cannot influence a
+  // turn or branch a workflow on a semantic result.
+  // The panel's table rows carry plain strings, so they must pick a language;
+  // the other nodes do not, because the client reads their bilingual form. The
+  // host URL is not exposed to a plugin, so it comes from the environment.
+  registerActivityPanel(registry, activityStore, readSettings, process.env.OPENFOX_HOST_URL)
 }

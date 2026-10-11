@@ -119,6 +119,48 @@ permission to make experimental features automatic.
     registered. Production remains gated on action-state false-positive-success
     and fallback measurements plus an explicit production GO/DEFER decision.
 
+## Semantic activity panel — delivered, with two signals DEFER
+
+Delivered: a declarative **Semantic tools** section in the OpenFox Stats panel,
+behind the `activityPanel` setting (on by default, in memory only, never
+persisted, never transmitted).
+
+What it measures is deliberately limited to what the plugin can prove about its
+**own** calls: how many there were, the provider time, how many answers came back
+unusable, and how many times the same question was asked twice — a proven sign
+the earlier attempt did not settle. A call with no evidence either way is
+reported as **indeterminate**, never as useless.
+
+**DEFER — `read_file` corroboration.** A call would be *conclusive* only if a
+deterministic tool later opened one of the candidates the report listed. This
+needs the host's `tool.completed` hook, and two host facts were verified against
+the released 2.0.161 sources before deferring it:
+
+1. the `tool.result` payload carries `{ messageId, toolCallId, result }` — the
+   tool **name** is only in `tool.call`, so a sequence has to be rebuilt by
+   joining both on `toolCallId`;
+2. hook tools arrive through the EventStore subscription, whose async iterator
+   carries **no ordering contract** relative to execution, so "the next tool" is
+   not a defined notion without buffering per session.
+
+Buying one medium-confidence signal with a state machine over the host's most
+reconstructed data source was not worth the risk, so the corroborated signal was
+dropped rather than approximated.
+
+**DEFER — the `ask_user` signal.** An agent that asks a human right after a
+semantic call did not get what it needed. It is a weak signal, rarely present
+and sometimes correct, and it is the only thing the hook would add.
+
+**DEFER — the semantic-versus-deterministic share.** The host's per-session
+tool-call count lives in its session stats, reachable only through a session hook
+(never registered) or an HTTP call back into the server (never made). The panel
+reports each tool's share of the *semantic* calls instead, and names that
+denominator in the row label, rather than showing a ratio it cannot compute.
+
+Calibrating whether these tools are worth their cost is a separate piece of work
+and needs a deterministic control group. The panel produces the **baseline** that
+such a comparison would need; it does not claim a result.
+
 **#9 remains the shared measurement umbrella** for durable claims about
 verification/discovery/impact/cache. It must not become a permanent provider
 leaderboard and does not block bounded functionality in #33 or #34.

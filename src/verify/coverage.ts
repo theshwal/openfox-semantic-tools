@@ -2,6 +2,7 @@ import type { PluginTool } from 'openfox/plugin'
 
 import { ProviderError } from '../errors.js'
 import { isRecord } from '../decision/validation.js'
+import { NULL_ACTIVITY_RECORDER, type ActivityRecorder } from '../activity/recorder.js'
 import type { GateId, GateOutcome } from './policy.js'
 import {
   runVerifyAssessment,
@@ -162,6 +163,7 @@ export function criterionCoverage(report: VerifyReport): CoverageCriterionResult
 export function createIssueCoverageTool(
   readSettings: (projectId?: string) => Record<string, unknown>,
   options: VerifyRunOptions = {},
+  activity: ActivityRecorder = NULL_ACTIVITY_RECORDER,
 ): PluginTool {
   return {
     name: 'semantic_issue_coverage',
@@ -255,8 +257,34 @@ export function createIssueCoverageTool(
           criteria,
           counts,
         }
+        // One aggregated record: the report has no per-issue id of its own, and
+        // the criteria statuses are what the policy counters need.
+        activity.record({
+          tool: 'semantic_issue_coverage',
+          kind: 'coverage',
+          reportId: `coverage:${parsed.issueId ?? 'issue'}:${criteria.length}`,
+          context,
+          question: parsed.task ?? '',
+          success: true,
+          latencyMs: output.latencyMs,
+          coverageStatuses: criteria.map((result) => result.coverage),
+          // Every criterion's own verification status, so the policy counters
+          // see the same statuses `semantic_verify_task` would have reported.
+          // Without this the coverage tool would feed the coverage buckets
+          // while its non-positive statuses went uncounted.
+          statuses: criteria.map((result) => result.verificationStatus),
+          gateReasons: criteria.flatMap((result) => result.reasons),
+        })
         return { success: true, output: JSON.stringify(output) }
       } catch (error) {
+        activity.record({
+          tool: 'semantic_issue_coverage',
+          kind: 'coverage',
+          reportId: 'coverage:failed',
+          context,
+          question: '',
+          success: false,
+        })
         if (error instanceof ProviderError) {
           return {
             success: false,

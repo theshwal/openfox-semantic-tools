@@ -2,6 +2,7 @@ import type { PluginTool } from 'openfox/plugin'
 
 import { ProviderError } from '../errors.js'
 import { runVerifyAssessment, type VerifyRunOptions } from './run.js'
+import { NULL_ACTIVITY_RECORDER, type ActivityRecorder } from '../activity/recorder.js'
 
 export type { VerifyReport } from './run.js'
 
@@ -16,6 +17,7 @@ export interface VerifyToolOptions extends VerifyRunOptions {}
 export function createVerifyTool(
   readSettings: (projectId?: string) => Record<string, unknown>,
   options: VerifyToolOptions = {},
+  activity: ActivityRecorder = NULL_ACTIVITY_RECORDER,
 ): PluginTool {
   return {
     name: 'semantic_verify_task',
@@ -45,8 +47,27 @@ export function createVerifyTool(
     async execute(args, context) {
       try {
         const report = await runVerifyAssessment(args, context, readSettings, options)
+        activity.record({
+          tool: 'semantic_verify_task',
+          kind: 'verify',
+          reportId: report.reportId,
+          context,
+          question: report.trace.criterionText,
+          success: true,
+          latencyMs: report.latencyMs,
+          status: report.status,
+          gateReasons: report.reasons,
+        })
         return { success: true, output: JSON.stringify(report) }
       } catch (error) {
+        activity.record({
+          tool: 'semantic_verify_task',
+          kind: 'verify',
+          reportId: 'verify:failed',
+          context,
+          question: typeof args.criterion === 'string' ? args.criterion : '',
+          success: false,
+        })
         if (error instanceof ProviderError) {
           return {
             success: false,

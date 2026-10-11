@@ -42,6 +42,12 @@ function stubRegistry(): StubRegistry {
     registerSettings() {},
     registerSkillSource() {},
     registerMessageTransform() {},
+    // Declarative UI is a contribution like any other: the host mounts it, and
+    // its RPC must read settings through the same captured context.
+    registerUiComponent() {},
+    registerUiAction() {},
+    registerUiPanel() {},
+    registerRpc() {},
   } as unknown as PluginRegistry
   return {
     registry,

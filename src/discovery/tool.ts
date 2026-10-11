@@ -13,6 +13,7 @@ import {
   rankCandidates,
   type DiscoveryReport,
 } from './rank.js'
+import { NULL_ACTIVITY_RECORDER, type ActivityRecorder } from '../activity/recorder.js'
 
 export type DiscoveryToolName = 'semantic_search' | 'semantic_scan'
 
@@ -52,6 +53,7 @@ export function createDiscoveryTool(
   name: DiscoveryToolName,
   readSettings: (projectId?: string) => Record<string, unknown>,
   transport: typeof fetch = fetch,
+  activity: ActivityRecorder = NULL_ACTIVITY_RECORDER,
 ): PluginTool {
   const { field, id: questionId } = FIELD[name]
   const required = name === 'semantic_search' ? [field] : [field, 'candidates']
@@ -76,6 +78,9 @@ export function createDiscoveryTool(
     },
     async execute(args, context) {
       let recall: LocalRecallResult | undefined
+      // A fallback still SPENT the time it took the provider to fail, so the
+      // elapsed time is measured here rather than reported as zero.
+      const startedAt = Date.now()
       try {
         const parsed = parseDiscoveryArgs(args, context.workdir, field, questionId)
         let candidates = parsed.candidates
@@ -117,6 +122,17 @@ export function createDiscoveryTool(
             ranked,
             recall,
           )
+          activity.record({
+            tool: name,
+            kind: 'discovery',
+            reportId: id,
+            context,
+            question: parsed.question,
+            success: true,
+            latencyMs: report.latencyMs,
+            usableCandidates: report.candidates.filter((candidate) => candidate.usable).length,
+            semanticApplied: report.semanticApplied,
+          })
           return { success: true, output: JSON.stringify(report) }
         } catch (error) {
           // Only an auto-recall semantic_search can safely degrade to the local
@@ -131,11 +147,32 @@ export function createDiscoveryTool(
               recall,
               `semantic_fallback:${error.code}`,
             )
+            activity.record({
+              tool: name,
+              kind: 'discovery',
+              reportId: id,
+              context,
+              question: parsed.question,
+              success: true,
+              latencyMs: Date.now() - startedAt,
+              usableCandidates: report.candidates.filter((candidate) => candidate.usable).length,
+              semanticApplied: false,
+            })
             return { success: true, output: JSON.stringify(report) }
           }
           throw error
         }
       } catch (error) {
+        // Recorded once here: every failure path reaches this handler, so
+        // recording in the inner catch too would count the same call twice.
+        activity.record({
+          tool: name,
+          kind: 'discovery',
+          reportId: `discovery:${name}:failed`,
+          context,
+          question: typeof args[field] === 'string' ? args[field] : '',
+          success: false,
+        })
         if (error instanceof ProviderError) {
           return {
             success: false,
