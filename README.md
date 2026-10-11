@@ -254,6 +254,7 @@ session you are looking at, and its numbers reflect the moment it was opened.
 | `semantic_scan` | Score an explicit file list against a behavioural predicate. | No — ranked candidates. |
 | `semantic_provider_self_test` | Synthetic smoke test of your endpoint. Free. | No — never changes settings. |
 | `semantic_transform_status` | What the optional transform did, and why. | No — a pure reader. |
+| `semantic_hook_status` | Which host events the plugin observed, and which data keys arrived. | No — a pure reader. |
 | `semantic_calibration_candidate` | Turn your labelled cases into an inactive profile. | No — never activates anything. |
 | `semantic_question_calibration` | Score one question against your cases. | No — never sets a threshold. |
 | `semantic_reference_agreement` | Compare the provider to your reference judgments. | No — never ranks providers. |
@@ -290,8 +291,10 @@ These are guarantees, enforced by tests:
 
 - Never replaces tests, typechecks, linters or human review.
 - Never marks a task complete or merge-safe.
-- Never branches a workflow on a semantic result — no transition handler and no
-  hook are registered.
+- Never branches a workflow on a semantic result — no transition handler is
+  registered. The read-only hooks it does subscribe to are not a gate: a
+  `PluginHookHandler` **returns void**, so there is no channel through which a
+  plugin could accept, refuse or alter a turn.
 - Never blocks a turn; a transform cannot veto one.
 - Never deletes the current request or anything after the last tool result.
 - Never turns a provider error, timeout or malformed answer into a positive

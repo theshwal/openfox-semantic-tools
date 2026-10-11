@@ -56,11 +56,19 @@ test('the port is reserved from the OS, never a random draw', () => {
   )
 })
 
-test('the harness asserts the absence of hooks and transitions', () => {
+test('the harness asserts the absence of transitions and REPORTS the hook count', () => {
   const source = readFileSync(HARNESS, 'utf8')
-  // Asserted against the host's own contribution counts, not against intent.
-  assert.match(source, /listed\.contributions\?\.hooks === 0/)
+  // A workflow transition is a gate and must stay absent: asserted, not assumed.
   assert.match(source, /listed\.contributions\?\.transitions === 0/)
+  // Hooks are no longer asserted at zero. `registerHook` handlers return void
+  // and cannot decide anything, so a count is evidence rather than a risk. It
+  // is still surfaced, so a silent regression in subscription is visible.
+  assert.match(source, /contributions\?\.hooks/)
+  assert.equal(
+    /contributions\?\.hooks === 0/.test(source),
+    false,
+    'the hook count must be reported, not pinned to zero',
+  )
 })
 
 test('the setup script installs OpenFox into a throwaway tree only', () => {

@@ -313,12 +313,25 @@ test('the plugin registers the action, the panel, the RPC and the switch', () =>
   assert.equal(field.default, true)
 })
 
-test('the plugin still registers no hook and no transition handler', () => {
-  const { registry } = fakeRegistry()
+test('the plugin registers no transition handler, and its hooks cannot decide', () => {
+  const { registry, hooks } = fakeRegistry()
   register(registry)
   const raw = registry as unknown as Record<string, unknown>
-  assert.equal(raw.registerHook, undefined)
+  // A workflow transition is a real gate, so it must stay absent.
   assert.equal(raw.registerTransitionHandler, undefined)
+
+  // Hooks are read-only. `PluginHookHandler` returns void upstream, so a
+  // handler has no channel through which it could accept, refuse or alter a
+  // turn. That is the guarantee this plugin relies on, and it is structural.
+  //
+  // An earlier version of this test asserted only that a handler had an own
+  // `length` property, which every JavaScript function does — it proved
+  // nothing. The real assertion lives in test/hook-observer.test.ts, where a
+  // handler is actually invoked and its return value checked.
+  assert.ok(hooks.size > 0, 'the observer should subscribe to the emitted events')
+  for (const [event, handler] of hooks) {
+    assert.equal(typeof handler, 'function', `${event} must be a function`)
+  }
 })
 
 test('no classified call can ever be reported as conclusive', () => {

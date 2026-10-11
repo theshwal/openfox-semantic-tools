@@ -268,6 +268,35 @@ reasons only: no message content is retained.
 If you enable `contextReduce` and nothing seems to happen, this is where you
 look. A no-op is always explained.
 
+The same report keeps two reduction sources **apart**: `transform` is what this
+plugin removed, and `hostCompactions` is what OpenFox itself removed. The two
+are never summed. OpenFox measures its own compaction, and this plugin does not
+claim a share of it.
+
+### `semantic_hook_status` — what the host was observed doing
+
+Pure reader. For each host event the plugin subscribes to, it reports how many
+times it fired, how many sessions were seen, and **which `data` keys arrived
+with which types**.
+
+That census is deliberate. A key's *type* is enough to tell which fields could
+carry free text, and a type name cannot carry that text — so the report can be
+produced from a real session without writing repository or conversation
+content anywhere.
+
+Two fields matter most:
+
+- `measured` — false until that event has fired at all. "Never observed" is not
+  "did not occur".
+- `complete` — false while any subscribed event is still unmeasured.
+
+The hooks are **read-only**. A `PluginHookHandler` returns void, so there is no
+channel through which this plugin could accept, refuse or alter a turn.
+
+Only events the host actually emits are subscribed. On OpenFox 2.0.161, five of
+the fifteen declared events never fire; `docs/HOOK-PAYLOADS.md` records the
+measurement.
+
 ### `semantic_usage_report` — did anything get used?
 
 Answers one question nothing else could: how often each skill was **offered** to
@@ -317,8 +346,11 @@ These are guarantees, not limitations:
 
 - It never replaces tests, typechecks or linters.
 - It never marks a task complete or merge-safe.
-- It never branches a workflow on a semantic result: no transition handler and
-  no hook are registered.
+- It never branches a workflow on a semantic result: no transition handler is
+  registered.
+- The hooks it does subscribe to are **read-only**. A `PluginHookHandler`
+  returns void, so a plugin has no channel through which it could accept,
+  refuse or alter a turn — observing is all they can do.
 - It never blocks a turn — a transform cannot veto one.
 - It never deletes the current request or anything after the last tool result.
 - A provider error, timeout or malformed answer never becomes a positive

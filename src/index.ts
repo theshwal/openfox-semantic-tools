@@ -18,6 +18,8 @@ import { registerActivityPanel } from './activity/panel.js'
 import { createUsageReportTool } from './usage/tool.js'
 import { UsageLedger, defaultUsageLedgerDir } from './usage/ledger.js'
 import { withUsageAll, seedCatalogue, withUsageSkillSource } from './usage/wrap.js'
+import { createHookObserver, OBSERVED_EVENTS, type HookObserver } from './hooks/observer.js'
+import { createHookStatusTool } from './hooks/status-tool.js'
 import {
   THRESHOLD_DESCRIPTION_EN,
   THRESHOLD_DESCRIPTION_FR,
@@ -27,12 +29,23 @@ import {
  * Advisory workflow templates, exported as reference data.
  *
  * The plugin deliberately does NOT register them as behaviour: it registers no
- * transition handler and no hook, so it can never branch a workflow on a
- * semantic result. A workflow author opts in by copying a template, and removing
- * the semantic step leaves the deterministic checks and the normal verifier
- * intact.
+ * transition handler, so it can never branch a workflow on a semantic result.
+ * It does register read-only hooks, whose handlers return void and therefore
+ * cannot accept, refuse or alter a turn; see `src/hooks/observer.ts`. A
+ * workflow author opts in by copying a template, and removing the semantic step
+ * leaves the deterministic checks and the normal verifier intact.
  */
 export { ADVISORY_VERIFICATION_WORKFLOW, advisoryWorkflowFor, listAdvisoryWorkflows }
+
+/**
+ * The host events this plugin subscribes to.
+ *
+ * Exported so `scripts/hook-observation-pass.ts` can build its probe from the
+ * SAME list the plugin uses. A hand-copied array there would be a second source
+ * of truth that drifts silently, and that script is presented in
+ * docs/HOOK-PAYLOADS.md as the measurement source.
+ */
+export { OBSERVED_EVENTS }
 import type {
   PluginRegistry,
   PluginSettingsSchema,
@@ -252,7 +265,7 @@ export const SETTINGS: PluginSettingsSchema = {
  */
 export function register(
   registry: PluginRegistry,
-  options: { usage?: UsageLedger } = {},
+  options: { usage?: UsageLedger; hooks?: HookObserver } = {},
 ): void {
   registry.registerSettings(SETTINGS)
   // `registry.context` is only readable WHILE a plugin is registering: the host
@@ -305,9 +318,23 @@ export function register(
   // docs/EVALUATION.md before enabling it.
   const transformStatus = new TransformStatusStore()
   registry.registerMessageTransform(createContextTransform(readSettings, fetch, transformStatus))
+
+  // Host observation, read-only. `registerHook` handlers return void, so they
+  // cannot accept, refuse or alter a turn: there is no decision channel. The
+  // observer keeps counts and data-key types, never payload values. See
+  // src/hooks/observer.ts and docs/HOOK-PAYLOADS.md.
+  //
+  // Built HERE, before the two status tools, because both report on it: the
+  // transform report needs the host's compaction count to keep the two
+  // reduction sources apart.
+  const hooks = options.hooks ?? createHookObserver()
+  hooks.attach(registry)
+
   // The read path for the transform's own metadata: without it, `contextReduce`
   // is a toggle whose effect an operator cannot observe.
-  registry.registerTool(createTransformStatusTool(transformStatus))
+  registry.registerTool(createTransformStatusTool(transformStatus, hooks))
+  // The observation's own read path. A counter nobody can read is not evidence.
+  registry.registerTool(createHookStatusTool(hooks))
   // Every real invocation is counted. Names and counts only: no endpoint,
   // credential, file content or repository path is ever recorded.
   for (const tool of withUsageAll(tools, usage)) {

@@ -40,7 +40,14 @@ export interface TransformStatus {
   appliedTurns: number
 }
 
-const MAX_RETAINED = 20
+/**
+ * How many outcomes the store keeps.
+ *
+ * Exported because `semantic_transform_status` reports a rolling window over
+ * exactly these entries, and a reader must be able to see that the window is
+ * bounded rather than lifetime.
+ */
+export const MAX_RETAINED = 20
 
 /**
  * Records transform outcomes and exposes a snapshot for the status tool.

@@ -261,9 +261,12 @@ test('the plugin itself registers nothing that could branch a workflow', async (
   const fake = fakeRegistry()
   const registry = fake.registry as unknown as Record<string, unknown>
   register(fake.registry)
-  // The fake only implements settings, tools and skills: a transition handler or
-  // a hook registration would throw, and neither exists here.
+  // A transition handler is the one registration that could branch a workflow,
+  // and the fake does not implement it, so registering one would throw.
   assert.equal(registry.registerTransitionHandler, undefined)
-  assert.equal(registry.registerHook, undefined)
+  // Hooks ARE registered, and that is not a gate: `PluginHookHandler` returns
+  // void, so a handler has no channel through which to accept, refuse or alter
+  // a step. What matters for this test is that no workflow template consults one.
+  assert.ok(fake.hooks.size > 0, 'the read-only observer subscribes to the emitted events')
   assert.equal(fake.skillSources.length, 1)
 })

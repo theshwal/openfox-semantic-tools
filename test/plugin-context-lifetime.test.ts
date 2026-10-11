@@ -48,6 +48,9 @@ function stubRegistry(): StubRegistry {
     registerUiAction() {},
     registerUiPanel() {},
     registerRpc() {},
+    // Read-only observation. A handler receives a payload and returns void, so
+    // subscribing cannot read the registration-scoped context either.
+    registerHook() {},
   } as unknown as PluginRegistry
   return {
     registry,

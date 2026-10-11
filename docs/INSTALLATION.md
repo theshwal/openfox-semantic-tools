@@ -183,10 +183,12 @@ To exercise the plugin inside a real OpenFox host, install the public OpenFox
 package into a throwaway tree first:
 
 ```bash
-HARNESS_PKG_DIR=/tmp/of-harness-2.0.160 OPENFOX_VERSION=2.0.160 scripts/setup-harness.sh
-HARNESS_PKG_DIR=/tmp/of-harness-2.0.160 npm run harness
+npm run setup-harness
+npm run harness
 ```
 
-Use one `HARNESS_PKG_DIR` per OpenFox version. The setup script refuses to reuse
+`setup-harness` reads the version from the single declared baseline in
+`package.json`, so a bump is a one-line change there. Use one
+`HARNESS_PKG_DIR` per OpenFox version. The setup script refuses to reuse
 a tree that holds a different release, and it prints the version read back from
 the installed tree — never the version that was requested.
