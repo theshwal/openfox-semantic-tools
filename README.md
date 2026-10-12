@@ -222,11 +222,16 @@ Every line states its own proof level: `[proven]` for something the plugin
 established itself, `[reported status]` for a number copied from a report, and a
 separately-counted `heuristic, unproven` bucket for the one guess it makes.
 
-It does **not** show a "share of tool calls" ratio: that denominator lives in the
-host's session stats, which a plugin can only reach through a hook this one does
-not register. What it does show is each tool's share of the semantic calls made
-in the session — a real number, with a real denominator, named once in the
+It does **not** show a "share of tool calls" ratio: that denominator lives in
+the host's session stats, and this panel reports only what the plugin observed
+about its own calls. It shows each tool's share of the *semantic* calls made in
+the session — a real number, with a real denominator, named once in the
 section's closing note rather than repeated on every row.
+
+The wider session total is observable separately: the plugin subscribes to
+`tool.completed` through the read-only hook surface, and `semantic_hook_status`
+reports what arrived. Those counts are the host's, reported by us, and are never
+merged with the panel's own numbers.
 
 What it deliberately does not do is claim the semantic path is better. A call
 with no evidence either way is reported as **indeterminate**, never as "useless".

@@ -12,6 +12,7 @@ import {
 } from './read.js'
 import { localRecall, type LocalRecallResult } from './recall.js'
 import { buildDiscoveryQuestions, buildDiscoveryState, parseDiscoveryArgs } from './request.js'
+import { buildFragments } from './fragments.js'
 import {
   buildLocalFallbackReport,
   buildReport,
@@ -111,14 +112,30 @@ export function createDiscoveryTool(
           }
         }
 
-        const read = await readBoundedCandidates(parsed.root, candidates)
-        const state = buildDiscoveryState(parsed.question, read, questionId)
+        const read = await readBoundedCandidates(parsed.root, candidates, {
+          presetId: typeof settings.backend === 'string' ? settings.backend : undefined,
+        })
+        // FRAGMENTS, not files. A decision model is asked to judge a
+        // declaration, not to read a module; whole files cost ~4 000 tokens
+        // per question, which is what made this tool expensive at scale.
+        const fragments = await buildFragments(parsed.root, read.files.map((f) => f.path))
+        if (fragments.length === 0) {
+          throw new ProviderError(
+            'insufficient_evidence',
+            'No fragment could be built from the candidates. Confirm the paths are readable source files.',
+          )
+        }
+        const state = buildDiscoveryState(parsed.question, fragments)
         const request = {
           state: state as unknown as Record<string, never>,
           ...(parsed.model ? { model: parsed.model } : {}),
-          questions: buildDiscoveryQuestions(parsed.question, questionId, read.files),
+          questions: buildDiscoveryQuestions(parsed.question, questionId, fragments),
         }
-        const id = reportId(name, parsed.question, read.files.map((file) => file.path))
+        const id = reportId(
+          name,
+          parsed.question,
+          fragments.map((fragment) => `${fragment.path}:${fragment.startLine}`),
+        )
 
         try {
           const provider = new SystemOneHttpProvider(parseSettings(settings), transport)
@@ -126,7 +143,16 @@ export function createDiscoveryTool(
             signal: context.signal,
             origin: 'automatic',
           })
-          const ranked = rankCandidates(read.files, response.answers, questionId)
+          const ranked = rankCandidates(
+            fragments.map((fragment) => ({
+              path: fragment.path,
+              startLine: fragment.startLine,
+              endLine: fragment.endLine,
+              evidenceKind: fragment.kind,
+            })),
+            response.answers,
+            questionId,
+          )
           const report: DiscoveryReport = buildReport(
             name,
             id,

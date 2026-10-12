@@ -3,11 +3,24 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 
 import { ProviderError } from '../errors.js'
 import type { SkipReasonCode } from '../relevance/envelope.js'
+import { estimateTokens, tokenBudgetForPreset } from '../presets/token-budget.js'
 
 /** Hard bounds on one discovery call. Exceeding any of them is a refusal. */
 export const MAX_CANDIDATE_FILES = 40
 export const MAX_FILE_BYTES = 16_000
-export const MAX_TOTAL_BYTES = 120_000
+
+/**
+ * A coarse backstop on one assembled buffer, NOT the limit that governs a request.
+ *
+ * It was previously 120 000, which was an invented number in the wrong unit:
+ * engines count TOKENS. Measured on the hosted endpoint, ~32.7k tokens are
+ * accepted and ~60k are refused with HTTP 400 — a refusal that arrives AFTER the
+ * request, so the caller saw an empty ranking with no stated reason.
+ *
+ * The budget that actually applies is `tokenBudgetForPreset`, enforced below.
+ * This constant only stops a pathological read before it is tokenized.
+ */
+export const MAX_TOTAL_BYTES = 1_000_000
 
 export interface CandidateFile {
   /** Repository-relative path, POSIX-style, safe to show and to transmit. */
@@ -82,6 +95,7 @@ function isInside(root: string, child: string): boolean {
 export async function readBoundedCandidates(
   root: string,
   paths: readonly string[],
+  options: { presetId?: string } = {},
 ): Promise<BoundedRead> {
   if (!Array.isArray(paths) || paths.length === 0) {
     reject('Provide at least one candidate path to read')
@@ -89,6 +103,11 @@ export async function readBoundedCandidates(
   if (paths.length > MAX_CANDIDATE_FILES) {
     reject(`Provide at most ${MAX_CANDIDATE_FILES} candidate paths, received ${paths.length}`)
   }
+
+  // The budget that actually governs a request, in TOKENS. Measured against
+  // real engines, because a byte ceiling is the wrong unit and getting it
+  // wrong is invisible until the provider refuses the request.
+  const tokenBudget = tokenBudgetForPreset(options.presetId)
 
   // Resolve the root through symlinks so a symlinked root still contains the
   // files the caller addresses.
@@ -102,6 +121,8 @@ export async function readBoundedCandidates(
   const files: CandidateFile[] = []
   const skipped: SkippedFile[] = []
   let bytes = 0
+  // Tracked alongside bytes because bytes do not govern the request: tokens do.
+  let tokens = 0
 
   for (const raw of paths) {
     if (typeof raw !== 'string' || !raw.trim()) reject('Every candidate path must be a nonempty string')
@@ -153,6 +174,18 @@ export async function readBoundedCandidates(
       continue
     }
     bytes += Buffer.byteLength(content, 'utf8')
+    // Stop ADDING once the token budget is spent, and NAME what did not fit.
+    //
+    // Rejecting the whole call was the old behaviour, and it blamed the caller
+    // for a limit it never saw: recall assembled the evidence, and the search
+    // died before the rerank stage could run at all. Dropping the surplus is
+    // safe because those files are reported as skipped, so a short result is
+    // never read as "nothing else was relevant".
+    if (tokens + estimateTokens(content) > tokenBudget) {
+      skipped.push({ path: raw, reason: 'evidence-budget' })
+      continue
+    }
+    tokens += estimateTokens(content)
     if (bytes > MAX_TOTAL_BYTES) {
       reject(`Assembled evidence exceeds the total evidence limit of ${MAX_TOTAL_BYTES} bytes`)
     }

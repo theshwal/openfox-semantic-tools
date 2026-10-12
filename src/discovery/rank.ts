@@ -23,6 +23,17 @@ import type { LocalRecallCandidate, LocalRecallResult } from './recall.js'
  */
 export interface RankedCandidateBase {
   readonly path: string
+  /**
+   * The line range the score refers to, when the evidence was a fragment.
+   *
+   * Null for a whole-file candidate. It is what turns a ranked file into a
+   * ranked DECLARATION: the agent can jump straight to the lines that were
+   * judged instead of re-reading the file.
+   */
+  readonly startLine: number | null
+  readonly endLine: number | null
+  /** How the evidence was produced, so a preview is never read as complete. */
+  readonly evidenceKind: 'declaration' | 'whole-file' | 'preview' | 'unknown'
   /** Semantic expectation E[level], null when semantic ranking was unavailable. */
   readonly score: number | null
   readonly probabilities: Record<string, number> | null
@@ -92,16 +103,25 @@ function readNumber(answer: unknown, key: 'score' | 'confidence'): number | null
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
+/** What rankOne needs to know about the unit it is judging. */
+interface RankedUnit {
+  readonly path: string
+  readonly startLine: number | null
+  readonly endLine: number | null
+  readonly evidenceKind: RankedCandidateBase['evidenceKind']
+}
+
 function rankOne(
-  path: string,
+  unit: RankedUnit,
   answer: DecisionAnswer | undefined,
 ): { candidate: RankedCandidateBase; reasons: string[] } {
+  const { path, startLine, endLine, evidenceKind } = unit
   const typed = answer as
     | { type?: string; score?: unknown; probabilities?: unknown; confidence?: unknown }
     | undefined
   if (!typed || typed.type !== 'score') {
     return {
-      candidate: { path, score: null, probabilities: null, confidence: null, usable: false, rankingSource: 'semantic' },
+      candidate: { ...unit, score: null, probabilities: null, confidence: null, usable: false, rankingSource: 'semantic' },
       reasons: ['answer_unusable'],
     }
   }
@@ -111,7 +131,7 @@ function rankOne(
   const raw = typed.probabilities
   if (score === null || raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
     return {
-      candidate: { path, score: null, probabilities: null, confidence, usable: false, rankingSource: 'semantic' },
+      candidate: { ...unit, score: null, probabilities: null, confidence, usable: false, rankingSource: 'semantic' },
       reasons: ['answer_unusable'],
     }
   }
@@ -123,7 +143,7 @@ function rankOne(
   for (const [level, mass] of Object.entries(raw as Record<string, unknown>)) {
     if (typeof mass !== 'number' || !Number.isFinite(mass) || mass < 0 || mass > 1 || !/^\d+$/.test(level)) {
       return {
-        candidate: { path, score: null, probabilities: null, confidence, usable: false, rankingSource: 'semantic' },
+        candidate: { ...unit, score: null, probabilities: null, confidence, usable: false, rankingSource: 'semantic' },
         reasons: ['answer_unusable'],
       }
     }
@@ -146,7 +166,7 @@ function rankOne(
   const usable = reasons.length === 0
   return {
     candidate: {
-      path,
+      ...unit,
       score: usable ? score : null,
       probabilities: usable ? probabilities : null,
       confidence,
@@ -188,20 +208,24 @@ export function applyThreshold(
 
 /** Parse one per-file answer from a single batched request and sort best-first. */
 export function rankCandidates(
-  files: readonly { path: string; content: string }[],
+  units: readonly RankedUnit[],
   answers: Record<string, DecisionAnswer | undefined>,
   questionId: string,
 ): { candidates: RankedCandidateBase[]; reasons: string[] } {
   const candidates: RankedCandidateBase[] = []
   const reasons: string[] = []
-  files.forEach((file, index) => {
-    const ranked = rankOne(file.path, answers[discoveryQuestionId(questionId, index)])
+  units.forEach((unit, index) => {
+    const ranked = rankOne(unit, answers[discoveryQuestionId(questionId, index)])
     candidates.push(ranked.candidate)
-    for (const reason of ranked.reasons) reasons.push(`${file.path}:${reason}`)
+    for (const reason of ranked.reasons) reasons.push(`${unit.path}:${reason}`)
   })
   candidates.sort((a, b) => {
     if (a.usable !== b.usable) return a.usable ? -1 : 1
-    return (b.score ?? -1) - (a.score ?? -1) || a.path.localeCompare(b.path)
+    return (
+      (b.score ?? -1) - (a.score ?? -1) ||
+      a.path.localeCompare(b.path) ||
+      (a.startLine ?? 0) - (b.startLine ?? 0)
+    )
   })
   return { candidates, reasons: [...new Set(reasons)] }
 }
@@ -212,6 +236,9 @@ export function localFallbackCandidates(
 ): RankedCandidate[] {
   return recall.candidates.map((candidate) => ({
     path: candidate.path,
+    startLine: null,
+    endLine: null,
+    evidenceKind: 'unknown' as const,
     score: null,
     probabilities: null,
     confidence: null,

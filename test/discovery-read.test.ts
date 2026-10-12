@@ -10,6 +10,7 @@ import {
   MAX_TOTAL_BYTES,
   readBoundedCandidates,
 } from '../src/discovery/read.ts'
+import { MAX_STATE_TOKENS } from '../src/presets/token-budget.ts'
 import { ProviderError } from '../src/errors.ts'
 
 async function tree(): Promise<string> {
@@ -69,23 +70,30 @@ test('a file above the per-file bound is refused, not cut', async () => {
   )
 })
 
-test('a total above the aggregate bound is refused', async () => {
+test('a total above the token budget drops the surplus by name', async () => {
+  // This test used to assert a REFUSAL. The behaviour changed deliberately:
+  // refusing blamed the caller for a limit it never saw, and it killed the whole
+  // call before the rerank stage — so a search on a normal repository returned
+  // an error instead of a ranking. The surplus is now named instead.
   const root = await tree()
   const chunk = 'x'.repeat(MAX_FILE_BYTES)
-  const count = Math.ceil(MAX_TOTAL_BYTES / MAX_FILE_BYTES) + 2
+  // 16 000 bytes is ~4 000 tokens at the conservative estimate, so the 24 000
+  // budget holds exactly six of them. Offering twelve makes the BUDGET the
+  // binding constraint rather than the 40-file candidate cap, which is what this
+  // test is about.
+  const count = 12
   const paths: string[] = []
   for (let i = 0; i < count; i += 1) {
     await writeFile(join(root, `f${i}.ts`), chunk)
     paths.push(`f${i}.ts`)
   }
-  await assert.rejects(
-    () => readBoundedCandidates(root, paths),
-    (error: unknown) => {
-      assert.ok(error instanceof ProviderError)
-      assert.match(error.message, /exceeds the total evidence limit/)
-      return true
-    },
-  )
+
+  const read = await readBoundedCandidates(root, paths)
+  assert.ok(read.files.length > 0, 'the budget must leave usable evidence')
+  assert.ok(read.files.length < paths.length, 'the surplus must be reported')
+  for (const entry of read.skipped) {
+    assert.equal(entry.reason, 'evidence-budget')
+  }
 })
 
 test('a path escaping the root is refused', async () => {
