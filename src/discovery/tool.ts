@@ -12,7 +12,7 @@ import {
 } from './read.js'
 import { localRecall, type LocalRecallResult } from './recall.js'
 import { buildDiscoveryQuestions, buildDiscoveryState, parseDiscoveryArgs } from './request.js'
-import { buildFragments } from './fragments.js'
+import { buildFragments, withinFragmentBudget } from './fragments.js'
 import {
   buildLocalFallbackReport,
   buildReport,
@@ -118,13 +118,26 @@ export function createDiscoveryTool(
         // FRAGMENTS, not files. A decision model is asked to judge a
         // declaration, not to read a module; whole files cost ~4 000 tokens
         // per question, which is what made this tool expensive at scale.
-        const fragments = await buildFragments(parsed.root, read.files.map((f) => f.path))
-        if (fragments.length === 0) {
+        const allFragments = await buildFragments(parsed.root, read.files.map((f) => f.path))
+        if (allFragments.length === 0) {
           throw new ProviderError(
             'insufficient_evidence',
             'No fragment could be built from the candidates. Confirm the paths are readable source files.',
           )
         }
+        // The token budget must be applied AFTER fragmenting, not before: a
+        // budget satisfied by 8 whole files can become 131 fragments and overrun
+        // it. Measured on a Python-heavy repo — 268 KB of files is 20 KB of
+        // fragments, but 131 fragments is a 29k-token state, and the engine
+        // refuses anything past ~32k. Trimming here is what keeps the request
+        // sendable; the surplus is named in the envelope like any other skip.
+        // Trimming is reported, never silent: a short fragment set that reads
+        // as complete is the failure this whole mechanism exists to prevent.
+        const fragmentSkips: { path: string; reason: 'evidence-budget' | 'candidate-limit' }[] = []
+        const fragments = withinFragmentBudget(allFragments, {
+          presetId: typeof settings.backend === 'string' ? settings.backend : undefined,
+          skipped: fragmentSkips,
+        })
         const state = buildDiscoveryState(parsed.question, fragments)
         const request = {
           state: state as unknown as Record<string, never>,
@@ -163,6 +176,8 @@ export function createDiscoveryTool(
             ranked,
             recall,
             threshold,
+            fragmentSkips,
+            fragments,
           )
           activity.record({
             tool: name,

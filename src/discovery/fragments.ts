@@ -1,6 +1,13 @@
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
+import {
+  MAX_QUESTIONS_PER_REQUEST,
+  TOKENS_PER_QUESTION,
+  estimateTokens,
+  tokenBudgetForPreset,
+} from '../presets/token-budget.js'
+
 /**
  * Fragment-level evidence, the way the state of the art does it.
  *
@@ -57,11 +64,27 @@ export interface Fragment {
 /**
  * Languages we can pull declarations out of without a dependency.
  *
- * Deliberately narrow. A half-correct extractor that silently returns the wrong
- * declarations would be worse than an honest preview, so anything not listed
- * here takes the fallback and says so.
+ * Python is here because it has to be: on a real 137-file repository, 15 335
+ * files are Python and none are JavaScript or TypeScript. With the table
+ * limited to JS/TS, every file scored there came back as a `preview`.
+ *
+ * Still narrow on purpose. A half-correct extractor that silently returns the
+ * wrong declarations would be worse than an honest preview, so anything not
+ * listed takes the fallback and says so.
  */
-const DECLARATION_LANGUAGES = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.mts', '.cjs'])
+const DECLARATION_LANGUAGES = new Set([
+  '.ts', '.tsx', '.js', '.jsx', '.mjs', '.mts', '.cjs',
+  '.py', '.pyi',
+])
+
+/** Indented `def`, as found inside a Python class. */
+const PY_METHOD = /^\s+(async\s+)?def\s+\w+/
+/** Top-level `def`. */
+const PY_FUNCTION = /^def\s+\w+/
+/** `class`, at any indentation. */
+const PY_CLASS = /^\s*class\s+\w+/
+/** Module-level constant: NAME = value, or NAME: type = value. */
+const PY_CONSTANT = /^[A-Z][A-Z0-9_]{2,}\s*(?::[^=]+)?=/
 
 /** Lines kept around a declaration so the model can judge it in context. */
 const CONTEXT_LINES = 2
@@ -75,17 +98,34 @@ const CONTEXT_LINES = 2
  * match calls inside a body — the failure mode that would produce a fragment
  * pointing at the wrong place.
  */
+const JS_DECLARATION =
+  /^(export\s+)?(async\s+)?(function|class|const|let|var|interface|type|enum)\b/
+
 export function extractDeclarations(source: string): { head: string; line: number }[] {
   const lines = source.split('\n')
   const found: { head: string; line: number }[] = []
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i]!
-    if (!/^(export\s+)?(async\s+)?(function|class|const|let|var|interface|type|enum)\b/.test(line)) {
+    if (!JS_DECLARATION.test(line) && !isPythonDeclaration(line)) {
       continue
     }
     found.push({ head: line.trimEnd(), line: i + 1 })
   }
   return found
+}
+
+/**
+ * Python: a `def` or `class`, at module level or indented inside a class.
+ *
+ * Indented `def`s are kept on purpose. A method is frequently what a caller
+ * actually needs to open, and dropping it would send the agent to the class
+ * when the useful code is three lines inside it.
+ *
+ * An `import` or a docstring cannot match any of these shapes, which is what
+ * keeps a module header from being reported as a declaration.
+ */
+function isPythonDeclaration(line: string): boolean {
+  return PY_METHOD.test(line) || PY_FUNCTION.test(line) || PY_CLASS.test(line) || PY_CONSTANT.test(line)
 }
 
 /**
@@ -180,6 +220,7 @@ function fragmentsFor(path: string, source: string): Fragment[] {
   }
 
   const lines = source.split('\n')
+  const isPython = ext === '.py' || ext === '.pyi'
   return declarations.map((declaration, index) => {
     const next = declarations[index + 1]
     // Everything up to the next declaration is this one's body; it is dropped
@@ -194,18 +235,31 @@ function fragmentsFor(path: string, source: string): Fragment[] {
     while (head <= declaration.line && /^[\s}]*$/.test(lines[head - 1]!)) head += 1
     const from = Math.min(head, declaration.line)
 
-    // The SIGNATURE only, starting AT the declaration line. Walking upward to
-    // include context is what pulled bodies in: the line after a one-line
-    // arrow function opens with `{`, which reads as "signature continues" and
-    // swallowed the body. The header is what matters; the caller can read the
-    // surrounding lines from the file using `startLine`.
+    // The SIGNATURE only, starting AT the declaration line.
+    //
+    // Walking upward to include context is what pulled bodies in: the line
+    // after a one-line arrow function opens with `{`, which reads as
+    // "signature continues" and swallowed the body.
     const signature: string[] = []
     let opened = false
+    const isAssignment = isPython && PY_CONSTANT.test(declaration.head)
     for (let line = declaration.line - 1; line < lines.length; line += 1) {
       const text = lines[line]!
       signature.push(text)
       const isHeader = line === declaration.line - 1
-      if (/[{=]\s*$/.test(text) && (isHeader || !/^\s*\}/.test(text))) {
+      // A Python signature ends at `:`, possibly several lines down; a JS one
+      // ends at `{` or `=`. Testing both shapes on every line would stop a
+      // wrapped Python signature at its first parameter, so the language
+      // decides which terminator counts.
+      const opensBody = isPython
+        ? // A module-level assignment is complete on its header line: it has no
+          // `:` and never wraps the way a `def` signature does. Without this it
+          // would swallow the blank lines and the next declaration.
+          isAssignment
+          ? true
+          : /:\s*$/.test(text)
+        : /[{=]\s*$/.test(text) && (isHeader || !/^\s*\}/.test(text))
+      if (opensBody) {
         opened = true
         break
       }
@@ -236,4 +290,58 @@ function bound(text: string): string {
     cut = cut.slice(0, Math.floor(cut.length * 0.9))
   }
   return `${cut}\n… (fragment truncated at ${MAX_FRAGMENT_BYTES} bytes) …`
+}
+
+/**
+ * Trims a fragment set to the engine's token budget, keeping the strongest.
+ *
+ * The budget has to be applied HERE, not only at the file level: a budget
+ * satisfied by 8 whole files can become 131 fragments once a file is split per
+ * declaration, and 131 fragments is a 29k-token state the hosted engine refuses
+ * with HTTP 400. Measured on a Python-heavy repository.
+ *
+ * A caller that omits `skipped` gets the trimming silently, which is why the
+ * discovery tool always passes it: a trimmed fragment that nobody is told
+ * about is exactly the "short result that reads as complete" failure.
+ */
+export function withinFragmentBudget(
+  fragments: readonly Fragment[],
+  options: {
+    presetId?: string
+    skipped?: { path: string; reason: 'evidence-budget' | 'candidate-limit' }[]
+  } = {},
+): Fragment[] {
+  const budget = tokenBudgetForPreset(options.presetId)
+  // Each kept fragment costs its instruction block too, so the per-question
+  // cost is subtracted up front rather than discovered as a 400.
+  const effective = Math.max(
+    0,
+    budget - Math.min(fragments.length, MAX_QUESTIONS_PER_REQUEST) * TOKENS_PER_QUESTION,
+  )
+  const kept: Fragment[] = []
+  let tokens = 0
+  for (const fragment of fragments) {
+    const cost = estimateTokens(fragment.text)
+    if (tokens + cost > effective) {
+      options.skipped?.push({
+        path: `${fragment.path}:${fragment.startLine}`,
+        reason: 'evidence-budget',
+      })
+      continue
+    }
+    kept.push(fragment)
+    tokens += cost
+  }
+  // Then cap the COUNT, since a fragment set can satisfy the byte budget and
+  // still be too many questions for one call.
+  if (kept.length > MAX_QUESTIONS_PER_REQUEST) {
+    for (const fragment of kept.slice(MAX_QUESTIONS_PER_REQUEST)) {
+      options.skipped?.push({
+        path: `${fragment.path}:${fragment.startLine}`,
+        reason: 'candidate-limit',
+      })
+    }
+    return kept.slice(0, MAX_QUESTIONS_PER_REQUEST)
+  }
+  return kept
 }

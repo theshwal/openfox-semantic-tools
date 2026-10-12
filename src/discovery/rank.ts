@@ -258,6 +258,7 @@ export function buildReport(
   reportId: string,
   questionId: string,
   question: string,
+
   read: {
     files: readonly { path: string; content: string }[]
     bytes: number
@@ -267,6 +268,8 @@ export function buildReport(
   ranked: { candidates: RankedCandidateBase[]; reasons: string[] },
   recall: LocalRecallResult | undefined,
   threshold: number,
+  fragmentSkips: readonly { path: string; reason: SkipReasonCode }[] = [],
+  fragments: { readonly length: number } = { length: 0 },
 ): DiscoveryReport {
   return {
     reportId,
@@ -281,12 +284,15 @@ export function buildReport(
     relevance: buildRelevanceEnvelope({
       searched: {
         filesScanned: recall?.scannedFiles ?? read.files.length,
-        candidatesScored: read.files.length,
+        candidatesScored: fragments.length,
         ...(recall ? { ignoredDirectories: recall.ignoredDirectories } : {}),
       },
       skipped: [
         ...(recall?.skipped ?? []),
         ...read.skipped,
+        // Fragments trimmed AFTER the file budget passed: without these, a
+        // trimmed set would read as complete.
+        ...fragmentSkips,
       ],
       numberKind: 'provider-confidence',
       threshold,
@@ -324,6 +330,7 @@ export function buildLocalFallbackReport(
   recall: LocalRecallResult,
   reason: string,
   threshold: number,
+  fragmentSkips: readonly { path: string; reason: SkipReasonCode }[] = [],
 ): DiscoveryReport {
   return {
     reportId,
@@ -344,7 +351,7 @@ export function buildLocalFallbackReport(
         candidatesScored: 0,
         ignoredDirectories: recall.ignoredDirectories,
       },
-      skipped: [...recall.skipped, ...read.skipped],
+      skipped: [...recall.skipped, ...read.skipped, ...fragmentSkips],
       numberKind: 'none',
       threshold,
     }),
