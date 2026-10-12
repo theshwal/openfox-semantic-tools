@@ -1,7 +1,7 @@
 import type { DecisionQuestion } from '../decision/types.js'
 import { ProviderError } from '../errors.js'
 import { isRecord } from '../decision/validation.js'
-import { readBoundedCandidates, type BoundedRead } from './read.js'
+import type { Fragment } from './fragments.js'
 
 /** Hard bounds, mirrored in the tool schema so the caller sees them. */
 export const MAX_QUERY_LENGTH = 400
@@ -20,21 +20,32 @@ function readText(value: unknown, field: string, max: number): string {
 }
 
 /**
- * Builds the state sent to the provider: the caller's question, plus the exact
- * file excerpts that were read. Excerpts are labelled with their relative path
- * so the answer can refer to them, and the paths are the only location
- * information that leaves the machine.
+ * Builds the state sent to the provider: the caller's question, plus the
+ * FRAGMENTS that were read.
+ *
+ * Fragments, not files: a decision model is asked to judge a declaration, not
+ * to read a module. Handing it whole files cost ~4 000 tokens per question,
+ * which is what turned a few searches into millions of tokens. Each fragment
+ * carries its path and line range, so the answer can be acted on by reading
+ * the real code afterwards, and `kind` so a preview is never mistaken for a
+ * complete view of the file.
  */
 export function buildDiscoveryState(
   question: string,
-  read: BoundedRead,
-  questionId: string,
+  fragments: readonly Fragment[],
 ): Record<string, unknown> {
   return {
     question,
-    files: read.files.map((file) => ({ path: file.path, content: file.content })),
-    fileCount: read.files.length,
-    totalBytes: read.bytes,
+    fragments: fragments.map((fragment) => ({
+      path: fragment.path,
+      lines: `${fragment.startLine}-${fragment.endLine}`,
+      kind: fragment.kind,
+      text: fragment.text,
+    })),
+    fragmentCount: fragments.length,
+    totalBytes: fragments.reduce((sum, fragment) => sum + fragment.bytes, 0),
+    note:
+      'fragments are declaration signatures with bodies elided, or a declared preview of an unparseable file; read the file for the full source',
   }
 }
 
@@ -43,26 +54,32 @@ export function discoveryQuestionId(questionId: string, index: number): string {
 }
 
 /**
- * One batched provider call, but one score question per candidate. A single
- * score over the whole list cannot rank files against each other.
+ * One batched provider call, one score question per FRAGMENT.
+ *
+ * A single score over the whole list cannot rank candidates against each
+ * other. The instruction names the file AND the line range, so the answer says
+ * which declaration is relevant rather than merely which file is — which is the
+ * difference between a lead the agent can use and one it has to re-explore.
  */
 export function buildDiscoveryQuestions(
   question: string,
   questionId: string,
-  files: readonly { path: string }[],
+  fragments: readonly Fragment[],
 ): Record<string, DecisionQuestion> {
   const out: Record<string, DecisionQuestion> = {}
-  files.forEach((file, index) => {
+  fragments.forEach((fragment, index) => {
     out[discoveryQuestionId(questionId, index)] = {
       type: 'score',
       instructions:
-        `${question} Consider only the supplied file "${file.path}". ` +
-        'Place this file on the following rubric according to how strongly its content bears on the question. ' +
-        'Judge only the supplied content, and answer with the level whose probability best matches your reading.',
+        `${question} Consider only the supplied fragment of "${fragment.path}" ` +
+        `(lines ${fragment.startLine}-${fragment.endLine}, body elided). ` +
+        'Place this declaration on the following rubric according to how strongly its ' +
+        'signature bears on the question. Judge only the supplied signature, and answer ' +
+        'with the level whose probability best matches your reading.',
       criteria: [
-        'The file content has no bearing on the question',
-        'The file content is tangentially related to the question',
-        'The file content is directly relevant to answering the question',
+        'This declaration has no bearing on the question',
+        'This declaration is tangentially related to the question',
+        'This declaration is directly relevant to answering the question',
       ],
     }
   })

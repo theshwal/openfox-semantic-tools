@@ -88,8 +88,19 @@ test('one provider call contains one score question per candidate', async () => 
   assert.equal(seen.length, 1, 'reranking stays one batched provider call')
   assert.equal(Object.keys(seen[0].body.questions).length, 2)
   assert.deepEqual(Object.keys(seen[0].body.questions).sort(), ['relevance_0', 'relevance_1'])
-  assert.equal(seen[0].body.state.files.length, 2)
+  // The state carries FRAGMENTS, not whole files: one question per fragment,
+  // each naming the file AND the line range that was judged.
+  assert.equal(seen[0].body.state.files, undefined, 'whole files must no longer be sent')
+  assert.equal(seen[0].body.state.fragments.length, 2)
+  for (const fragment of seen[0].body.state.fragments) {
+    assert.ok(typeof fragment.text === 'string' && fragment.text.length > 0)
+    assert.match(fragment.path, /^src\//)
+    assert.match(fragment.lines, /^\d+-\d+$/)
+  }
+  // One question per fragment, and the state says how each was produced.
+  assert.match(seen[0].body.state.note, /bodies elided/i)
   assert.match(seen[0].body.questions.relevance_0.instructions, /src\/alpha\.ts/)
+  assert.match(seen[0].body.questions.relevance_0.instructions, /lines \d+-\d+/i)
   assert.match(seen[0].body.questions.relevance_1.instructions, /src\/beta\.ts/)
 })
 
@@ -109,8 +120,10 @@ test('semantic_search performs bounded local recall before semantic reranking', 
   const { transport, seen } = dynamicStub((body) => {
     // Make alpha strongest even if recall also surfaced gamma.
     const answers: Record<string, unknown> = {}
-    body.state.files.forEach((file: { path: string }, index: number) => {
-      answers[`relevance_${index}`] = score(file.path.endsWith('alpha.ts') ? 2 : 1)
+    // The state carries fragments now; a whole-file candidate still names its
+    // path, so this works for either shape.
+    body.state.fragments.forEach((fragment: { path: string }, index: number) => {
+      answers[`relevance_${index}`] = score(fragment.path.endsWith('alpha.ts') ? 2 : 1)
     })
     return { answers }
   })
@@ -124,7 +137,13 @@ test('semantic_search performs bounded local recall before semantic reranking', 
   const report = JSON.parse(result.output!) as DiscoveryReport
   assert.equal(report.recall?.used, true)
   assert.ok((report.recall?.scannedFiles ?? 0) >= 3)
-  assert.ok(report.trace.candidatePaths.includes('src/alpha.ts'))
+  // `trace.candidatePaths` carries `path:line` when the evidence is a fragment,
+  // and a bare `path` when the file was small enough to send whole. Both are
+  // valid, so the assertion accepts either rather than pinning one shape.
+  assert.ok(
+    report.trace.candidatePaths.some((entry) => entry.startsWith('src/alpha.ts')),
+    `expected alpha.ts among ${report.trace.candidatePaths.join(', ')}`,
+  )
   assert.equal(report.candidates[0].path, 'src/alpha.ts')
   assert.equal(report.semanticApplied, true)
 })

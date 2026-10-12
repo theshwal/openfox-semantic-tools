@@ -3,7 +3,7 @@ import { relative, resolve, sep } from 'node:path'
 
 import { ProviderError } from '../errors.js'
 import type { SkipReasonCode } from '../relevance/envelope.js'
-import { MAX_FILE_BYTES, MAX_CANDIDATE_FILES } from './read.js'
+import { MAX_FILE_BYTES, MAX_CANDIDATE_FILES, MAX_TOTAL_BYTES } from './read.js'
 
 export const MAX_RECALL_SCANNED_FILES = 2_000
 export const MAX_LOCAL_RECALL_CANDIDATES = Math.min(24, MAX_CANDIDATE_FILES)
@@ -27,6 +27,8 @@ export interface LocalRecallCandidate {
   readonly path: string
   readonly score: number
   readonly signals: readonly string[]
+  /** Content size in bytes, used to keep the shortlist inside the read budget. */
+  readonly size?: number
 }
 
 /** A file the walk saw but could not use as a candidate, and why. */
@@ -132,6 +134,7 @@ export async function localRecall(root: string, query: string): Promise<LocalRec
       const pathLower = rel.toLowerCase()
 
       let content = ''
+      let size = 0
       try {
         const raw = await readFile(full)
         // Keep the recall stage aligned with what the semantic reader can later
@@ -146,6 +149,7 @@ export async function localRecall(root: string, query: string): Promise<LocalRec
           skipped.push({ path: rel, reason: 'binary' })
           continue
         }
+        size = raw.byteLength
         content = raw.toString('utf8').toLowerCase()
       } catch {
         skipped.push({ path: rel, reason: 'unreadable' })
@@ -182,7 +186,7 @@ export async function localRecall(root: string, query: string): Promise<LocalRec
       if (score <= 0) continue
 
       scoredFiles += 1
-      scored.push({ path: rel, score, signals: [...new Set(signals)] })
+      scored.push({ path: rel, score, size, signals: [...new Set(signals)] })
     }
   }
 
@@ -190,10 +194,46 @@ export async function localRecall(root: string, query: string): Promise<LocalRec
 
   scored.sort((a, b) => b.score - a.score || a.path.localeCompare(b.path))
   return {
-    candidates: scored.slice(0, MAX_LOCAL_RECALL_CANDIDATES),
+    candidates: withinEvidenceBudget(scored, skipped),
     scannedFiles,
     scoredFiles,
     ignoredDirectories,
     skipped,
   }
+}
+
+/**
+ * Trims the ranked list to what the reader can actually assemble.
+ *
+ * The reader caps the assembled evidence at `MAX_TOTAL_BYTES` and refuses
+ * anything larger, which is right: nothing is ever silently truncated. But the
+ * recall stage used to hand it a fixed 24 candidates without measuring them,
+ * so on a normal repository it routinely proposed ~190 KB against a 120 KB cap
+ * and the whole call died with `invalid_arguments` before the rerank stage —
+ * blaming the caller for a limit the caller never saw.
+ *
+ * So the shortlist is trimmed here, worst-ranked first, and every file dropped
+ * to respect the budget is reported by path and reason. The refusal stays for
+ * an explicit caller who ignores it.
+ */
+function withinEvidenceBudget(
+  ranked: readonly LocalRecallCandidate[],
+  dropped: RecallSkip[],
+): LocalRecallCandidate[] {
+  const kept: LocalRecallCandidate[] = []
+  let total = 0
+  for (const candidate of ranked) {
+    if (kept.length >= MAX_LOCAL_RECALL_CANDIDATES) {
+      dropped.push({ path: candidate.path, reason: 'candidate-limit' })
+      continue
+    }
+    const size = candidate.size ?? 0
+    if (total + size > MAX_TOTAL_BYTES) {
+      dropped.push({ path: candidate.path, reason: 'evidence-budget' })
+      continue
+    }
+    kept.push(candidate)
+    total += size
+  }
+  return kept
 }

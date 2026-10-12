@@ -29,6 +29,14 @@ export type SkipReasonCode =
   | 'too-large'
   | 'binary'
   | 'unreadable'
+  /**
+   * Matched the query but did not fit the evidence budget assembled for the
+   * rerank stage. Distinct from `candidate-limit`: this file lost on size, not
+   * on rank, so a caller raising the budget can win it back.
+   */
+  | 'evidence-budget'
+  /** Matched, ranked, but fell outside the shortlist size. */
+  | 'candidate-limit'
 
 export interface SkippedEntry {
   /** Repository-relative path, POSIX-style, safe to display and to log. */
