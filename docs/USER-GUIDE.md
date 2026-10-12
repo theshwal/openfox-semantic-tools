@@ -200,6 +200,52 @@ and you will see a refusal, not a silent failure.
 
 ## 4. Use the tools
 
+### Which tool do I want?
+
+Work down this list and stop at the first line that fits. The same order is in
+the README; this is the version with the reasoning.
+
+| If you want to… | Use | Instead of |
+| --- | --- | --- |
+| find where a **behaviour** lives | `semantic_search` | nothing — this is the entry point |
+| judge a **list of files** you already have | `semantic_scan` | `semantic_search`, which would have to find the list first |
+| check **one** acceptance criterion | `semantic_verify_task` | `semantic_issue_coverage`, which is broader than you need |
+| check **several** criteria over the same change | `semantic_issue_coverage` | calling `verify_task` in a loop |
+| explain what the **context transform** did | `semantic_transform_status` | `semantic_hook_status`, which reports the host, not us |
+| see what the **host** was observed doing | `semantic_hook_status` | — |
+
+**Worked examples.**
+
+*"Where is token expiry handled?"* — you have no file names, so
+`semantic_search`. If it returns a shortlist and you want to narrow it further
+against a second behaviour, feed that list to `semantic_scan`.
+
+*"Which of these nine files decide the answer?"* — you already have the list.
+`semantic_search` would spend a recall pass rediscovering what you just told
+it. **`semantic_scan` beats `semantic_search` whenever you have a list.**
+
+*"Did this PR meet its three acceptance criteria?"* — three criteria over one
+diff is exactly `semantic_issue_coverage`. `verify_task` is the narrower call
+for a single criterion; using it three times means three reports to reconcile
+instead of one.
+
+*"Context was compacted and the answer looks wrong."* — `semantic_hook_status`
+tells you the host compacted and when; `semantic_transform_status` tells you
+what *our* transform removed. They are separate measurements and the report
+never merges them.
+
+**When not to reach for a semantic tool at all.** The first move is usually
+free and exact: `rg`, the symbol index, the failing test. Those answer "where
+is this named thing" perfectly. A semantic tool earns its cost on questions
+about *meaning* — which file actually decides this, where this behaviour lives
+across module boundaries — not on questions about text you could have matched.
+
+**The operator instruments** — `semantic_decide`, `semantic_provider_self_test`,
+`semantic_calibration_candidate`, `semantic_question_calibration`,
+`semantic_reference_agreement`, `semantic_usage_report` — exist to produce the
+evidence behind a decision. They are yours to run, not an agent's to reach for
+on its own.
+
 ### `semantic_decide` — the primitive
 
 One state, several batched questions. Returns typed probabilities.

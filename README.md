@@ -248,22 +248,47 @@ session you are looking at, and its numbers reflect the moment it was opened.
 
 ---
 
+## Which tool do I want?
+
+Work down this list and stop at the first line that fits.
+
+| If you want to… | Use | Instead of |
+| --- | --- | --- |
+| find where a **behaviour** lives | `semantic_search` | nothing — this is the entry point |
+| judge a **list of files** you already have | `semantic_scan` | `semantic_search`, which would spend a recall pass rediscovering what you just supplied |
+| check **one** acceptance criterion | `semantic_verify_task` | `semantic_issue_coverage`, which is broader than you need |
+| check **several** criteria over the same change | `semantic_issue_coverage` | calling `verify_task` in a loop and reconciling three reports |
+| explain what the **context transform** did | `semantic_transform_status` | `semantic_hook_status`, which reports the host, not us |
+| see what the **host** was observed doing | `semantic_hook_status` | — |
+
+**When not to reach for a semantic tool at all.** The first move is usually
+free and exact: `rg`, the symbol index, the failing test. Those answer "where
+is this named thing" perfectly and cost nothing. A semantic tool earns its cost
+on questions about *meaning* — which file actually decides this, where a
+behaviour lives across module boundaries — not on questions about text you
+could have matched yourself.
+
+The six tools marked **operator** are yours to run, not an agent's to reach for
+on its own.
+
+---
+
 ## Tools
 
-| Tool | Purpose | Can it conclude? |
-| --- | --- | --- |
-| `semantic_decide` | One state, several batched `noul`/`choice`/`score` questions. | No — it returns probabilities. |
-| `semantic_verify_task` | One acceptance criterion against bounded evidence. | No — cannot mark anything satisfied while uncalibrated. |
-| `semantic_issue_coverage` | Several criteria against one task/evidence block. | No — coverage and follow-ups only. |
-| `semantic_search` | Find code from a query; bounded local recall, then reranking. | No — ranked candidates. |
-| `semantic_scan` | Score an explicit file list against a behavioural predicate. | No — ranked candidates. |
-| `semantic_provider_self_test` | Synthetic smoke test of your endpoint. Free. | No — never changes settings. |
-| `semantic_transform_status` | What the optional transform did, and why. | No — a pure reader. |
-| `semantic_hook_status` | Which host events the plugin observed, and which data keys arrived. | No — a pure reader. |
-| `semantic_calibration_candidate` | Turn your labelled cases into an inactive profile. | No — never activates anything. |
-| `semantic_question_calibration` | Score one question against your cases. | No — never sets a threshold. |
-| `semantic_reference_agreement` | Compare the provider to your reference judgments. | No — never ranks providers. |
-| `semantic_usage_report` | How often each skill was offered and each capability invoked. | No — bookkeeping only, contacts nothing. |
+| Tool | Called by | Purpose | Can it conclude? |
+| --- | --- | --- | --- |
+| `semantic_decide` | **operator** | One state, several batched `noul`/`choice`/`score` questions. | No — it returns probabilities. |
+| `semantic_verify_task` | **agent** | One acceptance criterion against bounded evidence. | No — cannot mark anything satisfied while uncalibrated. |
+| `semantic_issue_coverage` | **agent** | Several criteria against one task/evidence block. | No — coverage and follow-ups only. |
+| `semantic_search` | **agent** | Find code from a query; bounded local recall, then reranking. | No — ranked candidates. |
+| `semantic_scan` | **agent** | Score an explicit file list against a behavioural predicate. | No — ranked candidates. |
+| `semantic_provider_self_test` | **operator** | Synthetic smoke test of your endpoint. Free. | No — never changes settings. |
+| `semantic_transform_status` | **agent** | What the optional transform did, and why. | No — a pure reader. |
+| `semantic_hook_status` | **agent** | Which host events the plugin observed, and which data keys arrived. | No — a pure reader. |
+| `semantic_calibration_candidate` | **operator** | Turn your labelled cases into an inactive profile. | No — never activates anything. |
+| `semantic_question_calibration` | **operator** | Score one question against your cases. | No — never sets a threshold. |
+| `semantic_reference_agreement` | **operator** | Compare the provider to your reference judgments. | No — never ranks providers. |
+| `semantic_usage_report` | **operator** | How often each skill was offered and each capability invoked. | No — bookkeeping only, contacts nothing. |
 
 Registering a tool does **not** grant access. Add it to the agent's
 `allowedTools` (Settings → Agents), or the agent cannot call it.
