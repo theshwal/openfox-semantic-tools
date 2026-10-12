@@ -56,6 +56,23 @@ export const PRESET_STATE_TOKEN_BUDGETS: Readonly<Record<string, number>> = {
   laya: 800,
 }
 
+/**
+ * Ceiling on QUESTIONS per request, not just on tokens.
+ *
+ * Measured: 131 fragments fit the token budget and still produced a 29k-token
+ * state, because each one carries its own instruction block. The token budget
+ * alone therefore cannot keep a request sendable — the fragment count has to be
+ * bounded too.
+ *
+ * jevgrep reads a bounded number of declarations per call for the same reason.
+ * Batching stays (it is what makes the cost O(1) round trip), but not without
+ * a limit.
+ */
+export const MAX_QUESTIONS_PER_REQUEST = 60
+
+/** Rough cost of one instruction block, used to budget the state as a whole. */
+export const TOKENS_PER_QUESTION = 90
+
 export function tokenBudgetForPreset(presetId: string | undefined): number {
   if (presetId === undefined) return MAX_STATE_TOKENS
   return PRESET_STATE_TOKEN_BUDGETS[presetId] ?? MAX_STATE_TOKENS
